@@ -8,15 +8,15 @@ export const acColor = (rate) => {
 // ─── Codeforces rank colors (Official) ─────────────────────────────────────────
 export const rankColor = (rank = "") => {
   const r = rank.toLowerCase();
-  if (r.includes("legendary grandmaster")) return "#ff0000";
-  if (r.includes("international grandmaster")) return "#ff0000";
-  if (r.includes("grandmaster")) return "#ff0000";
-  if (r.includes("international master")) return "#ff8c00";
-  if (r.includes("master")) return "#ff8c00";
-  if (r.includes("candidate master")) return "#aa00aa";
-  if (r.includes("expert")) return "#0000ff";
-  if (r.includes("specialist")) return "#03a89e";
   if (r.includes("pupil")) return "#008000";
+  if (r.includes("specialist")) return "#03a89e";
+  if (r.includes("expert")) return "#0000ff";
+  if (r.includes("candidate master")) return "#aa00aa";
+  if (r.includes("international master")) return "#ff8c00";
+  if (r.includes("international grandmaster")) return "#ff0000";
+  if (r.includes("legendary grandmaster")) return "#ff0000";
+  if (r.includes("grandmaster")) return "#ff0000";
+  if (r.includes("master")) return "#ff8c00";
   return "#808080"; // newbie / unrated
 };
 
