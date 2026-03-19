@@ -40,22 +40,8 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
               borderRadius: 8,
               border: isActive ? "1px solid var(--accent-secondary)" : "1px solid transparent",
               background: isActive ? "rgba(0, 180, 216, 0.06)" : "transparent",
-              position: "relative",
             }}
           >
-            {isActive && (
-              <div style={{
-                position: "absolute",
-                top: 10,
-                right: 10,
-                fontSize: 9,
-                letterSpacing: "0.1em",
-                color: "var(--accent-secondary)",
-                fontWeight: 700,
-              }}>
-                VIEW PROBLEMS →
-              </div>
-            )}
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>{t.tag}</span>
               <span style={{ fontSize: 13, color: acColor(t.acRate), fontWeight: 700 }}>{t.acRate}%</span>
@@ -85,6 +71,18 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
               {t.solved} / {t.attempts} solved
               {t.avgRating ? ` · Avg. Rating ${t.avgRating}` : ""}
             </div>
+
+            {isActive && (
+              <div style={{
+                marginTop: 6,
+                fontSize: 9,
+                letterSpacing: "0.1em",
+                color: "var(--accent-secondary)",
+                fontWeight: 700,
+              }}>
+                VIEW PROBLEMS →
+              </div>
+            )}
           </div>
         );
       })}
