@@ -1,7 +1,7 @@
 // All Codeforces API calls go through /cf-api which Vite proxies to
 // https://codeforces.com/api — this bypasses CORS.
 
-const BASE = "/cf-api";
+const BASE = import.meta.env.PROD ? "/api/cf" : "/cf-api";
 
 export async function fetchUserInfo(handle) {
   const res = await fetch(`${BASE}/user.info?handles=${encodeURIComponent(handle)}`);
