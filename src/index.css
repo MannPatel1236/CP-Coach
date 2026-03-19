@@ -78,3 +78,9 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
 ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #2a4a7a; }
+
+@media (max-width: 860px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

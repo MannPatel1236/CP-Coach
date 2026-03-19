@@ -10,13 +10,35 @@ export async function fetchUserInfo(handle) {
   return data.result[0];
 }
 
-export async function fetchSubmissions(handle, count = 1000) {
-  const res = await fetch(
-    `${BASE}/user.status?handle=${encodeURIComponent(handle)}&count=${count}`
-  );
-  const data = await res.json();
-  if (data.status !== "OK") throw new Error("Could not fetch submissions.");
-  return data.result;
+export async function fetchSubmissions(handle, mode = "quick") {
+  if (mode === "quick") {
+    const res = await fetch(
+      `${BASE}/user.status?handle=${encodeURIComponent(handle)}&count=1000`
+    );
+    const data = await res.json();
+    if (data.status !== "OK") throw new Error("Could not fetch submissions.");
+    return data.result;
+  }
+
+  // Deep mode: paginate until end of history or 8,000 submissions
+  const MAX = 8000;
+  const PAGE = 1000;
+  let all = [];
+  let from = 1;
+
+  while (all.length < MAX) {
+    const res = await fetch(
+      `${BASE}/user.status?handle=${encodeURIComponent(handle)}&from=${from}&count=${PAGE}`
+    );
+    const data = await res.json();
+    if (data.status !== "OK") throw new Error("Could not fetch submissions.");
+    const batch = data.result;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break; // reached end of history
+    from += PAGE;
+  }
+
+  return all;
 }
 
 // Fetch problems for a single tag
@@ -70,16 +92,34 @@ export async function fetchProblemsForTags(tags) {
 export function buildTagProfile(submissions) {
   const tagMap = {};
   const solvedSet = new Set();
+  const total = submissions.length;
 
-  submissions.forEach((sub) => {
+  // Submissions arrive newest-first from the CF API.
+  // Assign a recency weight: most recent = 1.0, oldest approaches 0.2.
+  // This means recent performance dominates the skill score,
+  // so old failures don't permanently penalise a mastered topic.
+  submissions.forEach((sub, idx) => {
     if (!sub.problem?.tags?.length) return;
     const key = `${sub.problem.contestId}-${sub.problem.index}`;
+    const weight = 1.0 - (0.8 * idx) / Math.max(total - 1, 1); // 1.0 → 0.2
 
     if (sub.verdict === "OK") solvedSet.add(key);
 
     sub.problem.tags.forEach((tag) => {
       if (!tagMap[tag]) {
-        tagMap[tag] = { attempted: new Set(), solved: new Set(), ratings: [] };
+        tagMap[tag] = {
+          attempted: new Set(),
+          solved: new Set(),
+          weightedAttempts: 0,
+          weightedSolved: 0,
+          ratings: [],
+        };
+      }
+      // Only count the first attempt per unique problem per tag
+      // to avoid inflate from repeated submissions of same problem.
+      if (!tagMap[tag].attempted.has(key)) {
+        tagMap[tag].weightedAttempts += weight;
+        if (sub.verdict === "OK") tagMap[tag].weightedSolved += weight;
       }
       tagMap[tag].attempted.add(key);
       if (sub.verdict === "OK") {
@@ -95,11 +135,15 @@ export function buildTagProfile(submissions) {
       const avgRating = v.ratings.length
         ? Math.round(v.ratings.reduce((a, b) => a + b, 0) / v.ratings.length)
         : null;
+      const weightedAcRate = v.weightedAttempts > 0
+        ? Math.round((v.weightedSolved / v.weightedAttempts) * 100)
+        : 0;
       return {
         tag,
         attempts: v.attempted.size,
         solved: v.solved.size,
-        acRate: Math.round((v.solved.size / v.attempted.size) * 100),
+        acRate: weightedAcRate,   // weighted, recency-aware
+        rawAcRate: Math.round((v.solved.size / v.attempted.size) * 100),
         avgRating,
       };
     })
@@ -118,19 +162,14 @@ export function findWeakTags(profile, threshold = 65) {
 
 // Build recommendations from an already-merged problem list (multi-tag)
 export function buildRecommendations(problems, solvedSet, userRating) {
-  const lo = Math.max(800, userRating - 100);
-  const hi = userRating + 350;
+  const lo = Math.max(800, Math.floor((userRating - 100) / 100) * 100);
+  const hi = Math.ceil((userRating + 350) / 100) * 100;
 
-  return problems
+  const base = problems
     .filter((p) => {
       const key = `${p.contestId}-${p.index}`;
-      return (
-        p.rating >= lo &&
-        p.rating <= hi &&
-        !solvedSet.has(key) &&
-        p.name &&
-        p.contestId
-      );
+      const ratingOk = !p.rating || (p.rating >= lo && p.rating <= hi);
+      return ratingOk && !solvedSet.has(key) && p.name && p.contestId;
     })
     .map((p) => ({
       name: p.name,
@@ -140,13 +179,36 @@ export function buildRecommendations(problems, solvedSet, userRating) {
       solvedCount: p.solvedCount || 0,
       matchedTags: p.matchedTags || [],
       url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`,
+      isStretch: false,
     }))
     .sort((a, b) => {
-      // Problems matching more selected tags rank higher, then by solve count
       if (b.matchedTags.length !== a.matchedTags.length)
         return b.matchedTags.length - a.matchedTags.length;
       return b.solvedCount - a.solvedCount;
     })
+    .slice(0, 12);
+
+  if (base.length > 0) return base;
+
+  // Pool exhausted — widen to +600 above rating and flag as stretch
+  const hiStretch = Math.ceil((userRating + 600) / 100) * 100;
+  return problems
+    .filter((p) => {
+      const key = `${p.contestId}-${p.index}`;
+      const ratingOk = !p.rating || (p.rating >= lo && p.rating <= hiStretch);
+      return ratingOk && !solvedSet.has(key) && p.name && p.contestId;
+    })
+    .map((p) => ({
+      name: p.name,
+      rating: p.rating,
+      contestId: p.contestId,
+      index: p.index,
+      solvedCount: p.solvedCount || 0,
+      matchedTags: p.matchedTags || [],
+      url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`,
+      isStretch: true,
+    }))
+    .sort((a, b) => (a.rating || 9999) - (b.rating || 9999))
     .slice(0, 12);
 }
 

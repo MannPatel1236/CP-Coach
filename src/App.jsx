@@ -19,10 +19,26 @@ import TopicPicker from "./components/TopicPicker.jsx";
 import Recommendations from "./components/Recommendations.jsx";
 import { CheckIcon, LogoIcon, AlertIcon } from "./components/Icons.jsx";
 
+const STEP_LABELS_QUICK = [
+  "",
+  "Accessing Codeforces record...",
+  "Scanning recent submissions...",
+  "Building skill metrics...",
+  "Aggregating problems...",
+];
+
+const STEP_LABELS_DEEP = [
+  "",
+  "Accessing Codeforces record...",
+  "Scanning full submission history (may take 10–20s)...",
+  "Building skill metrics...",
+  "Aggregating problems...",
+];
+
 export default function App() {
   const [handle, setHandle] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState("");
+  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState("");
 
   // Profile state
@@ -39,6 +55,10 @@ export default function App() {
   // Final recommendations
   const [recs, setRecs] = useState([]);
 
+  // Active weak tag selection
+  const [activeWeakTag, setActiveWeakTag] = useState(null);
+  const [analysisMode, setAnalysisMode] = useState("quick");
+
   // ── Analyze handle ──────────────────────────────────────────────────────────
   const analyze = async () => {
     if (!handle.trim() || loading) return;
@@ -52,15 +72,16 @@ export default function App() {
     setSuggestedTopics([]);
     setSelectedTopics([]);
     setRecs([]);
+    setActiveWeakTag(null);
 
     try {
-      setStep("Accessing Codeforces record...");
+      setLoadingStep(1);
       const userInfo = await fetchUserInfo(handle.trim());
 
-      setStep("Scanning recent submissions...");
-      const submissions = await fetchSubmissions(handle.trim(), 1000);
+      setLoadingStep(2);
+      const submissions = await fetchSubmissions(handle.trim(), analysisMode);
 
-      setStep("Building skill metrics...");
+      setLoadingStep(3);
       const { profile, solvedSet: solved } = buildTagProfile(submissions);
       const weak = findWeakTags(profile);
 
@@ -70,7 +91,8 @@ export default function App() {
       setSolvedSet(solved);
 
       if (weak.length > 0) {
-        setStep(`Aggregating problems for "${weak[0].tag}"...`);
+        setLoadingStep(4);
+        setActiveWeakTag(weak[0].tag);
         const problems = await fetchProblemsForTags([weak[0].tag]);
         const recommendations = buildRecommendations(problems, solved, userInfo.rating || 1200);
         setRecs(recommendations);
@@ -83,8 +105,36 @@ export default function App() {
       setError(err.message || "Failed to analyze handle. Please verify the username.");
     } finally {
       setLoading(false);
-      setStep("");
+      setLoadingStep(0);
     }
+  };
+
+  // ── Select weak tag ─────────────────────────────────────────────────────────
+  const selectWeakTag = async (tag) => {
+    setActiveWeakTag(tag);
+    setFetchingRecs(true);
+    setRecs([]);
+    try {
+      const problems = await fetchProblemsForTags([tag]);
+      const recommendations = buildRecommendations(problems, solvedSet, user.rating || 1200);
+      setRecs(recommendations);
+      setSelectedTopics([tag]);
+    } catch { setError("Failed to fetch problems."); }
+    finally { setFetchingRecs(false); }
+  };
+
+  // ── Clear results ───────────────────────────────────────────────────────────
+  const clearResults = () => {
+    setUser(null);
+    setTagProfile([]);
+    setWeakTags([]);
+    setSolvedSet(new Set());
+    setSuggestedTopics([]);
+    setSelectedTopics([]);
+    setRecs([]);
+    setError("");
+    setActiveWeakTag(null);
+    setHandle("");
   };
 
   // ── Toggle topic selection ──────────────────────────────────────────────────
@@ -125,19 +175,34 @@ export default function App() {
         setHandle={setHandle}
         onAnalyze={analyze}
         loading={loading}
+        hasResult={!!user}
+        onClear={clearResults}
+        analysisMode={analysisMode}
+        setAnalysisMode={setAnalysisMode}
       />
 
       {/* Loading */}
       {(loading || fetchingRecs) && (
-        <div style={{ padding: "20px 36px", color: "var(--accent-primary)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 12 }}>
-          <div className="pulse" style={{
-            width: 8, height: 8,
-            background: "var(--accent-primary)", borderRadius: "50%",
-            boxShadow: "0 0 10px var(--accent-primary)"
-          }} />
-          {fetchingRecs
-            ? `Syncing problems for ${selectedTopics.length} selected topic${selectedTopics.length > 1 ? "s" : ""}...`
-            : step}
+        <div style={{ padding: "20px 36px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--accent-primary)", fontSize: 13, fontWeight: 600 }}>
+              <div className="pulse" style={{ width: 8, height: 8, background: "var(--accent-primary)", borderRadius: "50%", boxShadow: "0 0 10px var(--accent-primary)" }} />
+              {fetchingRecs
+                ? `Syncing problems for ${selectedTopics.length} topic${selectedTopics.length > 1 ? "s" : ""}...`
+                : (analysisMode === "deep" ? STEP_LABELS_DEEP : STEP_LABELS_QUICK)[loadingStep]}
+            </div>
+            {!fetchingRecs && loadingStep > 0 && (
+              <div style={{ display: "flex", gap: 4, paddingLeft: 20 }}>
+                {[1,2,3,4].map(s => (
+                  <div key={s} style={{
+                    height: 2, width: 36, borderRadius: 1,
+                    background: s <= loadingStep ? "var(--accent-primary)" : "var(--border-color)",
+                    transition: "background 0.3s ease",
+                  }} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -189,7 +254,7 @@ export default function App() {
       {/* Dashboard */}
       {user && (
         <div
-          className="fade-in"
+          className="fade-in dashboard-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "280px 1fr",
@@ -204,7 +269,7 @@ export default function App() {
               tagCount={tagProfile.length}
               weakCount={weakTags.length}
             />
-            <WeakAreas weakTags={weakTags} />
+            <WeakAreas weakTags={weakTags} selectedTag={activeWeakTag} onSelectTag={selectWeakTag} />
             <TagOverview tags={tagProfile} />
           </div>
 

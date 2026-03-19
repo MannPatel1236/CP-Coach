@@ -60,6 +60,32 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
           </div>
         ))}
       </div>
+
+      {(user.country || user.organization) && (
+        <div style={{
+          marginTop: 16,
+          paddingTop: 16,
+          borderTop: "1px solid var(--border-color)",
+          fontSize: 11,
+          color: "var(--text-secondary)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}>
+          {user.country && (
+            <div>
+              <span style={{ opacity: 0.5 }}>Country: </span>
+              {user.country}
+            </div>
+          )}
+          {user.organization && (
+            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ opacity: 0.5 }}>Org: </span>
+              {user.organization}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -35,9 +35,7 @@ export default function Header() {
         </div>
       </div>
 
-      <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>
-        Prototype <span style={{ color: "var(--accent-secondary)" }}>v0.1</span>
-      </div>
+
     </div>
   );
 }

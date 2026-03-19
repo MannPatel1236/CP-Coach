@@ -108,6 +108,7 @@ export default function SkillChart({ tags }) {
                 axisLine={false}
                 tick={false}
               />
+              <Tooltip content={<ChartTooltip />} />
               <Radar
                 dataKey="acRate"
                 stroke="var(--accent-primary)"

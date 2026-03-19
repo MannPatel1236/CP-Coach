@@ -4,6 +4,7 @@ import { ExternalLinkIcon, BookIcon } from "./Icons";
 export default function Recommendations({ recs, userRating, selectedTopics, solvedSet }) {
   if (!recs.length) return null;
 
+  const isStretchMode = recs.length > 0 && recs.every(r => r.isStretch);
   const isMultiTopic = selectedTopics && selectedTopics.length > 1;
 
   return (
@@ -31,8 +32,40 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
             <div>Focus: <span style={{ color: "var(--accent-warning)", fontWeight: 600 }}>{recs[0]?.matchedTags?.[0]}</span></div>
           )}
           <div style={{ marginTop: 2 }}>
-            Difficulty Range: <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{Math.max(800, userRating - 100)} – {userRating + 350}</span>
+            Difficulty Range: <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{Math.max(800, Math.floor((userRating - 100) / 100) * 100)} – {Math.ceil((userRating + 350) / 100) * 100}</span>
           </div>
+          {isStretchMode && (
+            <div style={{
+              marginTop: 8,
+              padding: "10px 14px",
+              background: "rgba(251, 191, 36, 0.06)",
+              border: "1px solid rgba(251, 191, 36, 0.2)",
+              borderRadius: 8,
+              fontSize: 12,
+              color: "var(--accent-warning)",
+              lineHeight: 1.6,
+              fontWeight: 500,
+            }}>
+              You've solved all <strong>{recs[0]?.matchedTags?.[0] || "this topic"}</strong> problems
+              in your normal range. Showing harder stretch problems instead.
+            </div>
+          )}
+        </div>
+
+        {/* B8: Coaching context line */}
+        <div style={{
+          marginTop: 8,
+          padding: "8px 12px",
+          background: "rgba(0, 180, 216, 0.04)",
+          border: "1px solid rgba(0, 180, 216, 0.12)",
+          borderRadius: 8,
+          fontSize: 11,
+          color: "var(--text-secondary)",
+          lineHeight: 1.6,
+        }}>
+          Sorted by coverage across your selected topics, then by community
+          solve count — problems solved by more users at your rating are
+          generally better learning material.
         </div>
       </div>
 
@@ -82,6 +115,18 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
                 </div>
 
                 <div style={{ minWidth: 0 }}>
+                  {/* B2: Problem index */}
+                  <div style={{
+                    fontSize: 10,
+                    color: "var(--text-secondary)",
+                    fontWeight: 600,
+                    fontFamily: "var(--font-mono)",
+                    marginBottom: 2,
+                    letterSpacing: "0.05em",
+                    opacity: 0.6,
+                  }}>
+                    {p.contestId}{p.index}
+                  </div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.name}
                   </div>
@@ -106,7 +151,11 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
               <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0, marginLeft: 12 }}>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>
-                    {p.solvedCount.toLocaleString()} solved
+                    {/* B3: NEW label for zero-solved */}
+                    {p.solvedCount > 0
+                      ? `${p.solvedCount.toLocaleString()} solved`
+                      : <span style={{ color: "var(--accent-primary)", fontWeight: 700, fontSize: 10 }}>NEW</span>
+                    }
                   </div>
                 </div>
                 <div style={{ color: isSolved ? "var(--accent-success)" : "var(--text-secondary)", opacity: 0.8 }}>

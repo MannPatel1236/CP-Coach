@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { CheckIcon, TargetIcon } from "./Icons";
 
 export default function TopicPicker({ topics, selected, onToggle, onConfirm, loading }) {
+  const [hoveredTag, setHoveredTag] = useState(null);
+
   if (!topics.length) return null;
 
   return (
@@ -23,6 +26,8 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
             <div
               key={tag}
               onClick={() => onToggle(tag)}
+              onMouseEnter={() => setHoveredTag(tag)}
+              onMouseLeave={() => setHoveredTag(null)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -30,13 +35,14 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 padding: "14px 18px",
                 background: isSelected ? "rgba(0, 255, 135, 0.04)" : "rgba(0, 0, 0, 0.2)",
                 border: "1px solid",
-                borderColor: isSelected ? "var(--accent-primary)" : "var(--border-color)",
+                borderColor: isSelected ? "var(--accent-primary)"
+                  : hoveredTag === tag ? "var(--accent-secondary)"
+                  : "var(--border-color)",
                 borderRadius: 10,
                 cursor: "pointer",
                 transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                 userSelect: "none",
               }}
-              className="topic-item"
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <span style={{
@@ -96,13 +102,6 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
           ? "Select Topics to Begin"
           : `Generate Problems for ${selected.length} Topic${selected.length > 1 ? "s" : ""}`}
       </button>
-
-      <style jsx="true">{`
-        .topic-item:hover {
-          border-color: ${selected.length > 0 ? "var(--accent-primary)" : "var(--accent-secondary)"};
-          transform: translateX(4px);
-        }
-      `}</style>
     </div>
   );
 }

@@ -53,7 +53,6 @@ export const diffColor = (rating) => {
 
 export const ratingColor = (rating) => {
   if (!rating) return "#808080";
-  if (rating >= 3000) return "#ff0000";
   if (rating >= 2400) return "#ff0000";
   if (rating >= 2200) return "#ff8c00";
   if (rating >= 1900) return "#aa00aa";
