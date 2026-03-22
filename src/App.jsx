@@ -278,7 +278,7 @@ export default function App() {
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
 
             {/* No weak areas banner */}
-            {weakTags.length === 0 && tagProfile.length > 0 && (
+            {weakTags.length === 0 && tagProfile.length > 0 && tagProfile.every(t => t.solved >= 10) && (
               <div style={{
                 background: "rgba(74, 222, 128, 0.04)",
                 border: "1px solid rgba(74, 222, 128, 0.15)",

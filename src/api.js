@@ -130,7 +130,7 @@ export function buildTagProfile(submissions) {
   });
 
   const profile = Object.entries(tagMap)
-    .filter(([, v]) => v.attempted.size >= 3)
+    .filter(([, v]) => v.attempted.size >= 1)
     .map(([tag, v]) => {
       const avgRating = v.ratings.length
         ? Math.round(v.ratings.reduce((a, b) => a + b, 0) / v.ratings.length)
@@ -154,8 +154,24 @@ export function buildTagProfile(submissions) {
 }
 
 export function findWeakTags(profile, threshold = 65) {
-  return profile
-    .filter((t) => t.acRate < threshold)
+  // Standard weak: below the AC rate threshold
+  const weak = profile.filter((t) => t.acRate < threshold);
+
+  // Beginner weak: even if AC rate is high, flag tags with very few
+  // solved problems — the user needs more practice volume.
+  if (weak.length === 0) {
+    const needsPractice = profile.filter(
+      (t) => t.acRate >= threshold && t.solved < 10
+    );
+    if (needsPractice.length > 0) {
+      return needsPractice
+        .sort((a, b) => a.solved - b.solved)
+        .slice(0, 3)
+        .map((t) => ({ ...t, lowVolume: true }));
+    }
+  }
+
+  return weak
     .sort((a, b) => a.acRate - b.acRate)
     .slice(0, 3);
 }
@@ -239,12 +255,15 @@ const TOPIC_LADDER = [
 
 // Returns up to `count` untouched topics appropriate for the user's rating
 export function findNextTopics(profile, userRating, count = 5) {
-  const attemptedTags = new Set(profile.map((t) => t.tag));
+  // Only consider a tag "well-attempted" if the user solved >= 10 problems in it
+  const wellAttempted = new Set(
+    profile.filter((t) => t.solved >= 10).map((t) => t.tag)
+  );
 
   return TOPIC_LADDER
     .filter(
       (t) =>
-        !attemptedTags.has(t.tag) &&
+        !wellAttempted.has(t.tag) &&
         userRating >= t.minRating &&
         userRating <= t.maxRating + 400
     )

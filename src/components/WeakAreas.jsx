@@ -23,7 +23,7 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
         marginBottom: 16 
       }}>
         <AlertIcon size={14} />
-        Weak Areas Detected
+        {weakTags.every(t => t.lowVolume) ? "Needs More Practice" : "Weak Areas Detected"}
       </div>
 
       {weakTags.map((t) => {
@@ -45,6 +45,11 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>{t.tag}</span>
               <span style={{ fontSize: 13, color: acColor(t.acRate), fontWeight: 700 }}>{t.acRate}%</span>
+              {t.lowVolume && (
+                <span style={{ fontSize: 10, color: "var(--accent-warning)", fontWeight: 600, marginLeft: 4 }}>
+                  Low practice volume
+                </span>
+              )}
             </div>
 
             {/* Progress bar */}
