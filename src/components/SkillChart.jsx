@@ -10,17 +10,17 @@ function ChartTooltip({ active, payload }) {
   const d = payload[0].payload;
   return (
     <div style={{
-      background: "var(--bg-card)",
-      border: "1px solid var(--border-color)",
-      padding: "10px 14px",
-      borderRadius: 10,
-      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+      background: "var(--surface-4)",
+      border: "1px solid var(--outline)",
+      padding: "14px 18px",
+      borderRadius: "var(--radius-lg)",
+      fontFamily: "var(--font-body)"
     }}>
-      <div style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{d.tag}</div>
-      <div style={{ color: acColor(d.acRate), fontSize: 13, fontWeight: 600 }}>AC Rate: {d.acRate}%</div>
-      <div style={{ color: "var(--text-secondary)", fontSize: 11, marginTop: 4 }}>
+      <div style={{ color: "var(--on-surface)", fontSize: 14, fontWeight: 700, marginBottom: 4, fontFamily: "var(--font-heading)" }}>{d.tag}</div>
+      <div style={{ color: acColor(d.acRate), fontSize: 14, fontWeight: 700 }}>AC Rate: {d.acRate}%</div>
+      <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 8, fontWeight: 500 }}>
         {d.solved} / {d.attempts} solved
-        {d.avgRating ? ` · Avg. Rating ${d.avgRating}` : ""}
+        {d.avgRating ? ` · ${d.avgRating} Rating` : ""}
       </div>
     </div>
   );
@@ -34,26 +34,28 @@ export default function SkillChart({ tags }) {
   return (
     <div className="card" style={{ padding: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <div className="font-heading" style={{ fontWeight: 800, fontSize: 16, color: "var(--text-primary)" }}>
-          Skill Profile
+        <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
+          Skill Distribution
         </div>
-        <div style={{ display: "flex", background: "rgba(0,0,0,0.2)", padding: 4, borderRadius: 8 }}>
+        <div style={{ display: "flex", background: "var(--surface-dim)", padding: 3, borderRadius: "var(--radius-full)", border: "1px solid var(--outline)" }}>
           {["bar", "radar"].map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               style={{
-                background: tab === t ? "var(--border-color)" : "transparent",
+                background: tab === t ? "var(--primary-container)" : "transparent",
                 border: "none",
-                color: tab === t ? "var(--text-primary)" : "var(--text-secondary)",
-                padding: "6px 14px",
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 600,
+                color: tab === t ? "var(--on-primary)" : "var(--text-muted)",
+                padding: "5px 14px",
+                borderRadius: "var(--radius-full)",
+                fontSize: 10,
+                fontWeight: 700,
                 cursor: "pointer",
                 textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                transition: "all 0.2s ease",
+                letterSpacing: "0.1em",
+                transition: "all 0.3s ease",
+                fontFamily: "var(--font-body)",
+                boxShadow: tab === t ? "0 0 12px var(--primary-glow)" : "none",
               }}
             >
               {t}
@@ -68,7 +70,7 @@ export default function SkillChart({ tags }) {
             <BarChart data={chartData} margin={{ left: -15, right: 0, top: 0, bottom: 40 }}>
               <XAxis
                 dataKey="short"
-                tick={{ fill: "var(--text-secondary)", fontSize: 10, fontWeight: 500 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 10, fontWeight: 500 }}
                 axisLine={false}
                 tickLine={false}
                 angle={-45}
@@ -76,14 +78,14 @@ export default function SkillChart({ tags }) {
                 interval={0}
               />
               <YAxis
-                tick={{ fill: "var(--text-secondary)", fontSize: 10, fontWeight: 500 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 10, fontWeight: 500 }}
                 axisLine={false}
                 tickLine={false}
                 domain={[0, 100]}
                 tickFormatter={(v) => `${v}%`}
               />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-              <Bar dataKey="acRate" radius={[4, 4, 0, 0]} barSize={24}>
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
+              <Bar dataKey="acRate" radius={[2, 2, 0, 0]} barSize={22}>
                 {chartData.map((e, i) => (
                   <Cell key={i} fill={acColor(e.acRate)} />
                 ))}
@@ -97,10 +99,10 @@ export default function SkillChart({ tags }) {
         <div style={{ width: "100%", height: 260 }}>
           <ResponsiveContainer>
             <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="80%">
-              <PolarGrid stroke="var(--border-color)" />
+              <PolarGrid stroke="var(--outline)" />
               <PolarAngleAxis
                 dataKey="short"
-                tick={{ fill: "var(--text-secondary)", fontSize: 11, fontWeight: 500 }}
+                tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
               />
               <PolarRadiusAxis
                 angle={30}
@@ -111,9 +113,9 @@ export default function SkillChart({ tags }) {
               <Tooltip content={<ChartTooltip />} />
               <Radar
                 dataKey="acRate"
-                stroke="var(--accent-primary)"
-                fill="var(--accent-primary)"
-                fillOpacity={0.15}
+                stroke="var(--primary-container)"
+                fill="var(--primary-container)"
+                fillOpacity={0.12}
                 strokeWidth={2}
               />
             </RadarChart>

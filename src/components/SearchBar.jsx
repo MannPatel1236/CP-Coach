@@ -6,21 +6,22 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
   };
 
   return (
-    <div style={{ padding: "30px 36px 10px" }}>
+    <div style={{ padding: "32px 48px 16px" }}>
       <div style={{
         display: "flex",
         alignItems: "center",
         gap: 12,
-        maxWidth: 500,
+        maxWidth: 600,
         position: "relative"
       }}>
         <div style={{
           position: "absolute",
-          left: 14,
-          color: "var(--text-secondary)",
+          left: 16,
+          color: "var(--text-muted)",
           display: "flex",
           alignItems: "center",
-          pointerEvents: "none"
+          pointerEvents: "none",
+          zIndex: 10
         }}>
           <SearchIcon size={18} />
         </div>
@@ -33,15 +34,15 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
           onKeyDown={handleKeyDown}
           style={{
             flex: 1,
-            background: "var(--bg-card)",
-            border: "1px solid var(--border-color)",
-            borderRadius: 10,
-            padding: "12px 16px 12px 42px",
-            color: "var(--text-primary)",
-            fontSize: 14,
+            background: "var(--surface-2)",
+            border: "1px solid var(--outline)",
+            borderRadius: "var(--radius-sm)",
+            padding: "12px 16px 12px 48px",
+            color: "var(--on-surface)",
+            fontSize: 15,
             transition: "all 0.2s ease",
             outline: "none",
-            letterSpacing: "0.02em"
+            fontFamily: "var(--font-body)"
           }}
           className="search-input"
         />
@@ -51,14 +52,18 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
           disabled={loading || !handle.trim()}
           className="btn-primary"
           style={{
-            padding: "12px 24px",
+            padding: "12px 28px",
             fontSize: 13,
             display: "flex",
             alignItems: "center",
-            gap: 8
+            gap: 8,
+            whiteSpace: "nowrap",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+            fontWeight: 700,
           }}
         >
-          {loading ? "Analyzing..." : "Analyze Profile"}
+          {loading ? "Analyzing..." : "Analyze"}
         </button>
 
         {hasResult && (
@@ -66,16 +71,20 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
             onClick={onClear}
             style={{
               background: "transparent",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-secondary)",
-              padding: "12px 16px",
-              borderRadius: 10,
+              border: "1px solid var(--outline)",
+              color: "var(--text-muted)",
+              padding: "12px 20px",
+              borderRadius: "var(--radius-sm)",
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
               transition: "all 0.2s ease",
               whiteSpace: "nowrap",
+              fontFamily: "var(--font-body)",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
             }}
+            className="clear-btn"
           >
             Clear
           </button>
@@ -85,37 +94,39 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
       <div style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        marginTop: 10,
+        gap: 10,
+        marginTop: 16,
         paddingLeft: 2,
       }}>
-        <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>
-          Analysis depth:
+        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, fontFamily: "var(--font-body)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          Depth:
         </span>
         {[
-          { value: "quick", label: "Quick  (last 1,000)" },
-          { value: "deep",  label: "Deep  (full history, up to 8,000)" },
+          { value: "quick", label: "Quick" },
+          { value: "deep",  label: "Deep" },
         ].map((opt) => (
           <button
             key={opt.value}
             onClick={() => setAnalysisMode(opt.value)}
             style={{
               background: analysisMode === opt.value
-                ? "rgba(0, 180, 216, 0.12)"
-                : "transparent",
+                ? "var(--primary-container)"
+                : "var(--surface-2)",
               border: "1px solid",
-              borderColor: analysisMode === opt.value
-                ? "var(--accent-secondary)"
-                : "var(--border-color)",
+              borderColor: analysisMode === opt.value ? "var(--primary-container)" : "var(--outline)",
               color: analysisMode === opt.value
-                ? "var(--accent-secondary)"
-                : "var(--text-secondary)",
-              padding: "4px 12px",
-              borderRadius: 6,
+                ? "var(--on-primary)"
+                : "var(--text-muted)",
+              padding: "5px 14px",
+              borderRadius: "var(--radius-full)",
               fontSize: 11,
               fontWeight: 600,
               cursor: "pointer",
               transition: "all 0.2s ease",
+              fontFamily: "var(--font-body)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              boxShadow: analysisMode === opt.value ? "0 0 12px var(--primary-glow)" : "none",
             }}
           >
             {opt.label}
@@ -125,9 +136,13 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
 
       <style jsx="true">{`
         .search-input:focus {
-          border-color: var(--accent-secondary) !important;
-          background: var(--bg-card-hover) !important;
-          box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.1);
+          border-color: var(--primary-container) !important;
+          background: var(--surface-3) !important;
+          box-shadow: 0 0 16px var(--primary-glow);
+        }
+        .clear-btn:hover {
+          border-color: var(--on-surface-variant);
+          color: var(--on-surface);
         }
       `}</style>
     </div>

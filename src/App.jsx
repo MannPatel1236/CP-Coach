@@ -167,8 +167,8 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-dark)", color: "var(--text-primary)", paddingBottom: 80 }}>
-      <Header />
+    <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", paddingBottom: 80 }}>
+      <Header onHome={clearResults} />
 
       <SearchBar
         handle={handle}
@@ -183,21 +183,22 @@ export default function App() {
 
       {/* Loading */}
       {(loading || fetchingRecs) && (
-        <div style={{ padding: "20px 36px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--accent-primary)", fontSize: 13, fontWeight: 600 }}>
-              <div className="pulse" style={{ width: 8, height: 8, background: "var(--accent-primary)", borderRadius: "50%", boxShadow: "0 0 10px var(--accent-primary)" }} />
+        <div style={{ padding: "20px 48px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, color: "var(--primary)", fontSize: 12, fontWeight: 700, fontFamily: "var(--font-body)", letterSpacing: "0.1em" }}>
+              <div className="pulse" style={{ width: 8, height: 8, background: "var(--primary-container)", borderRadius: "2px", boxShadow: "0 0 8px var(--primary-glow)" }} />
               {fetchingRecs
-                ? `Syncing problems for ${selectedTopics.length} topic${selectedTopics.length > 1 ? "s" : ""}...`
-                : (analysisMode === "deep" ? STEP_LABELS_DEEP : STEP_LABELS_QUICK)[loadingStep]}
+                ? `SYNCHRONIZING PROBLEMS...`
+                : (analysisMode === "deep" ? STEP_LABELS_DEEP : STEP_LABELS_QUICK)[loadingStep].toUpperCase()}
             </div>
             {!fetchingRecs && loadingStep > 0 && (
-              <div style={{ display: "flex", gap: 4, paddingLeft: 20 }}>
+              <div style={{ display: "flex", gap: 6, paddingLeft: 22 }}>
                 {[1,2,3,4].map(s => (
                   <div key={s} style={{
-                    height: 2, width: 36, borderRadius: 1,
-                    background: s <= loadingStep ? "var(--accent-primary)" : "var(--border-color)",
+                    height: 3, width: 48, borderRadius: "var(--radius-full)",
+                    background: s <= loadingStep ? "var(--primary-container)" : "var(--surface-3)",
                     transition: "background 0.3s ease",
+                    boxShadow: s <= loadingStep ? "0 0 8px var(--primary-glow)" : "none",
                   }} />
                 ))}
               </div>
@@ -209,17 +210,18 @@ export default function App() {
       {/* Error */}
       {error && (
         <div style={{
-          margin: "16px 36px",
-          padding: "16px 20px",
-          background: "rgba(248, 113, 113, 0.05)",
-          border: "1px solid rgba(248, 113, 113, 0.2)",
-          borderRadius: 12,
-          color: "var(--accent-danger)",
+          margin: "16px 48px",
+          padding: "20px 24px",
+          background: "var(--error-container)",
+          border: "1px solid rgba(255, 180, 171, 0.15)",
+          borderRadius: "var(--radius-lg)",
+          color: "var(--error)",
           fontSize: 14,
-          maxWidth: 600,
+          maxWidth: 640,
           display: "flex",
           alignItems: "center",
-          gap: 12
+          gap: 14,
+          fontFamily: "var(--font-body)"
         }}>
           <AlertIcon size={18} />
           {error}
@@ -228,25 +230,26 @@ export default function App() {
 
       {/* Empty state */}
       {!user && !loading && !error && (
-        <div style={{ padding: "100px 36px", textAlign: "center", maxWidth: 600, margin: "0 auto" }}>
+        <div style={{ padding: "120px 36px", textAlign: "left", maxWidth: 640, margin: "0 auto 0 48px" }}>
           <div style={{ 
-            width: 64, height: 64, 
-            background: "rgba(0, 255, 131, 0.05)", 
-            borderRadius: 16, 
+            width: 56, height: 56, 
+            background: "rgba(93, 92, 255, 0.1)", 
+            borderRadius: "var(--radius-sm)", 
             display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 24px",
-            color: "var(--accent-primary)"
+            marginBottom: 32,
+            color: "var(--primary-container)",
+            boxShadow: "0 0 24px var(--primary-glow)",
           }}>
-            <LogoIcon size={32} />
+            <LogoIcon size={28} />
           </div>
-          <div className="font-heading" style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>
-            Performance Insights
+          <div className="font-heading" style={{ fontSize: 48, fontWeight: 700, marginBottom: 16, letterSpacing: "-0.02em", lineHeight: 1.1, color: "#ffffff" }}>
+            The Architect of Performance
           </div>
-          <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Submit a Codeforces handle to generate a comprehensive skill profile and personalized problem set based on your competitive history.
+          <div style={{ fontSize: 18, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)", maxWidth: 520 }}>
+            Identify technical bottlenecks with surgical precision. Submit a Codeforces handle to generate a bespoke profile and strategic growth path.
           </div>
-          <div style={{ fontSize: 12, marginTop: 20, color: "rgba(148, 163, 184, 0.4)", fontWeight: 500, letterSpacing: "0.02em" }}>
-            Last 1,000 Submissions · Weak Spot Identification · Growth Trajectory
+          <div style={{ fontSize: 11, marginTop: 48, color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "var(--font-body)" }}>
+            Metric Calibration · Deep Scan · Growth Trajectory
           </div>
         </div>
       )}
@@ -257,13 +260,13 @@ export default function App() {
           className="fade-in dashboard-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "280px 1fr",
-            gap: 20,
-            padding: "30px 36px",
+            gridTemplateColumns: "300px 1fr",
+            gap: 24,
+            padding: "32px 48px 80px",
           }}
         >
           {/* Left column */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             <ProfileCard
               user={user}
               tagCount={tagProfile.length}
@@ -274,36 +277,36 @@ export default function App() {
           </div>
 
           {/* Right column */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
 
             {/* No weak areas banner */}
             {weakTags.length === 0 && tagProfile.length > 0 && tagProfile.every(t => t.solved >= 10) && (
               <div style={{
-                background: "rgba(74, 222, 128, 0.04)",
+                background: "var(--success-container)",
                 border: "1px solid rgba(74, 222, 128, 0.15)",
-                borderRadius: 12,
-                padding: "20px 24px",
+                borderRadius: "var(--radius-lg)",
+                padding: "24px",
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
+                gap: 20,
               }}>
                 <div style={{ 
-                  color: "var(--accent-success)", 
+                  color: "var(--success)", 
                   background: "rgba(74, 222, 128, 0.1)", 
-                  width: 36, height: 36, 
-                  borderRadius: "50%",
+                  width: 40, height: 40, 
+                  borderRadius: "var(--radius-full)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0 
                 }}>
-                  <CheckIcon size={20} />
+                  <CheckIcon size={22} />
                 </div>
                 <div>
-                  <div className="font-heading" style={{ fontWeight: 800, fontSize: 15, color: "var(--accent-success)", marginBottom: 4 }}>
-                    Optimal Performance Maintained
+                  <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "var(--success)", marginBottom: 4 }}>
+                    Strategic Optimization Achieved
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                    You have achieved an efficiency rating above 65% in all currently practiced domains. Consider exploring new mathematical or algorithmic territories below.
+                  <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
+                    You have maintained an efficiency rating above 65% across all domains.
                   </div>
                 </div>
               </div>

@@ -6,24 +6,25 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
 
   return (
     <div style={{
-      background: "rgba(248, 113, 113, 0.05)",
-      border: "1px solid rgba(248, 113, 113, 0.2)",
-      borderRadius: 12,
-      padding: 20,
+      background: "var(--surface-1)",
+      border: "1px solid var(--outline)",
+      borderRadius: "var(--radius-lg)",
+      padding: 24,
     }}>
       <div style={{ 
         display: "flex", 
         alignItems: "center", 
         gap: 8,
-        fontSize: 10, 
-        color: "var(--accent-danger)", 
-        letterSpacing: "0.12em", 
+        fontSize: 11, 
+        color: "var(--error)", 
+        letterSpacing: "0.1em", 
         textTransform: "uppercase", 
         fontWeight: 700,
-        marginBottom: 16 
+        marginBottom: 16,
+        fontFamily: "var(--font-body)"
       }}>
         <AlertIcon size={14} />
-        {weakTags.every(t => t.lowVolume) ? "Needs More Practice" : "Weak Areas Detected"}
+        {weakTags.every(t => t.lowVolume) ? "Performance Calibration" : "Technical Vulnerabilities"}
       </div>
 
       {weakTags.map((t) => {
@@ -33,59 +34,48 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
             key={t.tag}
             onClick={() => onSelectTag(t.tag)}
             style={{
-              marginBottom: 16,
+              marginBottom: 8,
               cursor: "pointer",
-              transition: "all 0.2s ease",
-              padding: 10,
-              borderRadius: 8,
-              border: isActive ? "1px solid var(--accent-secondary)" : "1px solid transparent",
-              background: isActive ? "rgba(0, 180, 216, 0.06)" : "transparent",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              padding: "12px 14px",
+              borderRadius: "var(--radius-sm)",
+              background: isActive ? "rgba(93, 92, 255, 0.08)" : "transparent",
+              border: "1px solid",
+              borderColor: isActive ? "var(--primary-container)" : "transparent",
+              boxShadow: isActive ? "0 0 16px var(--primary-glow)" : "none",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>{t.tag}</span>
-              <span style={{ fontSize: 13, color: acColor(t.acRate), fontWeight: 700 }}>{t.acRate}%</span>
-              {t.lowVolume && (
-                <span style={{ fontSize: 10, color: "var(--accent-warning)", fontWeight: 600, marginLeft: 4 }}>
-                  Low practice volume
-                </span>
-              )}
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: "var(--on-surface)", fontWeight: 500, fontFamily: "var(--font-body)" }}>{t.tag}</span>
+              <span style={{ fontSize: 13, color: acColor(t.acRate), fontWeight: 700, fontFamily: "var(--font-heading)" }}>{t.acRate}%</span>
             </div>
 
-            {/* Progress bar */}
-            <div style={{ height: 6, background: "rgba(0,0,0,0.2)", borderRadius: 3, overflow: "hidden", position: "relative" }}>
+            {/* Progress bar — pill shape */}
+            <div style={{ height: 4, background: "var(--surface-dim)", borderRadius: "var(--radius-full)", overflow: "hidden", position: "relative" }}>
               <div style={{
                 width: `${t.acRate}%`,
                 height: "100%",
                 background: acColor(t.acRate),
-                borderRadius: 3,
+                borderRadius: "var(--radius-full)",
                 transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
-              }} />
-              <div style={{
-                position: "absolute",
-                left: "65%",
-                top: 0,
-                width: 2,
-                height: "100%",
-                background: "rgba(251, 191, 36, 0.6)",
-                borderRadius: 1,
               }} />
             </div>
 
-            <div style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 5, fontWeight: 500 }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8, fontWeight: 500, fontFamily: "var(--font-body)" }}>
               {t.solved} / {t.attempts} solved
-              {t.avgRating ? ` · Avg. Rating ${t.avgRating}` : ""}
+              {t.avgRating ? ` · ${t.avgRating} Rating` : ""}
             </div>
 
             {isActive && (
               <div style={{
-                marginTop: 6,
-                fontSize: 9,
+                marginTop: 8,
+                fontSize: 10,
                 letterSpacing: "0.1em",
-                color: "var(--accent-secondary)",
+                color: "var(--primary)",
                 fontWeight: 700,
+                fontFamily: "var(--font-body)"
               }}>
-                VIEW PROBLEMS →
+                TARGET PROBLEMS →
               </div>
             )}
           </div>

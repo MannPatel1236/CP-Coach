@@ -9,19 +9,20 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
   return (
     <div className="card" style={{ padding: 24 }}>
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div className="font-heading" style={{ fontWeight: 800, fontSize: 16, color: "var(--text-primary)" }}>
-          Expand Your Skillset
+      <div style={{ marginBottom: 24 }}>
+        <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
+          Expand Strategic Reach
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.5 }}>
-          You're performing well in your current topics. Select 1–3 new areas to focus on next.
+        <div style={{ fontSize: 13, color: "var(--on-surface-variant)", marginTop: 8, lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
+          Foundational mastery achieved. Select new territories for strategic advancement.
         </div>
       </div>
 
       {/* Topic cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
         {topics.map((tag, i) => {
           const isSelected = selected.includes(tag);
+          const isHovered = hoveredTag === tag;
           return (
             <div
               key={tag}
@@ -32,48 +33,51 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "14px 18px",
-                background: isSelected ? "rgba(0, 255, 135, 0.04)" : "rgba(0, 0, 0, 0.2)",
+                padding: "12px 16px",
+                background: isSelected ? "rgba(93, 92, 255, 0.08)" : "var(--surface-dim)",
                 border: "1px solid",
-                borderColor: isSelected ? "var(--accent-primary)"
-                  : hoveredTag === tag ? "var(--accent-secondary)"
-                  : "var(--border-color)",
-                borderRadius: 10,
+                borderColor: isSelected ? "var(--primary-container)"
+                  : isHovered ? "var(--primary-container)"
+                  : "var(--outline)",
+                boxShadow: isHovered || isSelected ? "0 0 16px var(--primary-glow)" : "none",
+                borderRadius: "var(--radius-sm)",
                 cursor: "pointer",
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 userSelect: "none",
+                fontFamily: "var(--font-body)"
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <span style={{
                   width: 24, height: 24,
-                  background: isSelected ? "var(--accent-primary)" : "var(--border-color)",
-                  borderRadius: 6,
+                  background: isSelected ? "var(--primary-container)" : "var(--surface-4)",
+                  borderRadius: "var(--radius-sm)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, color: isSelected ? "#050b18" : "var(--text-secondary)",
+                  fontSize: 11, color: isSelected ? "var(--on-primary)" : "var(--text-muted)",
                   fontWeight: 800, flexShrink: 0,
                   transition: "all 0.2s ease",
+                  fontFamily: "var(--font-heading)",
                 }}>
                   {i + 1}
                 </span>
-                <span style={{ fontSize: 14, fontWeight: 500, color: isSelected ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: isSelected ? "var(--on-surface)" : "var(--on-surface-variant)" }}>
                   {tag}
                 </span>
               </div>
 
               {/* Checkbox */}
               <div style={{
-                width: 20, height: 20,
-                borderRadius: 6,
+                width: 18, height: 18,
+                borderRadius: "var(--radius-sm)",
                 border: "2px solid",
-                borderColor: isSelected ? "var(--accent-primary)" : "var(--border-color)",
-                background: isSelected ? "var(--accent-primary)" : "transparent",
+                borderColor: isSelected ? "var(--primary-container)" : "var(--outline)",
+                background: isSelected ? "var(--primary-container)" : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
                 transition: "all 0.2s ease",
-                color: "#050b18",
+                color: "var(--on-primary)",
               }}>
-                {isSelected && <CheckIcon size={14} />}
+                {isSelected && <CheckIcon size={12} />}
               </div>
             </div>
           );
@@ -88,19 +92,23 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
         style={{
           width: "100%",
           padding: "14px",
-          fontSize: 14,
+          fontSize: 13,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 10,
+          fontFamily: "var(--font-body)",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          fontWeight: 700,
         }}
       >
-        <TargetIcon size={18} />
+        <TargetIcon size={16} />
         {loading
-          ? "Targeting Problems..."
+          ? "SYNCHRONIZING..."
           : selected.length === 0
-          ? "Select Topics to Begin"
-          : `Generate Problems for ${selected.length} Topic${selected.length > 1 ? "s" : ""}`}
+          ? "SELECT DOMAINS"
+          : `SYNTHESIZE PATH FOR ${selected.length} TOPIC${selected.length > 1 ? "S" : ""}`}
       </button>
     </div>
   );

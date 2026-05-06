@@ -1,41 +1,58 @@
 import { LogoIcon } from "./Icons";
 
-export default function Header() {
+export default function Header({ onHome }) {
   return (
     <div style={{
-      borderBottom: "1px solid var(--border-color)",
-      padding: "20px 36px",
-      background: "rgba(8, 15, 34, 0.8)",
-      backdropFilter: "blur(12px)",
+      padding: "24px 48px",
+      background: "rgba(18, 19, 23, 0.85)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderBottom: "1px solid var(--outline)",
       display: "flex",
       alignItems: "center",
-      gap: 14,
+      gap: 20,
       position: "sticky",
       top: 0,
       zIndex: 100,
     }}>
-      <div style={{
-        width: 38, height: 38,
-        background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
-        borderRadius: 10,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#050b18",
-        flexShrink: 0,
-        boxShadow: "0 0 20px rgba(0, 255, 135, 0.2)",
-      }}>
-        <LogoIcon size={22} />
+      <div 
+        onClick={onHome}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          cursor: "pointer",
+          transition: "opacity 0.2s ease"
+        }}
+        className="header-logo-group"
+      >
+        <div style={{
+          width: 40, height: 40,
+          background: "var(--primary-container)",
+          borderRadius: "var(--radius-sm)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "var(--on-primary)",
+          flexShrink: 0,
+          boxShadow: "0 0 16px var(--primary-glow)",
+        }}>
+          <LogoIcon size={22} />
+        </div>
+
+        <div>
+          <div className="font-heading" style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+            CP Coach
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.1em", marginTop: 4, textTransform: "uppercase", fontFamily: "var(--font-body)" }}>
+            Competitive Programming Analysis
+          </div>
+        </div>
       </div>
 
-      <div>
-        <div className="font-heading" style={{ fontSize: 20, fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
-          CP Coach
-        </div>
-        <div style={{ fontSize: 10, color: "var(--text-secondary)", fontWeight: 500, letterSpacing: "0.15em", marginTop: 2, textTransform: "uppercase" }}>
-          Personalized Competitive Programming Analysis
-        </div>
-      </div>
-
-
+      <style jsx="true">{`
+        .header-logo-group:hover {
+          opacity: 0.8;
+        }
+      `}</style>
     </div>
   );
 }

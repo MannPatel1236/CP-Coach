@@ -5,19 +5,19 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
   const rc = rankColor(user.rank);
 
   return (
-    <div className="card" style={{ padding: 20 }}>
+    <div className="card" style={{ padding: 24 }}>
       {/* Avatar + name */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
         {user.avatar ? (
           <img
             src={user.avatar}
             alt=""
-            style={{ width: 48, height: 48, borderRadius: 10, border: "2px solid var(--border-color)", objectFit: "cover" }}
+            style={{ width: 48, height: 48, borderRadius: "var(--radius-sm)", objectFit: "cover", border: `2px solid ${rc}` }}
           />
         ) : (
           <div style={{
-            width: 48, height: 48, borderRadius: 10,
-            background: "rgba(100, 116, 139, 0.1)", border: "2px solid var(--border-color)",
+            width: 48, height: 48, borderRadius: "var(--radius-sm)",
+            background: "var(--surface-3)",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: rc,
           }}>
@@ -26,35 +26,36 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
         )}
         <div style={{ minWidth: 0 }}>
           <div className="font-heading" style={{
-            fontWeight: 800,
-            fontSize: 18,
+            fontWeight: 700,
+            fontSize: 22,
             color: rc,
             letterSpacing: "-0.02em",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            lineHeight: 1.1,
           }}>
             {user.handle}
           </div>
-          <div style={{ fontSize: 11, color: rc, opacity: 0.7, textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.05em", marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: rc, opacity: 0.85, textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.1em", marginTop: 4, fontFamily: "var(--font-body)" }}>
             {user.rank || "unrated"}
           </div>
         </div>
       </div>
 
       {/* Stats grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {[
           { label: "rating", value: user.rating ?? "—", color: ratingColor(user.rating) },
           { label: "max rating", value: user.maxRating ?? "—", color: ratingColor(user.maxRating) },
-          { label: "topics", value: tagCount, color: "var(--text-secondary)" },
-          { label: "weak areas", value: weakCount, color: weakCount > 0 ? "var(--accent-danger)" : "var(--accent-success)" },
+          { label: "topics", value: tagCount, color: "var(--on-surface)" },
+          { label: "weak areas", value: weakCount, color: weakCount > 0 ? "var(--error)" : "var(--success)" },
         ].map((s) => (
           <div key={s.label}>
-            <div style={{ fontSize: 9, color: "var(--text-secondary)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 6, fontFamily: "var(--font-body)" }}>
               {s.label}
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: s.color, lineHeight: 1 }}>
+            <div className="font-heading" style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1 }}>
               {s.value}
             </div>
           </div>
@@ -63,24 +64,25 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
 
       {(user.country || user.organization) && (
         <div style={{
-          marginTop: 16,
-          paddingTop: 16,
-          borderTop: "1px solid var(--border-color)",
-          fontSize: 11,
-          color: "var(--text-secondary)",
+          marginTop: 24,
+          paddingTop: 24,
+          borderTop: "1px solid var(--outline)",
+          fontSize: 13,
+          color: "var(--on-surface-variant)",
           display: "flex",
           flexDirection: "column",
           gap: 4,
+          fontFamily: "var(--font-body)"
         }}>
           {user.country && (
             <div>
-              <span style={{ opacity: 0.5 }}>Country: </span>
+              <span style={{ color: "var(--text-muted)" }}>Location: </span>
               {user.country}
             </div>
           )}
           {user.organization && (
             <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              <span style={{ opacity: 0.5 }}>Org: </span>
+              <span style={{ color: "var(--text-muted)" }}>Affiliation: </span>
               {user.organization}
             </div>
           )}
