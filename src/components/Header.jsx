@@ -2,7 +2,7 @@ import { LogoIcon } from "./Icons";
 
 export default function Header({ onHome }) {
   return (
-    <div style={{
+    <div className="header-wrapper" style={{
       padding: "16px 48px",
       background: "linear-gradient(180deg, rgba(2,4,8,0.85) 0%, rgba(2,4,8,0.6) 100%)",
       backdropFilter: "blur(20px) saturate(180%)",

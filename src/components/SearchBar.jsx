@@ -6,7 +6,7 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
   };
 
   return (
-    <div style={{ padding: "28px 48px 20px" }}>
+    <div className="search-bar-wrapper" style={{ padding: "28px 48px 20px" }}>
       <div style={{
         display: "flex",
         alignItems: "center",

@@ -62,7 +62,7 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
       </div>
 
       {/* Stats Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div className="profile-card-stat-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         {[
           { label: "Rating", value: user.rating ?? "—", color: ratingColor(user.rating) },
           { label: "Max Rating", value: user.maxRating ?? "—", color: ratingColor(user.maxRating) },

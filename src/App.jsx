@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   fetchUserInfo,
   fetchSubmissions,
@@ -34,6 +35,16 @@ const STEP_LABELS_DEEP = [
   "Building skill metrics...",
   "Aggregating problems...",
 ];
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: (i = 1) => ({ opacity: 1, y: 0, transition: { delay: i * 0.12, duration: 0.6, ease: [0.2, 0, 0.2, 1] } }),
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
 
 export default function App() {
   const [handle, setHandle] = useState("");
@@ -244,14 +255,20 @@ export default function App() {
 
       {/* Landing Page — shown when no user and not loading */}
       {!user && !loading && !error && (
-        <div style={{ paddingBottom: 80 }}>
+        <div className="hero-landing" style={{ paddingBottom: 80 }}>
           {/* Hero */}
-          <div style={{
-            position: "relative",
-            padding: "80px 48px 60px",
-            maxWidth: 900,
-            margin: "0 auto",
-          }}>
+          <motion.div
+            className="hero-section"
+            initial="hidden"
+            animate="visible"
+            variants={fadeUp}
+            style={{
+              position: "relative",
+              padding: "80px 48px 60px",
+              maxWidth: 900,
+              margin: "0 auto",
+            }}
+          >
             {/* Decorative orbital rings */}
             <div style={{
               position: "absolute",
@@ -274,7 +291,10 @@ export default function App() {
               pointerEvents: "none",
             }} />
 
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -290,52 +310,76 @@ export default function App() {
               <span style={{ fontSize: 12, color: "var(--primary-bright)", fontWeight: 600 }}>
                 AI-Powered Analysis
               </span>
-            </div>
+            </motion.div>
 
-            <h1 className="font-heading" style={{
-              fontSize: 52,
-              fontWeight: 700,
-              lineHeight: 1.1,
-              letterSpacing: "-0.03em",
-              maxWidth: 640,
-              marginBottom: 20,
-              background: "linear-gradient(135deg, #ffffff 0%, var(--primary-bright) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}>
+            <motion.h1
+              className="font-heading hero-title"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0, 0.2, 1] }}
+              style={{
+                fontSize: 52,
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: "-0.03em",
+                maxWidth: 640,
+                marginBottom: 20,
+                background: "linear-gradient(135deg, #ffffff 0%, var(--primary-bright) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
               Master Competitive Programming
-            </h1>
+            </motion.h1>
 
-            <p style={{
-              fontSize: 18,
-              color: "var(--on-surface-variant)",
-              lineHeight: 1.7,
-              maxWidth: 540,
-              marginBottom: 40,
-            }}>
+            <motion.p
+              className="hero-subtitle"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.35, ease: [0.2, 0, 0.2, 1] }}
+              style={{
+                fontSize: 18,
+                color: "var(--on-surface-variant)",
+                lineHeight: 1.7,
+                maxWidth: 540,
+                marginBottom: 40,
+              }}
+            >
               Identify your weaknesses, track your progress, and get personalized
               problem recommendations to climb the ranks.
-            </p>
+            </motion.p>
 
             {/* Search bar in hero */}
-            <SearchBar
-              handle={handle}
-              setHandle={setHandle}
-              onAnalyze={analyze}
-              loading={loading}
-              hasResult={false}
-              onClear={clearResults}
-              analysisMode={analysisMode}
-              setAnalysisMode={setAnalysisMode}
-            />
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+            >
+              <SearchBar
+                handle={handle}
+                setHandle={setHandle}
+                onAnalyze={analyze}
+                loading={loading}
+                hasResult={false}
+                onClear={clearResults}
+                analysisMode={analysisMode}
+                setAnalysisMode={setAnalysisMode}
+              />
+            </motion.div>
 
             {/* Stats row */}
-            <div style={{
-              display: "flex",
-              gap: 48,
-              flexWrap: "wrap",
-              marginTop: 60,
-            }}>
+            <motion.div
+              className="stats-row"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.55 }}
+              style={{
+                display: "flex",
+                gap: 48,
+                flexWrap: "wrap",
+                marginTop: 60,
+              }}
+            >
               {[
                 { value: "1.6M+", label: "Competitive Programmers on Codeforces" },
                 { value: "100+", label: "Rated Contests Per Year" },
@@ -350,29 +394,52 @@ export default function App() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Features Grid */}
-          <div style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
+          <div className="features-section" style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
             <div style={{ maxWidth: 1200, margin: "0 auto" }}>
               <div style={{ textAlign: "center", marginBottom: 48 }}>
-                <span className="label-caps" style={{ display: "block", marginBottom: 12 }}>
+                <motion.span
+                  className="label-caps"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5 }}
+                  style={{ display: "block", marginBottom: 12 }}
+                >
                   Features
-                </span>
-                <h2 className="font-heading" style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}>
+                </motion.span>
+                <motion.h2
+                  className="font-heading features-section-title"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}
+                >
                   Everything you need to improve
-                </h2>
-                <p style={{ fontSize: 16, color: "var(--on-surface-variant)", maxWidth: 480, margin: "0 auto" }}>
+                </motion.h2>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  style={{ fontSize: 16, color: "var(--on-surface-variant)", maxWidth: 480, margin: "0 auto" }}
+                >
                   Deep analytics, smart recommendations, and progress tracking all in one place.
-                </p>
+                </motion.p>
               </div>
 
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: 20,
-              }}>
+              <div
+                className="features-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: 20,
+                }}
+              >
                 {[
                   {
                     icon: BarChartIcon,
@@ -394,65 +461,88 @@ export default function App() {
                     title: "Solve Streak Tracking",
                     desc: "Build consistent solving habits with streak tracking and daily challenge suggestions to keep you motivated."
                   },
-                ].map((feature) => (
-                  <div
+                ].map((feature, i) => (
+                  <motion.div
                     key={feature.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    whileHover={{
+                      y: -4,
+                      borderColor: "var(--primary-container)",
+                      boxShadow: "0 0 32px var(--primary-glow)",
+                      transition: { duration: 0.25 }
+                    }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ delay: i * 0.08, duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
                     style={{
                       padding: 24,
                       background: "var(--surface-1)",
                       border: "1px solid var(--outline)",
                       borderRadius: "var(--radius-lg)",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "var(--primary-container)";
-                      e.currentTarget.style.boxShadow = "0 0 32px var(--primary-glow)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "var(--outline)";
-                      e.currentTarget.style.boxShadow = "none";
-                      e.currentTarget.style.transform = "none";
                     }}
                   >
-                    <div style={{
-                      width: 40,
-                      height: 40,
-                      background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
-                      borderRadius: "var(--radius-sm)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "var(--on-primary)",
-                      marginBottom: 16,
-                    }}>
+                    <motion.div
+                      whileHover={{ scale: 1.08 }}
+                      transition={{ duration: 0.2 }}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
+                        borderRadius: "var(--radius-sm)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--on-primary)",
+                        marginBottom: 16,
+                      }}
+                    >
                       <feature.icon size={18} />
-                    </div>
+                    </motion.div>
                     <h3 className="font-heading" style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
                       {feature.title}
                     </h3>
                     <p style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6 }}>
                       {feature.desc}
                     </p>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
           </div>
 
           {/* How It Works */}
-          <div style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
+          <div className="how-it-works-section" style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
             <div style={{ maxWidth: 800, margin: "0 auto" }}>
               <div style={{ textAlign: "center", marginBottom: 48 }}>
-                <span className="label-caps" style={{ display: "block", marginBottom: 12 }}>
+                <motion.span
+                  className="label-caps"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5 }}
+                  style={{ display: "block", marginBottom: 12 }}
+                >
                   How It Works
-                </span>
-                <h2 className="font-heading" style={{ fontSize: 32, fontWeight: 700 }}>
+                </motion.span>
+                <motion.h2
+                  className="font-heading"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  style={{ fontSize: 32, fontWeight: 700 }}
+                >
                   Three steps to better performance
-                </h2>
+                </motion.h2>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={staggerContainer}
+                style={{ display: "flex", flexDirection: "column", gap: 24 }}
+              >
                 {[
                   {
                     step: "01",
@@ -470,8 +560,10 @@ export default function App() {
                     desc: "Receive targeted problem recommendations at your exact level. Focus on what matters and track your progress."
                   },
                 ].map((item) => (
-                  <div
+                  <motion.div
                     key={item.step}
+                    className="how-it-works-item"
+                    variants={fadeUp}
                     style={{
                       display: "flex",
                       gap: 24,
@@ -508,29 +600,36 @@ export default function App() {
                         {item.desc}
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </div>
           </div>
 
           {/* CTA Section */}
-          <div style={{
-            padding: "80px 48px",
-            textAlign: "center",
-            borderTop: "1px solid var(--outline)",
-          }}>
-            <h2 className="font-heading" style={{ fontSize: 36, fontWeight: 700, marginBottom: 16 }}>
+          <motion.div
+            className="cta-section"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6 }}
+            style={{
+              padding: "80px 48px",
+              textAlign: "center",
+              borderTop: "1px solid var(--outline)",
+            }}
+          >
+            <h2 className="font-heading cta-title" style={{ fontSize: 36, fontWeight: 700, marginBottom: 16 }}>
               Ready to improve?
             </h2>
             <p style={{ fontSize: 16, color: "var(--on-surface-variant)", marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
               Enter your Codeforces handle above and get your personalized
               analysis in seconds.
             </p>
-          </div>
+          </motion.div>
 
           {/* Footer */}
-          <div style={{
+          <div className="footer-section" style={{
             padding: "24px 48px",
             borderTop: "1px solid var(--outline)",
             display: "flex",

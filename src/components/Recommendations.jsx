@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
 import { ExternalLinkIcon, BookIcon, CheckIcon } from "./Icons";
 
@@ -7,7 +8,13 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
   const isStretchMode = recs.length > 0 && recs.every(r => r.isStretch);
 
   return (
-    <div className="card" style={{ padding: 24 }}>
+    <motion.div
+      className="card"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.2, 0, 0.2, 1] }}
+      style={{ padding: 24 }}
+    >
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -77,15 +84,24 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
       </div>
 
       {/* Problem list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {recs.map((p) => {
+      <motion.div
+        className="recommendation-list"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        style={{ display: "flex", flexDirection: "column", gap: 6 }}
+      >
+        {recs.map((p, i) => {
           const dc = diffColor(p.rating);
           const key = `${p.contestId}-${p.index}`;
           const isSolved = solvedSet?.has(key);
 
           return (
-            <a
+            <motion.a
               key={key}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05, duration: 0.35, ease: [0.2, 0, 0.2, 1] }}
               href={p.url}
               target="_blank"
               rel="noreferrer"
@@ -159,10 +175,10 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
                   <ExternalLinkIcon size={14} />
                 </div>
               </div>
-            </a>
+            </motion.a>
           );
         })}
-      </div>
+      </motion.div>
 
       <style jsx="true">{`
         .problem-item:hover {
@@ -171,6 +187,6 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
           transform: translateX(4px);
         }
       `}</style>
-    </div>
+    </motion.div>
   );
 }
