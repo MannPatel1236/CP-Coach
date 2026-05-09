@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   fetchUserInfo,
   fetchSubmissions,
@@ -37,7 +37,7 @@ const STEP_LABELS_DEEP = [
 ];
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
+  hidden: { opacity: 0, y: 20 },
   visible: (i = 1) => ({ opacity: 1, y: 0, transition: { delay: i * 0.12, duration: 0.6, ease: [0.2, 0, 0.2, 1] } }),
 };
 
@@ -163,7 +163,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", overflowX: "hidden", width: "100%" }}>
       <Header onHome={clearResults} />
 
       {/* Search bar at top when user exists */}
@@ -182,7 +182,7 @@ export default function App() {
 
       {/* Loading */}
       {(loading || fetchingRecs) && (
-        <div style={{ padding: "20px 48px" }}>
+        <div className="loading-wrapper" style={{ padding: "20px 48px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 640 }}>
             <div style={{
               display: "flex",
@@ -225,7 +225,7 @@ export default function App() {
 
       {/* Error */}
       {error && (
-        <div style={{
+        <div className="error-wrapper" style={{
           margin: "16px 48px",
           padding: "18px 24px",
           background: "var(--error-container)",
@@ -270,7 +270,7 @@ export default function App() {
             }}
           >
             {/* Decorative orbital rings */}
-            <div style={{
+            <div className="orbital-ring" style={{
               position: "absolute",
               top: "20%",
               right: "-10%",
@@ -280,7 +280,7 @@ export default function App() {
               border: "1px solid rgba(99, 102, 241, 0.08)",
               pointerEvents: "none",
             }} />
-            <div style={{
+            <div className="orbital-ring" style={{
               position: "absolute",
               top: "30%",
               right: "-5%",
@@ -292,6 +292,7 @@ export default function App() {
             }} />
 
             <motion.div
+              className="glow-pulse"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
@@ -405,7 +406,7 @@ export default function App() {
                   className="label-caps"
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
+                  viewport={{ once: true, margin: "0px" }}
                   transition={{ duration: 0.5 }}
                   style={{ display: "block", marginBottom: 12 }}
                 >
@@ -415,7 +416,7 @@ export default function App() {
                   className="font-heading features-section-title"
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
+                  viewport={{ once: true, margin: "0px" }}
                   transition={{ duration: 0.5, delay: 0.1 }}
                   style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}
                 >
@@ -424,7 +425,7 @@ export default function App() {
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
+                  viewport={{ once: true, margin: "0px" }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                   style={{ fontSize: 16, color: "var(--on-surface-variant)", maxWidth: 480, margin: "0 auto" }}
                 >
@@ -472,7 +473,7 @@ export default function App() {
                       boxShadow: "0 0 32px var(--primary-glow)",
                       transition: { duration: 0.25 }
                     }}
-                    viewport={{ once: true, margin: "-50px" }}
+                    viewport={{ once: true, margin: "0px" }}
                     transition={{ delay: i * 0.08, duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
                     style={{
                       padding: 24,
@@ -518,7 +519,7 @@ export default function App() {
                   className="label-caps"
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
+                  viewport={{ once: true, margin: "0px" }}
                   transition={{ duration: 0.5 }}
                   style={{ display: "block", marginBottom: 12 }}
                 >
@@ -528,7 +529,7 @@ export default function App() {
                   className="font-heading"
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
+                  viewport={{ once: true, margin: "0px" }}
                   transition={{ duration: 0.5, delay: 0.1 }}
                   style={{ fontSize: 32, fontWeight: 700 }}
                 >
@@ -539,7 +540,7 @@ export default function App() {
               <motion.div
                 initial="hidden"
                 whileInView="visible"
-                viewport={{ once: true, margin: "-50px" }}
+                viewport={{ once: true, margin: "0px" }}
                 variants={staggerContainer}
                 style={{ display: "flex", flexDirection: "column", gap: 24 }}
               >
@@ -611,7 +612,7 @@ export default function App() {
             className="cta-section"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
+            viewport={{ once: true, margin: "0px" }}
             transition={{ duration: 0.6 }}
             style={{
               padding: "80px 48px",
@@ -706,14 +707,16 @@ export default function App() {
               />
             )}
 
-            {recs.length > 0 && (
-              <Recommendations
-                recs={recs}
-                userRating={user.rating || 1200}
-                selectedTopics={selectedTopics}
-                solvedSet={solvedSet}
-              />
-            )}
+            <AnimatePresence>
+              {recs.length > 0 && (
+                <Recommendations
+                  recs={recs}
+                  userRating={user.rating || 1200}
+                  selectedTopics={selectedTopics}
+                  solvedSet={solvedSet}
+                />
+              )}
+            </AnimatePresence>
           </div>
         </div>
       )}

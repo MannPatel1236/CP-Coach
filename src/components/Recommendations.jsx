@@ -10,9 +10,9 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
   return (
     <motion.div
       className="card"
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.2, 0, 0.2, 1] }}
+      initial={{ opacity: 0, y: 30, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
       style={{ padding: 24 }}
     >
       {/* Header */}
@@ -88,7 +88,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
         className="recommendation-list"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
         style={{ display: "flex", flexDirection: "column", gap: 6 }}
       >
         {recs.map((p, i) => {
@@ -99,9 +99,9 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
           return (
             <motion.a
               key={key}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05, duration: 0.35, ease: [0.2, 0, 0.2, 1] }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 + i * 0.06, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
               href={p.url}
               target="_blank"
               rel="noreferrer"

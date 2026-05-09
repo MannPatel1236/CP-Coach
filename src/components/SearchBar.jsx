@@ -7,51 +7,54 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
 
   return (
     <div className="search-bar-wrapper" style={{ padding: "28px 48px 20px" }}>
-      <div style={{
+      <div className="search-row" style={{
         display: "flex",
         alignItems: "center",
         gap: 12,
         maxWidth: 640,
-        position: "relative"
       }}>
-        <div style={{
-          position: "absolute",
-          left: 16,
-          color: "var(--text-muted)",
-          display: "flex",
-          alignItems: "center",
-          pointerEvents: "none",
-          zIndex: 10
-        }}>
-          <SearchIcon size={18} />
-        </div>
+        <div className="search-input-group" style={{ position: "relative", flex: 1 }}>
+          <div style={{
+            position: "absolute",
+            left: 16,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            display: "flex",
+            alignItems: "center",
+            pointerEvents: "none",
+            zIndex: 10
+          }}>
+            <SearchIcon size={18} />
+          </div>
 
-        <input
-          type="text"
-          placeholder="Enter Codeforces Handle..."
-          value={handle}
-          onChange={(e) => setHandle(e.target.value)}
-          onKeyDown={handleKeyDown}
-          style={{
-            flex: 1,
-            background: "linear-gradient(145deg, var(--surface-2), var(--surface-1))",
-            border: "1px solid var(--outline)",
-            borderRadius: "var(--radius-sm)",
-            padding: "13px 16px 13px 48px",
-            color: "var(--on-surface)",
-            fontSize: 15,
-            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-            outline: "none",
-            fontFamily: "var(--font-body)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-          }}
-          className="search-input"
-        />
+          <input
+            type="text"
+            placeholder="Enter Codeforces Handle..."
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={{
+              width: "100%",
+              background: "linear-gradient(145deg, var(--surface-2), var(--surface-1))",
+              border: "1px solid var(--outline)",
+              borderRadius: "var(--radius-sm)",
+              padding: "13px 16px 13px 48px",
+              color: "var(--on-surface)",
+              fontSize: 15,
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              outline: "none",
+              fontFamily: "var(--font-body)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+            }}
+            className="search-input"
+          />
+        </div>
 
         <button
           onClick={onAnalyze}
           disabled={loading || !handle.trim()}
-          className="btn-primary"
+          className="btn-primary analyze-btn"
           style={{
             padding: "13px 28px",
             fontSize: 13,
