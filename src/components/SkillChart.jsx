@@ -10,14 +10,16 @@ function ChartTooltip({ active, payload }) {
   const d = payload[0].payload;
   return (
     <div style={{
-      background: "var(--surface-4)",
-      border: "1px solid var(--outline)",
+      background: "linear-gradient(145deg, var(--surface-4), var(--surface-3))",
+      border: "1px solid var(--outline-variant)",
       padding: "14px 18px",
       borderRadius: "var(--radius-lg)",
-      fontFamily: "var(--font-body)"
+      fontFamily: "var(--font-body)",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+      backdropFilter: "blur(10px)",
     }}>
-      <div style={{ color: "var(--on-surface)", fontSize: 14, fontWeight: 700, marginBottom: 4, fontFamily: "var(--font-heading)" }}>{d.tag}</div>
-      <div style={{ color: acColor(d.acRate), fontSize: 14, fontWeight: 700 }}>AC Rate: {d.acRate}%</div>
+      <div className="font-heading" style={{ color: "var(--on-surface)", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{d.tag}</div>
+      <div className="font-heading" style={{ color: acColor(d.acRate), fontSize: 14, fontWeight: 700 }}>AC Rate: {d.acRate}%</div>
       <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 8, fontWeight: 500 }}>
         {d.solved} / {d.attempts} solved
         {d.avgRating ? ` · ${d.avgRating} Rating` : ""}
@@ -37,16 +39,24 @@ export default function SkillChart({ tags }) {
         <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
           Skill Distribution
         </div>
-        <div style={{ display: "flex", background: "var(--surface-dim)", padding: 3, borderRadius: "var(--radius-full)", border: "1px solid var(--outline)" }}>
+        <div style={{
+          display: "flex",
+          background: "var(--surface-dim)",
+          padding: 3,
+          borderRadius: "var(--radius-full)",
+          border: "1px solid var(--outline)",
+        }}>
           {["bar", "radar"].map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               style={{
-                background: tab === t ? "var(--primary-container)" : "transparent",
+                background: tab === t
+                  ? "linear-gradient(135deg, var(--primary-container), var(--primary-dim))"
+                  : "transparent",
                 border: "none",
                 color: tab === t ? "var(--on-primary)" : "var(--text-muted)",
-                padding: "5px 14px",
+                padding: "5px 16px",
                 borderRadius: "var(--radius-full)",
                 fontSize: 10,
                 fontWeight: 700,
@@ -65,7 +75,7 @@ export default function SkillChart({ tags }) {
       </div>
 
       {tab === "bar" && (
-        <div style={{ width: "100%", height: 260 }}>
+        <div style={{ width: "100%", height: 280 }}>
           <ResponsiveContainer>
             <BarChart data={chartData} margin={{ left: -15, right: 0, top: 0, bottom: 40 }}>
               <XAxis
@@ -85,9 +95,9 @@ export default function SkillChart({ tags }) {
                 tickFormatter={(v) => `${v}%`}
               />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
-              <Bar dataKey="acRate" radius={[2, 2, 0, 0]} barSize={22}>
+              <Bar dataKey="acRate" radius={[4, 4, 0, 0]} barSize={22}>
                 {chartData.map((e, i) => (
-                  <Cell key={i} fill={acColor(e.acRate)} />
+                  <Cell key={i} fill={acColor(e.acRate)} fillOpacity={0.75} />
                 ))}
               </Bar>
             </BarChart>
@@ -96,10 +106,10 @@ export default function SkillChart({ tags }) {
       )}
 
       {tab === "radar" && (
-        <div style={{ width: "100%", height: 260 }}>
+        <div style={{ width: "100%", height: 280 }}>
           <ResponsiveContainer>
-            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="80%">
-              <PolarGrid stroke="var(--outline)" />
+            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
+              <PolarGrid stroke="var(--outline)" strokeOpacity={0.5} />
               <PolarAngleAxis
                 dataKey="short"
                 tick={{ fill: "var(--text-muted)", fontSize: 11, fontWeight: 500 }}
@@ -115,7 +125,7 @@ export default function SkillChart({ tags }) {
                 dataKey="acRate"
                 stroke="var(--primary-container)"
                 fill="var(--primary-container)"
-                fillOpacity={0.12}
+                fillOpacity={0.1}
                 strokeWidth={2}
               />
             </RadarChart>

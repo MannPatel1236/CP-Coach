@@ -8,17 +8,13 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
 
   return (
     <div className="card" style={{ padding: 24 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
-          Expand Strategic Reach
-        </div>
-        <div style={{ fontSize: 13, color: "var(--on-surface-variant)", marginTop: 8, lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
-          Foundational mastery achieved. Select new territories for strategic advancement.
-        </div>
+      <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em", marginBottom: 8 }}>
+        Expand Strategic Reach
+      </div>
+      <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)", marginBottom: 20 }}>
+        Foundational mastery achieved. Select new territories for strategic advancement.
       </div>
 
-      {/* Topic cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
         {topics.map((tag, i) => {
           const isSelected = selected.includes(tag);
@@ -34,17 +30,19 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "12px 16px",
-                background: isSelected ? "rgba(93, 92, 255, 0.08)" : "var(--surface-dim)",
+                background: isSelected ? "rgba(99, 102, 241, 0.08)" : "var(--surface-dim)",
                 border: "1px solid",
-                borderColor: isSelected ? "var(--primary-container)"
-                  : isHovered ? "var(--primary-container)"
+                borderColor: isSelected
+                  ? "var(--primary-container)"
+                  : isHovered
+                  ? "var(--outline-variant)"
                   : "var(--outline)",
-                boxShadow: isHovered || isSelected ? "0 0 16px var(--primary-glow)" : "none",
+                boxShadow: isSelected ? "0 0 16px var(--primary-glow)" : "none",
                 borderRadius: "var(--radius-sm)",
                 cursor: "pointer",
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 userSelect: "none",
-                fontFamily: "var(--font-body)"
+                fontFamily: "var(--font-body)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -55,7 +53,7 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 11, color: isSelected ? "var(--on-primary)" : "var(--text-muted)",
                   fontWeight: 800, flexShrink: 0,
-                  transition: "all 0.2s ease",
+                  transition: "all 0.25s ease",
                   fontFamily: "var(--font-heading)",
                 }}>
                   {i + 1}
@@ -65,7 +63,6 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 </span>
               </div>
 
-              {/* Checkbox */}
               <div style={{
                 width: 18, height: 18,
                 borderRadius: "var(--radius-sm)",
@@ -74,7 +71,7 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 background: isSelected ? "var(--primary-container)" : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
-                transition: "all 0.2s ease",
+                transition: "all 0.25s ease",
                 color: "var(--on-primary)",
               }}>
                 {isSelected && <CheckIcon size={12} />}
@@ -84,7 +81,6 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
         })}
       </div>
 
-      {/* Confirm button */}
       <button
         onClick={onConfirm}
         disabled={selected.length === 0 || loading}

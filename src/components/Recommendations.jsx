@@ -1,59 +1,67 @@
 import { diffColor } from "../utils.js";
-import { ExternalLinkIcon, BookIcon } from "./Icons";
+import { ExternalLinkIcon, BookIcon, CheckIcon } from "./Icons";
 
 export default function Recommendations({ recs, userRating, selectedTopics, solvedSet }) {
   if (!recs.length) return null;
 
   const isStretchMode = recs.length > 0 && recs.every(r => r.isStretch);
-  const isMultiTopic = selectedTopics && selectedTopics.length > 1;
 
   return (
     <div className="card" style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <BookIcon size={18} style={{ color: "var(--primary)" }} />
+          <div style={{
+            background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
+            borderRadius: "var(--radius-sm)",
+            width: 32, height: 32,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "var(--on-primary)",
+            flexShrink: 0,
+          }}>
+            <BookIcon size={16} />
+          </div>
           <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
             Curated Problem Set
           </div>
         </div>
-        
+
         <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
           {selectedTopics?.length > 0 ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-              Focus: 
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              Focus:
               {selectedTopics.map((t, i) => (
-                <span key={t} style={{ color: "var(--primary)", fontWeight: 700 }}>
+                <span key={t} style={{ color: "var(--primary-bright)", fontWeight: 700 }}>
                   {t}{i < selectedTopics.length - 1 ? "," : ""}
                 </span>
               ))}
             </div>
           ) : (
-            <div>Focus: <span style={{ color: "var(--primary)", fontWeight: 700 }}>{recs[0]?.matchedTags?.[0]}</span></div>
+            <div>Focus: <span style={{ color: "var(--primary-bright)", fontWeight: 700 }}>{recs[0]?.matchedTags?.[0]}</span></div>
           )}
-          <div style={{ marginTop: 2 }}>
-            Difficulty Range: <span style={{ color: "var(--on-surface)", fontWeight: 600 }}>{Math.max(800, Math.floor((userRating - 100) / 100) * 100)} – {Math.ceil((userRating + 350) / 100) * 100}</span>
+          <div style={{ marginTop: 4 }}>
+            Difficulty Range: <span style={{ color: "var(--on-surface)", fontWeight: 600 }}>
+              {Math.max(800, Math.floor((userRating - 100) / 100) * 100)} – {Math.ceil((userRating + 350) / 100) * 100}
+            </span>
           </div>
 
           {isStretchMode && (
             <div style={{
               marginTop: 12,
-              padding: "10px 14px",
+              padding: "12px 16px",
               background: "var(--warning-container)",
-              border: "1px solid rgba(245, 158, 11, 0.2)",
+              border: "1px solid rgba(251, 191, 36, 0.15)",
               borderRadius: "var(--radius-sm)",
-              fontSize: 12,
+              fontSize: 13,
               color: "var(--warning)",
-              lineHeight: 1.6,
+              lineHeight: 1.5,
               fontWeight: 500,
             }}>
-              You've solved all <strong>{recs[0]?.matchedTags?.[0] || "this topic"}</strong> problems
-              in your normal range. Showing harder stretch problems instead.
+              You've solved all <strong>{recs[0]?.matchedTags?.[0] || "this topic"}</strong> problems in your normal range. Showing harder stretch problems instead.
             </div>
           )}
         </div>
 
-        {/* Coaching context */}
         <div style={{
           marginTop: 12,
           padding: "8px 12px",
@@ -64,17 +72,16 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
           lineHeight: 1.6,
           fontFamily: "var(--font-body)",
         }}>
-          Prioritized by coverage across selected topics and community engagement. 
+          Prioritized by coverage across selected topics and community engagement.
         </div>
       </div>
 
       {/* Problem list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {recs.map((p) => {
           const dc = diffColor(p.rating);
           const key = `${p.contestId}-${p.index}`;
           const isSolved = solvedSet?.has(key);
-          const isMultiMatch = p.matchedTags?.length > 1;
 
           return (
             <a
@@ -87,9 +94,11 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "10px 14px",
-                background: isSolved ? "var(--success-container)" : "var(--surface-dim)",
+                background: isSolved
+                  ? "linear-gradient(135deg, rgba(52, 211, 153, 0.04), transparent)"
+                  : "var(--surface-dim)",
                 border: "1px solid",
-                borderColor: isSolved ? "rgba(74, 222, 128, 0.15)" : "var(--outline)",
+                borderColor: isSolved ? "rgba(52, 211, 153, 0.12)" : "var(--outline)",
                 borderRadius: "var(--radius-sm)",
                 textDecoration: "none",
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -98,18 +107,19 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
               className="problem-item"
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-                {/* Difficulty badge */}
                 <div style={{
-                  background: isSolved ? "rgba(74, 222, 128, 0.1)" : "var(--surface-3)",
+                  background: isSolved ? "rgba(52, 211, 153, 0.08)" : dc.bg.replace("0.1", "0.08"),
                   color: isSolved ? "var(--success)" : dc.text,
                   padding: "4px 0",
-                  width: 52,
+                  width: 54,
                   borderRadius: "var(--radius-sm)",
                   fontSize: 12,
                   fontWeight: 700,
                   textAlign: "center",
                   flexShrink: 0,
                   fontFamily: "var(--font-heading)",
+                  border: "1px solid",
+                  borderColor: isSolved ? "rgba(52, 211, 153, 0.15)" : dc.border.replace("0.25", "0.12"),
                 }}>
                   {p.rating || "—"}
                 </div>
@@ -134,10 +144,15 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
               <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0, marginLeft: 12 }}>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
-                    {p.solvedCount > 0
-                      ? `${p.solvedCount.toLocaleString()} solved`
-                      : <span style={{ color: "var(--primary)", fontWeight: 700, fontSize: 10, letterSpacing: "0.1em" }}>NEW</span>
-                    }
+                    {isSolved ? (
+                      <span style={{ color: "var(--success)", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                        <CheckIcon size={12} /> Done
+                      </span>
+                    ) : p.solvedCount > 0 ? (
+                      `${p.solvedCount.toLocaleString()} solved`
+                    ) : (
+                      <span style={{ color: "var(--primary-bright)", fontWeight: 700, fontSize: 10, letterSpacing: "0.1em" }}>NEW</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ color: isSolved ? "var(--success)" : "var(--text-muted)", opacity: 0.5 }}>
@@ -152,7 +167,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
       <style jsx="true">{`
         .problem-item:hover {
           border-color: var(--primary-container) !important;
-          box-shadow: 0 0 16px var(--primary-glow);
+          box-shadow: 0 0 20px var(--primary-glow);
           transform: translateX(4px);
         }
       `}</style>

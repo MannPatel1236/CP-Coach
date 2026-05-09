@@ -6,12 +6,12 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
   };
 
   return (
-    <div style={{ padding: "32px 48px 16px" }}>
+    <div style={{ padding: "28px 48px 20px" }}>
       <div style={{
         display: "flex",
         alignItems: "center",
         gap: 12,
-        maxWidth: 600,
+        maxWidth: 640,
         position: "relative"
       }}>
         <div style={{
@@ -25,7 +25,7 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
         }}>
           <SearchIcon size={18} />
         </div>
-        
+
         <input
           type="text"
           placeholder="Enter Codeforces Handle..."
@@ -34,25 +34,26 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
           onKeyDown={handleKeyDown}
           style={{
             flex: 1,
-            background: "var(--surface-2)",
+            background: "linear-gradient(145deg, var(--surface-2), var(--surface-1))",
             border: "1px solid var(--outline)",
             borderRadius: "var(--radius-sm)",
-            padding: "12px 16px 12px 48px",
+            padding: "13px 16px 13px 48px",
             color: "var(--on-surface)",
             fontSize: 15,
-            transition: "all 0.2s ease",
+            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
             outline: "none",
-            fontFamily: "var(--font-body)"
+            fontFamily: "var(--font-body)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
           }}
           className="search-input"
         />
-        
+
         <button
           onClick={onAnalyze}
           disabled={loading || !handle.trim()}
           className="btn-primary"
           style={{
-            padding: "12px 28px",
+            padding: "13px 28px",
             fontSize: 13,
             display: "flex",
             alignItems: "center",
@@ -61,6 +62,7 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
             letterSpacing: "0.05em",
             textTransform: "uppercase",
             fontWeight: 700,
+            borderRadius: "var(--radius-sm)",
           }}
         >
           {loading ? "Analyzing..." : "Analyze"}
@@ -73,12 +75,12 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
               background: "transparent",
               border: "1px solid var(--outline)",
               color: "var(--text-muted)",
-              padding: "12px 20px",
+              padding: "13px 20px",
               borderRadius: "var(--radius-sm)",
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
-              transition: "all 0.2s ease",
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
               whiteSpace: "nowrap",
               fontFamily: "var(--font-body)",
               letterSpacing: "0.05em",
@@ -95,7 +97,7 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
         display: "flex",
         alignItems: "center",
         gap: 10,
-        marginTop: 16,
+        marginTop: 14,
         paddingLeft: 2,
       }}>
         <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, fontFamily: "var(--font-body)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -110,23 +112,21 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
             onClick={() => setAnalysisMode(opt.value)}
             style={{
               background: analysisMode === opt.value
-                ? "var(--primary-container)"
+                ? "linear-gradient(135deg, var(--primary-container), var(--primary-dim))"
                 : "var(--surface-2)",
               border: "1px solid",
               borderColor: analysisMode === opt.value ? "var(--primary-container)" : "var(--outline)",
-              color: analysisMode === opt.value
-                ? "var(--on-primary)"
-                : "var(--text-muted)",
-              padding: "5px 14px",
+              color: analysisMode === opt.value ? "var(--on-primary)" : "var(--text-muted)",
+              padding: "6px 16px",
               borderRadius: "var(--radius-full)",
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: "pointer",
-              transition: "all 0.2s ease",
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
               fontFamily: "var(--font-body)",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              boxShadow: analysisMode === opt.value ? "0 0 12px var(--primary-glow)" : "none",
+              boxShadow: analysisMode === opt.value ? "0 0 16px var(--primary-glow)" : "none",
             }}
           >
             {opt.label}
@@ -137,12 +137,13 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
       <style jsx="true">{`
         .search-input:focus {
           border-color: var(--primary-container) !important;
-          background: var(--surface-3) !important;
-          box-shadow: 0 0 16px var(--primary-glow);
+          background: linear-gradient(145deg, var(--surface-3), var(--surface-2)) !important;
+          box-shadow: 0 0 20px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.03) !important;
         }
         .clear-btn:hover {
           border-color: var(--on-surface-variant);
           color: var(--on-surface);
+          background: var(--surface-2);
         }
       `}</style>
     </div>
