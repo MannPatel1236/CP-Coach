@@ -90,20 +90,29 @@ export default function App() {
       const { profile, solvedSet: solved } = buildTagProfile(submissions);
       const weak = findWeakTags(profile);
 
+      let recommendations = [];
+      let selectedTag = null;
+      let suggested = [];
+
+      if (weak.length > 0) {
+        setLoadingStep(4);
+        selectedTag = weak[0].tag;
+        const problems = await fetchProblemsForTags([selectedTag]);
+        recommendations = buildRecommendations(problems, solved, userInfo.rating || 1200);
+      } else {
+        suggested = findNextTopics(profile, userInfo.rating || 1200, 5);
+      }
+
+      // Set all state at once so everything renders together
       setUser(userInfo);
       setTagProfile(profile);
       setWeakTags(weak);
       setSolvedSet(solved);
-
-      if (weak.length > 0) {
-        setLoadingStep(4);
-        setActiveWeakTag(weak[0].tag);
-        const problems = await fetchProblemsForTags([weak[0].tag]);
-        const recommendations = buildRecommendations(problems, solved, userInfo.rating || 1200);
+      if (selectedTag) {
+        setActiveWeakTag(selectedTag);
         setRecs(recommendations);
-        setSelectedTopics([weak[0].tag]);
+        setSelectedTopics([selectedTag]);
       } else {
-        const suggested = findNextTopics(profile, userInfo.rating || 1200, 5);
         setSuggestedTopics(suggested);
       }
     } catch (err) {
