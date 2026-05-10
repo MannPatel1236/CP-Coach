@@ -5,7 +5,10 @@ import { ExternalLinkIcon, BookIcon, CheckIcon } from "./Icons";
 export default function Recommendations({ recs, userRating, selectedTopics, solvedSet }) {
   if (!recs.length) return null;
 
-  const isStretchMode = recs.length > 0 && recs.every(r => r.isStretch);
+  const lo = Math.max(800, Math.floor((userRating - 100) / 100) * 100);
+  const hi = Math.ceil((userRating + 350) / 100) * 100;
+  const isStretchMode = recs.every((r) => r.isStretch);
+  const firstTag = recs[0]?.matchedTags?.[0];
 
   return (
     <motion.div
@@ -44,11 +47,11 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
               ))}
             </div>
           ) : (
-            <div>Focus: <span style={{ color: "var(--primary-bright)", fontWeight: 700 }}>{recs[0]?.matchedTags?.[0]}</span></div>
+            <div>Focus: <span style={{ color: "var(--primary-bright)", fontWeight: 700 }}>{firstTag}</span></div>
           )}
           <div style={{ marginTop: 4 }}>
             Difficulty Range: <span style={{ color: "var(--on-surface)", fontWeight: 600 }}>
-              {Math.max(800, Math.floor((userRating - 100) / 100) * 100)} – {Math.ceil((userRating + 350) / 100) * 100}
+              {lo} – {hi}
             </span>
           </div>
 
@@ -64,7 +67,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
               lineHeight: 1.5,
               fontWeight: 500,
             }}>
-              You've solved all <strong>{recs[0]?.matchedTags?.[0] || "this topic"}</strong> problems in your normal range. Showing harder stretch problems instead.
+              You've solved all <strong>{firstTag || "this topic"}</strong> problems in your normal range. Showing harder stretch problems instead.
             </div>
           )}
         </div>
@@ -124,7 +127,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
                 <div style={{
-                  background: isSolved ? "rgba(52, 211, 153, 0.08)" : dc.bg.replace("0.1", "0.08"),
+                  background: isSolved ? "rgba(52, 211, 153, 0.08)" : dc.hoverBg,
                   color: isSolved ? "var(--success)" : dc.text,
                   padding: "4px 0",
                   width: 54,
@@ -135,7 +138,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
                   flexShrink: 0,
                   fontFamily: "var(--font-heading)",
                   border: "1px solid",
-                  borderColor: isSolved ? "rgba(52, 211, 153, 0.15)" : dc.border.replace("0.25", "0.12"),
+                  borderColor: isSolved ? "rgba(52, 211, 153, 0.15)" : "rgba(128,128,128,0.12)",
                 }}>
                   {p.rating || "—"}
                 </div>
@@ -180,13 +183,6 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
         })}
       </motion.div>
 
-      <style jsx="true">{`
-        .problem-item:hover {
-          border-color: var(--primary-container) !important;
-          box-shadow: 0 0 20px var(--primary-glow);
-          transform: translateX(4px);
-        }
-      `}</style>
     </motion.div>
   );
 }

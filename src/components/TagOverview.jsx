@@ -1,5 +1,17 @@
-import { acColor } from "../utils.js";
 import { useState } from "react";
+import { acColor } from "../utils.js";
+
+const AC_STYLES = {
+  low:    { bg: "rgba(248, 113, 113, 0.06)",  border: "rgba(248, 113, 113, 0.15)", },
+  medium: { bg: "rgba(251, 191, 36, 0.06)",   border: "rgba(251, 191, 36, 0.15)", },
+  high:   { bg: "rgba(52, 211, 153, 0.06)",  border: "rgba(52, 211, 153, 0.15)", },
+};
+
+function acStyle(rate) {
+  if (rate < 40) return AC_STYLES.low;
+  if (rate < 65) return AC_STYLES.medium;
+  return AC_STYLES.high;
+}
 
 export default function TagOverview({ tags }) {
   const [hoveredTag, setHoveredTag] = useState(null);
@@ -17,6 +29,8 @@ export default function TagOverview({ tags }) {
         {tags.map((t) => {
           const c = acColor(t.acRate);
           const isHovered = hoveredTag === t.tag;
+          const base = acStyle(t.acRate);
+
           return (
             <span
               key={t.tag}
@@ -27,18 +41,8 @@ export default function TagOverview({ tags }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 4,
-                background: isHovered
-                  ? `${c}20`
-                  : t.acRate < 40
-                  ? "rgba(248, 113, 113, 0.06)"
-                  : t.acRate < 65
-                  ? "rgba(251, 191, 36, 0.06)"
-                  : "rgba(52, 211, 153, 0.06)",
-                border: `1px solid ${isHovered ? c + "40" : t.acRate < 40
-                  ? "rgba(248, 113, 113, 0.15)"
-                  : t.acRate < 65
-                  ? "rgba(251, 191, 36, 0.15)"
-                  : "rgba(52, 211, 153, 0.15)"}`,
+                background: isHovered ? `${c}20` : base.bg,
+                border: `1px solid ${isHovered ? c + "40" : base.border}`,
                 color: c,
                 padding: "4px 10px",
                 borderRadius: "var(--radius-full)",

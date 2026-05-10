@@ -177,6 +177,21 @@ export function findWeakTags(profile, threshold = 65) {
 }
 
 // Build recommendations from an already-merged problem list (multi-tag)
+const MAX_RECOMMENDATIONS = 12;
+
+function toRecommendation(p, isStretch) {
+  return {
+    name: p.name,
+    rating: p.rating,
+    contestId: p.contestId,
+    index: p.index,
+    solvedCount: p.solvedCount || 0,
+    matchedTags: p.matchedTags || [],
+    url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`,
+    isStretch,
+  };
+}
+
 export function buildRecommendations(problems, solvedSet, userRating) {
   const lo = Math.max(800, Math.floor((userRating - 100) / 100) * 100);
   const hi = Math.ceil((userRating + 350) / 100) * 100;
@@ -187,22 +202,13 @@ export function buildRecommendations(problems, solvedSet, userRating) {
       const ratingOk = !p.rating || (p.rating >= lo && p.rating <= hi);
       return ratingOk && !solvedSet.has(key) && p.name && p.contestId;
     })
-    .map((p) => ({
-      name: p.name,
-      rating: p.rating,
-      contestId: p.contestId,
-      index: p.index,
-      solvedCount: p.solvedCount || 0,
-      matchedTags: p.matchedTags || [],
-      url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`,
-      isStretch: false,
-    }))
+    .map((p) => toRecommendation(p, false))
     .sort((a, b) => {
       if (b.matchedTags.length !== a.matchedTags.length)
         return b.matchedTags.length - a.matchedTags.length;
       return b.solvedCount - a.solvedCount;
     })
-    .slice(0, 12);
+    .slice(0, MAX_RECOMMENDATIONS);
 
   if (base.length > 0) return base;
 
@@ -214,18 +220,9 @@ export function buildRecommendations(problems, solvedSet, userRating) {
       const ratingOk = !p.rating || (p.rating >= lo && p.rating <= hiStretch);
       return ratingOk && !solvedSet.has(key) && p.name && p.contestId;
     })
-    .map((p) => ({
-      name: p.name,
-      rating: p.rating,
-      contestId: p.contestId,
-      index: p.index,
-      solvedCount: p.solvedCount || 0,
-      matchedTags: p.matchedTags || [],
-      url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`,
-      isStretch: true,
-    }))
+    .map((p) => toRecommendation(p, true))
     .sort((a, b) => (a.rating || 9999) - (b.rating || 9999))
-    .slice(0, 12);
+    .slice(0, MAX_RECOMMENDATIONS);
 }
 
 // ─── Next Topic Suggestions ───────────────────────────────────────────────────

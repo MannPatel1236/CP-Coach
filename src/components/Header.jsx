@@ -25,6 +25,8 @@ export default function Header({ onHome }) {
           transition: "opacity 0.25s ease",
         }}
         className="header-logo-group"
+        onMouseEnter={(e) => e.currentTarget.style.opacity = "0.75"}
+        onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
       >
         <div style={{
           width: 38, height: 38,
@@ -47,12 +49,6 @@ export default function Header({ onHome }) {
           </div>
         </div>
       </div>
-
-      <style jsx="true">{`
-        .header-logo-group:hover {
-          opacity: 0.75;
-        }
-      `}</style>
     </div>
   );
 }

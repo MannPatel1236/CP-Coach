@@ -137,18 +137,6 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
         ))}
       </div>
 
-      <style jsx="true">{`
-        .search-input:focus {
-          border-color: var(--primary-container) !important;
-          background: linear-gradient(145deg, var(--surface-3), var(--surface-2)) !important;
-          box-shadow: 0 0 20px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.03) !important;
-        }
-        .clear-btn:hover {
-          border-color: var(--on-surface-variant);
-          color: var(--on-surface);
-          background: var(--surface-2);
-        }
-      `}</style>
     </div>
   );
 }

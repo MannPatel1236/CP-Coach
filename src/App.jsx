@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   fetchUserInfo,
   fetchSubmissions,
@@ -18,33 +18,10 @@ import TagOverview from "./components/TagOverview.jsx";
 import SkillChart from "./components/SkillChart.jsx";
 import TopicPicker from "./components/TopicPicker.jsx";
 import Recommendations from "./components/Recommendations.jsx";
-import { CheckIcon, AlertIcon, CodeIcon, TrendUpIcon, TargetIcon, ZapIcon, BarChartIcon } from "./components/Icons.jsx";
-
-const STEP_LABELS_QUICK = [
-  "",
-  "Accessing Codeforces record...",
-  "Scanning recent submissions...",
-  "Building skill metrics...",
-  "Aggregating problems...",
-];
-
-const STEP_LABELS_DEEP = [
-  "",
-  "Accessing Codeforces record...",
-  "Scanning full submission history (may take 10–20s)...",
-  "Building skill metrics...",
-  "Aggregating problems...",
-];
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i = 1) => ({ opacity: 1, y: 0, transition: { delay: i * 0.12, duration: 0.6, ease: [0.2, 0, 0.2, 1] } }),
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
-};
+import LandingPage from "./components/LandingPage.jsx";
+import LoadingState from "./components/LoadingState.jsx";
+import ErrorState from "./components/ErrorState.jsx";
+import SuccessBanner from "./components/SuccessBanner.jsx";
 
 export default function App() {
   const [handle, setHandle] = useState("");
@@ -103,7 +80,6 @@ export default function App() {
         suggested = findNextTopics(profile, userInfo.rating || 1200, 5);
       }
 
-      // Set all state at once so everything renders together
       setUser(userInfo);
       setTagProfile(profile);
       setWeakTags(weak);
@@ -164,7 +140,7 @@ export default function App() {
       const problems = await fetchProblemsForTags(selectedTopics);
       const recommendations = buildRecommendations(problems, solvedSet, user.rating || 1200);
       setRecs(recommendations);
-    } catch (err) {
+    } catch {
       setError("Synchronization error. Please try again.");
     } finally {
       setFetchingRecs(false);
@@ -175,7 +151,6 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", overflowX: "hidden", width: "100%" }}>
       <Header onHome={clearResults} />
 
-      {/* Search bar at top when user exists */}
       {user && (
         <SearchBar
           handle={handle}
@@ -189,472 +164,24 @@ export default function App() {
         />
       )}
 
-      {/* Loading */}
       {(loading || fetchingRecs) && (
-        <div className="loading-wrapper" style={{ padding: "20px 48px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 640 }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              color: "var(--primary-bright)",
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: "var(--font-body)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-            }}>
-              <div className="pulse" style={{
-                width: 8, height: 8,
-                background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
-                borderRadius: 2,
-                boxShadow: "0 0 12px var(--primary-glow)",
-              }} />
-              {fetchingRecs
-                ? "Synchronizing Problems..."
-                : (analysisMode === "deep" ? STEP_LABELS_DEEP : STEP_LABELS_QUICK)[loadingStep]}
-            </div>
-            {!fetchingRecs && loadingStep > 0 && (
-              <div style={{ display: "flex", gap: 6, paddingLeft: 22 }}>
-                {[1, 2, 3, 4].map(s => (
-                  <div key={s} style={{
-                    height: 3, width: 48, borderRadius: "var(--radius-full)",
-                    background: s <= loadingStep
-                      ? "linear-gradient(90deg, var(--primary-container), var(--primary-bright))"
-                      : "var(--surface-3)",
-                    transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-                    boxShadow: s <= loadingStep ? "0 0 8px var(--primary-glow)" : "none",
-                  }} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <LoadingState step={loadingStep} mode={analysisMode} isFetchingRecs={fetchingRecs} />
       )}
 
-      {/* Error */}
-      {error && (
-        <div className="error-wrapper" style={{
-          margin: "16px 48px",
-          padding: "18px 24px",
-          background: "var(--error-container)",
-          border: "1px solid rgba(248, 113, 113, 0.12)",
-          borderRadius: "var(--radius-lg)",
-          color: "var(--error)",
-          fontSize: 14,
-          maxWidth: 640,
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          fontFamily: "var(--font-body)",
-          backdropFilter: "blur(8px)",
-        }}>
-          <div style={{
-            width: 24, height: 24,
-            background: "rgba(248, 113, 113, 0.1)",
-            borderRadius: "var(--radius-sm)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
-          }}>
-            <AlertIcon size={14} />
-          </div>
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} />}
 
-      {/* Landing Page — shown when no user and not loading */}
       {!user && !loading && !error && (
-        <div className="hero-landing" style={{ paddingBottom: 80 }}>
-          {/* Hero */}
-          <motion.div
-            className="hero-section"
-            initial="hidden"
-            animate="visible"
-            variants={fadeUp}
-            style={{
-              position: "relative",
-              padding: "80px 48px 60px",
-              maxWidth: 900,
-              margin: "0 auto",
-            }}
-          >
-            {/* Decorative orbital rings */}
-            <div className="orbital-ring" style={{
-              position: "absolute",
-              top: "20%",
-              right: "-10%",
-              width: 400,
-              height: 400,
-              borderRadius: "50%",
-              border: "1px solid rgba(99, 102, 241, 0.08)",
-              pointerEvents: "none",
-            }} />
-            <div className="orbital-ring" style={{
-              position: "absolute",
-              top: "30%",
-              right: "-5%",
-              width: 300,
-              height: 300,
-              borderRadius: "50%",
-              border: "1px solid rgba(99, 102, 241, 0.05)",
-              pointerEvents: "none",
-            }} />
-
-            <motion.div
-              className="glow-pulse"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 16px",
-                background: "rgba(99, 102, 241, 0.08)",
-                border: "1px solid rgba(99, 102, 241, 0.15)",
-                borderRadius: "var(--radius-full)",
-                marginBottom: 24,
-              }}
-            >
-              <ZapIcon size={14} style={{ color: "var(--primary-bright)" }} />
-              <span style={{ fontSize: 12, color: "var(--primary-bright)", fontWeight: 600 }}>
-                AI-Powered Analysis
-              </span>
-            </motion.div>
-
-            <motion.h1
-              className="font-heading hero-title"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0, 0.2, 1] }}
-              style={{
-                fontSize: 52,
-                fontWeight: 700,
-                lineHeight: 1.1,
-                letterSpacing: "-0.03em",
-                maxWidth: 640,
-                marginBottom: 20,
-                background: "linear-gradient(135deg, #ffffff 0%, var(--primary-bright) 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Master Competitive Programming
-            </motion.h1>
-
-            <motion.p
-              className="hero-subtitle"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.35, ease: [0.2, 0, 0.2, 1] }}
-              style={{
-                fontSize: 18,
-                color: "var(--on-surface-variant)",
-                lineHeight: 1.7,
-                maxWidth: 540,
-                marginBottom: 40,
-              }}
-            >
-              Identify your weaknesses, track your progress, and get personalized
-              problem recommendations to climb the ranks.
-            </motion.p>
-
-            {/* Search bar in hero */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.45 }}
-            >
-              <SearchBar
-                handle={handle}
-                setHandle={setHandle}
-                onAnalyze={analyze}
-                loading={loading}
-                hasResult={false}
-                onClear={clearResults}
-                analysisMode={analysisMode}
-                setAnalysisMode={setAnalysisMode}
-              />
-            </motion.div>
-
-            {/* Stats row */}
-            <motion.div
-              className="stats-row"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.55 }}
-              style={{
-                display: "flex",
-                gap: 48,
-                flexWrap: "wrap",
-                marginTop: 60,
-              }}
-            >
-              {[
-                { value: "1.6M+", label: "Competitive Programmers on Codeforces" },
-                { value: "100+", label: "Rated Contests Per Year" },
-                { value: "2–4", label: "Hours/Day Top Coders Practice" },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <div className="font-heading" style={{ fontSize: 24, fontWeight: 700, color: "#ffffff", marginBottom: 4 }}>
-                    {stat.value}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", letterSpacing: "0.05em" }}>
-                    {stat.label}
-                  </div>
-                </div>
-              ))}
-            </motion.div>
-          </motion.div>
-
-          {/* Features Grid */}
-          <div className="features-section" style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
-            <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-              <div style={{ textAlign: "center", marginBottom: 48 }}>
-                <motion.span
-                  className="label-caps"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "0px" }}
-                  transition={{ duration: 0.5 }}
-                  style={{ display: "block", marginBottom: 12 }}
-                >
-                  Features
-                </motion.span>
-                <motion.h2
-                  className="font-heading features-section-title"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "0px" }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                  style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}
-                >
-                  Everything you need to improve
-                </motion.h2>
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "0px" }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  style={{ fontSize: 16, color: "var(--on-surface-variant)", maxWidth: 480, margin: "0 auto" }}
-                >
-                  Deep analytics, smart recommendations, and progress tracking all in one place.
-                </motion.p>
-              </div>
-
-              <div
-                className="features-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: 20,
-                }}
-              >
-                {[
-                  {
-                    icon: BarChartIcon,
-                    title: "Deep Analytics",
-                    desc: "Analyze your submission history to identify weak tags, track AC rates, and understand your problem-solving patterns."
-                  },
-                  {
-                    icon: TargetIcon,
-                    title: "Smart Recommendations",
-                    desc: "Get tailored problem sets based on your current rating and weakest areas. Never waste time on the wrong problems."
-                  },
-                  {
-                    icon: TrendUpIcon,
-                    title: "Progress Tracking",
-                    desc: "Monitor your rating trajectory and see how your skills evolve across different algorithmic topics over time."
-                  },
-                  {
-                    icon: CheckIcon,
-                    title: "Solve Streak Tracking",
-                    desc: "Build consistent solving habits with streak tracking and daily challenge suggestions to keep you motivated."
-                  },
-                ].map((feature, i) => (
-                  <motion.div
-                    key={feature.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    whileHover={{
-                      y: -4,
-                      borderColor: "var(--primary-container)",
-                      boxShadow: "0 0 32px var(--primary-glow)",
-                      transition: { duration: 0.25 }
-                    }}
-                    viewport={{ once: true, margin: "0px" }}
-                    transition={{ delay: i * 0.08, duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
-                    style={{
-                      padding: 24,
-                      background: "var(--surface-1)",
-                      border: "1px solid var(--outline)",
-                      borderRadius: "var(--radius-lg)",
-                    }}
-                  >
-                    <motion.div
-                      whileHover={{ scale: 1.08 }}
-                      transition={{ duration: 0.2 }}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
-                        borderRadius: "var(--radius-sm)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--on-primary)",
-                        marginBottom: 16,
-                      }}
-                    >
-                      <feature.icon size={18} />
-                    </motion.div>
-                    <h3 className="font-heading" style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
-                      {feature.title}
-                    </h3>
-                    <p style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6 }}>
-                      {feature.desc}
-                    </p>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* How It Works */}
-          <div className="how-it-works-section" style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
-            <div style={{ maxWidth: 800, margin: "0 auto" }}>
-              <div style={{ textAlign: "center", marginBottom: 48 }}>
-                <motion.span
-                  className="label-caps"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "0px" }}
-                  transition={{ duration: 0.5 }}
-                  style={{ display: "block", marginBottom: 12 }}
-                >
-                  How It Works
-                </motion.span>
-                <motion.h2
-                  className="font-heading"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "0px" }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                  style={{ fontSize: 32, fontWeight: 700 }}
-                >
-                  Three steps to better performance
-                </motion.h2>
-              </div>
-
-              <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "0px" }}
-                variants={staggerContainer}
-                style={{ display: "flex", flexDirection: "column", gap: 24 }}
-              >
-                {[
-                  {
-                    step: "01",
-                    title: "Enter Your Handle",
-                    desc: "Provide your Codeforces username. Our system fetches your full submission history and rating data."
-                  },
-                  {
-                    step: "02",
-                    title: "Get Your Analysis",
-                    desc: "We analyze every submission to find your weak tags, compare against your rating, and build a complete skill profile."
-                  },
-                  {
-                    step: "03",
-                    title: "Practice Smarter",
-                    desc: "Receive targeted problem recommendations at your exact level. Focus on what matters and track your progress."
-                  },
-                ].map((item) => (
-                  <motion.div
-                    key={item.step}
-                    className="how-it-works-item"
-                    variants={fadeUp}
-                    style={{
-                      display: "flex",
-                      gap: 24,
-                      alignItems: "flex-start",
-                      padding: "24px",
-                      background: "var(--surface-1)",
-                      border: "1px solid var(--outline)",
-                      borderRadius: "var(--radius-lg)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--on-primary)",
-                        fontFamily: "var(--font-heading)",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {item.step}
-                    </div>
-                    <div>
-                      <h3 className="font-heading" style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                        {item.title}
-                      </h3>
-                      <p style={{ fontSize: 14, color: "var(--on-surface-variant)", lineHeight: 1.6 }}>
-                        {item.desc}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            </div>
-          </div>
-
-          {/* CTA Section */}
-          <motion.div
-            className="cta-section"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "0px" }}
-            transition={{ duration: 0.6 }}
-            style={{
-              padding: "80px 48px",
-              textAlign: "center",
-              borderTop: "1px solid var(--outline)",
-            }}
-          >
-            <h2 className="font-heading cta-title" style={{ fontSize: 36, fontWeight: 700, marginBottom: 16 }}>
-              Ready to improve?
-            </h2>
-            <p style={{ fontSize: 16, color: "var(--on-surface-variant)", marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
-              Enter your Codeforces handle above and get your personalized
-              analysis in seconds.
-            </p>
-          </motion.div>
-
-          {/* Footer */}
-          <div className="footer-section" style={{
-            padding: "24px 48px",
-            borderTop: "1px solid var(--outline)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: 12,
-            color: "var(--text-muted)",
-          }}>
-            <span>CP Coach</span>
-            <span>Built for competitive programmers</span>
-          </div>
-        </div>
+        <LandingPage
+          handle={handle}
+          setHandle={setHandle}
+          onAnalyze={analyze}
+          loading={loading}
+          onClear={clearResults}
+          analysisMode={analysisMode}
+          setAnalysisMode={setAnalysisMode}
+        />
       )}
 
-      {/* Dashboard */}
       {user && (
         <div
           className="fade-in dashboard-grid"
@@ -674,37 +201,7 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
 
-            {weakTags.length === 0 && tagProfile.length > 0 && tagProfile.every(t => t.solved >= 10) && (
-              <div style={{
-                background: "linear-gradient(135deg, rgba(52, 211, 153, 0.04), transparent)",
-                border: "1px solid rgba(52, 211, 153, 0.12)",
-                borderRadius: "var(--radius-lg)",
-                padding: "20px 22px",
-                display: "flex",
-                alignItems: "center",
-                gap: 18,
-                backdropFilter: "blur(8px)",
-              }}>
-                <div style={{
-                  color: "var(--success)",
-                  background: "rgba(52, 211, 153, 0.08)",
-                  width: 40, height: 40,
-                  borderRadius: "var(--radius-full)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                }}>
-                  <CheckIcon size={22} />
-                </div>
-                <div>
-                  <div className="font-heading" style={{ fontWeight: 600, fontSize: 16, color: "var(--success)", marginBottom: 2 }}>
-                    Strategic Optimization Achieved
-                  </div>
-                  <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.5, fontFamily: "var(--font-body)" }}>
-                    You have maintained an efficiency rating above 65% across all domains.
-                  </div>
-                </div>
-              </div>
-            )}
+            {weakTags.length === 0 && tagProfile.length > 0 && tagProfile.every(t => t.solved >= 10) && <SuccessBanner />}
 
             {suggestedTopics.length > 0 && weakTags.length === 0 && (
               <TopicPicker

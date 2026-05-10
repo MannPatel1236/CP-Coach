@@ -1,3 +1,10 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+
 # Logs
 logs
 *.log
@@ -7,22 +14,6 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# IDEs and editors
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
 # Environment variables
 .env
 .env.local
@@ -30,9 +21,24 @@ dist-ssr
 .env.test.local
 .env.production.local
 
-# Build outputs
-dist
-dist-ssr
+# IDEs and editors
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# AI tools
+.claude
+.gemini
 
 # Vite specific
+*.local
 *.timestamp-*
