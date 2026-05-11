@@ -21,8 +21,11 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
           const isHovered = hoveredTag === tag;
           return (
             <div
+              role="button"
+              tabIndex={0}
               key={tag}
               onClick={() => onToggle(tag)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onToggle(tag); }}
               onMouseEnter={() => setHoveredTag(tag)}
               onMouseLeave={() => setHoveredTag(null)}
               style={{
@@ -44,6 +47,7 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 userSelect: "none",
                 fontFamily: "var(--font-body)",
               }}
+              aria-pressed={isSelected}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <span style={{
@@ -82,6 +86,7 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
       </div>
 
       <button
+        type="button"
         onClick={onConfirm}
         disabled={selected.length === 0 || loading}
         className="btn-primary"

@@ -109,8 +109,7 @@ export default function LoadingState({ step, mode, isFetchingRecs }) {
   const labels = mode === "deep" ? STEPS_DEEP : STEPS_QUICK;
   const showRecsStep = isFetchingRecs || step >= 4;
 
-  // Build the visible step list
-  const visibleSteps = labels.slice(1).map((label, i) => {
+  const visibleSteps = labels.map((label, i) => {
     const stepNum = i + 1;
     let status;
     if (stepNum === 4 && !showRecsStep) return null;

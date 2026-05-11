@@ -106,7 +106,7 @@ export default function LandingPage({ handle, setHandle, onAnalyze, loading, onC
         >
           <ZapIcon size={14} style={{ color: "var(--primary-bright)" }} />
           <span style={{ fontSize: 12, color: "var(--primary-bright)", fontWeight: 600 }}>
-            AI-Powered Analysis
+            Smart Analytics
           </span>
         </motion.div>
 

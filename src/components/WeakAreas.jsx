@@ -4,7 +4,7 @@ import { AlertIcon } from "./Icons";
 export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
   if (!weakTags.length) return null;
 
-  const isLowVolume = weakTags.every(t => t.lowVolume);
+  const isLowVolume = weakTags.some(t => t.lowVolume);
 
   return (
     <div style={{
@@ -35,8 +35,11 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
         const isActive = t.tag === selectedTag;
         return (
           <div
+            role="button"
+            tabIndex={0}
             key={t.tag}
             onClick={() => onSelectTag(t.tag)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelectTag(t.tag); }}
             style={{
               marginBottom: 8,
               cursor: "pointer",

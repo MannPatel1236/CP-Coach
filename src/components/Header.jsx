@@ -2,7 +2,7 @@ import { LogoIcon } from "./Icons";
 
 export default function Header({ onHome }) {
   return (
-    <div className="header-wrapper" style={{
+    <header className="header-wrapper" style={{
       padding: "16px 48px",
       background: "linear-gradient(180deg, rgba(2,4,8,0.85) 0%, rgba(2,4,8,0.6) 100%)",
       backdropFilter: "blur(20px) saturate(180%)",
@@ -16,7 +16,10 @@ export default function Header({ onHome }) {
       zIndex: 30,
     }}>
       <div
+        role="button"
+        tabIndex={0}
         onClick={onHome}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onHome(); }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -49,6 +52,6 @@ export default function Header({ onHome }) {
           </div>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

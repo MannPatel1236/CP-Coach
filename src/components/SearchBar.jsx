@@ -31,6 +31,7 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
           <input
             type="text"
             placeholder="Enter Codeforces Handle..."
+            aria-label="Codeforces Handle"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -52,6 +53,7 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
         </div>
 
         <button
+          type="button"
           onClick={onAnalyze}
           disabled={loading || !handle.trim()}
           className="btn-primary analyze-btn"
@@ -111,7 +113,9 @@ export default function SearchBar({ handle, setHandle, onAnalyze, loading, hasRe
           { value: "deep",  label: "Deep" },
         ].map((opt) => (
           <button
+            type="button"
             key={opt.value}
+            aria-pressed={analysisMode === opt.value}
             onClick={() => setAnalysisMode(opt.value)}
             style={{
               background: analysisMode === opt.value

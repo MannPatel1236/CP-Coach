@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -30,8 +30,8 @@ function ChartTooltip({ active, payload }) {
 
 export default function SkillChart({ tags }) {
   const [tab, setTab] = useState("bar");
-  const chartData = tags.map((t) => ({ ...t, short: shortenTag(t.tag) }));
-  const radarData = tags.slice(0, 9).map((t) => ({ ...t, short: shortenTag(t.tag) }));
+  const chartData = useMemo(() => tags.map((t) => ({ ...t, short: shortenTag(t.tag) })), [tags]);
+  const radarData = useMemo(() => tags.slice(0, 9).map((t) => ({ ...t, short: shortenTag(t.tag) })), [tags]);
 
   return (
     <div className="card" style={{ padding: 24 }}>
@@ -96,8 +96,8 @@ export default function SkillChart({ tags }) {
               />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
               <Bar dataKey="acRate" radius={[4, 4, 0, 0]} barSize={22}>
-                {chartData.map((e, i) => (
-                  <Cell key={i} fill={acColor(e.acRate)} fillOpacity={0.75} />
+                {chartData.map((e) => (
+                  <Cell key={e.tag} fill={acColor(e.acRate)} fillOpacity={0.75} />
                 ))}
               </Bar>
             </BarChart>

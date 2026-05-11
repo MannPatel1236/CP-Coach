@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { acColor } from "../utils.js";
 
 const AC_STYLES = {
@@ -14,8 +13,6 @@ function acStyle(rate) {
 }
 
 export default function TagOverview({ tags }) {
-  const [hoveredTag, setHoveredTag] = useState(null);
-
   return (
     <div className="card" style={{ padding: 20 }}>
       <div style={{
@@ -28,21 +25,20 @@ export default function TagOverview({ tags }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {tags.map((t) => {
           const c = acColor(t.acRate);
-          const isHovered = hoveredTag === t.tag;
           const base = acStyle(t.acRate);
+          const tagKey = t.tag;
 
           return (
             <span
-              key={t.tag}
+              key={tagKey}
               title={`${t.solved}/${t.attempts} solved · avg ★${t.avgRating ?? "?"}`}
-              onMouseEnter={() => setHoveredTag(t.tag)}
-              onMouseLeave={() => setHoveredTag(null)}
+              className="tag-pill"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 4,
-                background: isHovered ? `${c}20` : base.bg,
-                border: `1px solid ${isHovered ? c + "40" : base.border}`,
+                background: base.bg,
+                border: `1px solid ${base.border}`,
                 color: c,
                 padding: "4px 10px",
                 borderRadius: "var(--radius-full)",

@@ -1,12 +1,16 @@
 import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
-import { ExternalLinkIcon, BookIcon, CheckIcon } from "./Icons";
+import { ExternalLinkIcon, BookIcon } from "./Icons";
 
-export default function Recommendations({ recs, userRating, selectedTopics, solvedSet }) {
+const BASE_RECOMMEND_RATING = 800;
+const RATING_STEP = 100;
+const NORMAL_RANGE = 350;
+
+export default function Recommendations({ recs, userRating, selectedTopics }) {
   if (!recs.length) return null;
 
-  const lo = Math.max(800, Math.floor((userRating - 100) / 100) * 100);
-  const hi = Math.ceil((userRating + 350) / 100) * 100;
+  const lo = Math.max(BASE_RECOMMEND_RATING, Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP);
+  const hi = Math.ceil((userRating + NORMAL_RANGE) / RATING_STEP) * RATING_STEP;
   const isStretchMode = recs.every((r) => r.isStretch);
   const firstTag = recs[0]?.matchedTags?.[0];
 
@@ -97,7 +101,6 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
         {recs.map((p, i) => {
           const dc = diffColor(p.rating);
           const key = `${p.contestId}-${p.index}`;
-          const isSolved = solvedSet?.has(key);
 
           return (
             <motion.a
@@ -113,11 +116,8 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "10px 14px",
-                background: isSolved
-                  ? "linear-gradient(135deg, rgba(52, 211, 153, 0.04), transparent)"
-                  : "var(--surface-dim)",
-                border: "1px solid",
-                borderColor: isSolved ? "rgba(52, 211, 153, 0.12)" : "var(--outline)",
+                background: "var(--surface-dim)",
+                border: "1px solid var(--outline)",
                 borderRadius: "var(--radius-sm)",
                 textDecoration: "none",
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -127,8 +127,8 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
                 <div style={{
-                  background: isSolved ? "rgba(52, 211, 153, 0.08)" : dc.hoverBg,
-                  color: isSolved ? "var(--success)" : dc.text,
+                  background: dc.hoverBg,
+                  color: dc.text,
                   padding: "4px 0",
                   width: 54,
                   borderRadius: "var(--radius-sm)",
@@ -137,8 +137,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
                   textAlign: "center",
                   flexShrink: 0,
                   fontFamily: "var(--font-heading)",
-                  border: "1px solid",
-                  borderColor: isSolved ? "rgba(52, 211, 153, 0.15)" : "rgba(128,128,128,0.12)",
+                  border: "1px solid rgba(128,128,128,0.12)",
                 }}>
                   {p.rating || "—"}
                 </div>
@@ -163,18 +162,14 @@ export default function Recommendations({ recs, userRating, selectedTopics, solv
               <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0, marginLeft: 12 }}>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
-                    {isSolved ? (
-                      <span style={{ color: "var(--success)", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                        <CheckIcon size={12} /> Done
-                      </span>
-                    ) : p.solvedCount > 0 ? (
+                    {p.solvedCount > 0 ? (
                       `${p.solvedCount.toLocaleString()} solved`
                     ) : (
                       <span style={{ color: "var(--primary-bright)", fontWeight: 700, fontSize: 10, letterSpacing: "0.1em" }}>NEW</span>
                     )}
                   </div>
                 </div>
-                <div style={{ color: isSolved ? "var(--success)" : "var(--text-muted)", opacity: 0.5 }}>
+                <div style={{ color: "var(--text-muted)", opacity: 0.5 }}>
                   <ExternalLinkIcon size={14} />
                 </div>
               </div>

@@ -3,17 +3,40 @@
 
 const BASE = import.meta.env.PROD ? "/api/cf" : "/cf-api";
 
-export async function fetchUserInfo(handle) {
-  const res = await fetch(`${BASE}/user.info?handles=${encodeURIComponent(handle)}`);
+const REQUEST_DELAY_MS = 800;
+const MAX_HANDLE_LENGTH = 40;
+const HANDLE_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function validateHandle(handle) {
+  if (!handle || typeof handle !== "string") {
+    throw new Error("Handle is required.");
+  }
+  if (handle.length > MAX_HANDLE_LENGTH) {
+    throw new Error("Handle too long.");
+  }
+  if (!HANDLE_PATTERN.test(handle)) {
+    throw new Error("Invalid characters in handle.");
+  }
+}
+
+export async function fetchUserInfo(handle, signal) {
+  validateHandle(handle);
+  const res = await fetch(`${BASE}/user.info?handles=${encodeURIComponent(handle)}`, { signal });
   const data = await res.json();
   if (data.status !== "OK") throw new Error(data.comment || "Handle not found.");
   return data.result[0];
 }
 
-export async function fetchSubmissions(handle, mode = "quick") {
+export async function fetchSubmissions(handle, mode = "quick", signal) {
+  validateHandle(handle);
   if (mode === "quick") {
     const res = await fetch(
-      `${BASE}/user.status?handle=${encodeURIComponent(handle)}&count=1000`
+      `${BASE}/user.status?handle=${encodeURIComponent(handle)}&count=1000`,
+      { signal }
     );
     const data = await res.json();
     if (data.status !== "OK") throw new Error("Could not fetch submissions.");
@@ -27,8 +50,10 @@ export async function fetchSubmissions(handle, mode = "quick") {
   let from = 1;
 
   while (all.length < MAX) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const res = await fetch(
-      `${BASE}/user.status?handle=${encodeURIComponent(handle)}&from=${from}&count=${PAGE}`
+      `${BASE}/user.status?handle=${encodeURIComponent(handle)}&from=${from}&count=${PAGE}`,
+      { signal }
     );
     const data = await res.json();
     if (data.status !== "OK") throw new Error("Could not fetch submissions.");
@@ -36,15 +61,17 @@ export async function fetchSubmissions(handle, mode = "quick") {
     all = all.concat(batch);
     if (batch.length < PAGE) break; // reached end of history
     from += PAGE;
+    await sleep(REQUEST_DELAY_MS);
   }
 
   return all;
 }
 
 // Fetch problems for a single tag
-export async function fetchProblemsByTag(tag) {
+export async function fetchProblemsByTag(tag, signal) {
   const res = await fetch(
-    `${BASE}/problemset.problems?tags=${encodeURIComponent(tag)}`
+    `${BASE}/problemset.problems?tags=${encodeURIComponent(tag)}`,
+    { signal }
   );
   const data = await res.json();
   if (data.status !== "OK") throw new Error("Could not fetch problems.");
@@ -54,9 +81,25 @@ export async function fetchProblemsByTag(tag) {
   };
 }
 
+// Limit concurrent parallel tag fetches to avoid rate limits
+const MAX_CONCURRENT = 3;
+
+async function fetchAllTags(tags, signal) {
+  if (tags.length <= MAX_CONCURRENT) {
+    return Promise.all(tags.map((tag) => fetchProblemsByTag(tag, signal)));
+  }
+  const batches = [];
+  for (let i = 0; i < tags.length; i += MAX_CONCURRENT) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const batch = tags.slice(i, i + MAX_CONCURRENT);
+    batches.push(await Promise.all(batch.map((tag) => fetchProblemsByTag(tag, signal))));
+  }
+  return batches.flat();
+}
+
 // Fetch problems for multiple tags in parallel, merge and deduplicate
-export async function fetchProblemsForTags(tags) {
-  const results = await Promise.all(tags.map((tag) => fetchProblemsByTag(tag)));
+export async function fetchProblemsForTags(tags, signal) {
+  const results = await fetchAllTags(tags, signal);
 
   // Merge all problems, keeping track of which tags each problem covers
   const problemMap = {}; // key → { problem, tags[], solvedCount }
@@ -123,8 +166,11 @@ export function buildTagProfile(submissions) {
       }
       tagMap[tag].attempted.add(key);
       if (sub.verdict === "OK") {
+        const firstSolveInTag = !tagMap[tag].solved.has(key);
         tagMap[tag].solved.add(key);
-        if (sub.problem.rating) tagMap[tag].ratings.push(sub.problem.rating);
+        if (sub.problem.rating && firstSolveInTag) {
+          tagMap[tag].ratings.push(sub.problem.rating);
+        }
       }
     });
   });
@@ -178,6 +224,10 @@ export function findWeakTags(profile, threshold = 65) {
 
 // Build recommendations from an already-merged problem list (multi-tag)
 const MAX_RECOMMENDATIONS = 12;
+const BASE_RECOMMEND_RATING = 800;
+const RATING_STEP = 100;
+const NORMAL_RATING_RANGE = 350;
+const STRETCH_RATING_RANGE = 600;
 
 function toRecommendation(p, isStretch) {
   return {
@@ -193,8 +243,8 @@ function toRecommendation(p, isStretch) {
 }
 
 export function buildRecommendations(problems, solvedSet, userRating) {
-  const lo = Math.max(800, Math.floor((userRating - 100) / 100) * 100);
-  const hi = Math.ceil((userRating + 350) / 100) * 100;
+  const lo = Math.max(BASE_RECOMMEND_RATING, Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP);
+  const hi = Math.ceil((userRating + NORMAL_RATING_RANGE) / RATING_STEP) * RATING_STEP;
 
   const base = problems
     .filter((p) => {
@@ -213,7 +263,7 @@ export function buildRecommendations(problems, solvedSet, userRating) {
   if (base.length > 0) return base;
 
   // Pool exhausted — widen to +600 above rating and flag as stretch
-  const hiStretch = Math.ceil((userRating + 600) / 100) * 100;
+  const hiStretch = Math.ceil((userRating + STRETCH_RATING_RANGE) / RATING_STEP) * RATING_STEP;
   return problems
     .filter((p) => {
       const key = `${p.contestId}-${p.index}`;
