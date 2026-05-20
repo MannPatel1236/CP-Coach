@@ -87,3 +87,17 @@ export const BarChartIcon = ({ size = 18, className = "" }) => (
     <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
   </BaseIcon>
 );
+
+export const CodeforcesIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" stroke="#0066ff" strokeWidth="2"/>
+    <text x="7" y="16" fontSize="10" fontWeight="700" fill="#0066ff">CF</text>
+  </svg>
+);
+
+export const LeetCodeIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" stroke="#28a745" strokeWidth="2"/>
+    <text x="5" y="16" fontSize="10" fontWeight="700" fill="#28a745">LC</text>
+  </svg>
+);

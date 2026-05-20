@@ -1,18 +1,32 @@
 import { motion, AnimatePresence } from "framer-motion";
 
-const STEPS_QUICK = [
-  "Accessing Codeforces record...",
-  "Scanning recent submissions...",
-  "Building skill metrics...",
-  "Curating problem set...",
-];
-
-const STEPS_DEEP = [
-  "Accessing Codeforces record...",
-  "Scanning full submission history (may take 10–20s)...",
-  "Building skill metrics...",
-  "Curating problem set...",
-];
+function getStepsForPlatform(platform, mode) {
+  const isCombined = platform === "combined";
+  const isLC = platform === "lc";
+  const isCF = platform === "cf";
+  
+  const platformName = isCombined ? "Codeforces & LeetCode" : isLC ? "LeetCode" : "Codeforces";
+  
+  if (mode === "deep") {
+    return [
+      `Accessing ${platformName} record...`,
+      isCombined 
+        ? "Scanning both platform histories (may take 10–20s)..."
+        : `Scanning full submission history (may take 10–20s)...`,
+      "Building skill metrics...",
+      "Curating problem set...",
+    ];
+  }
+  
+  return [
+    `Accessing ${platformName} record...`,
+    isCombined 
+      ? "Analyzing submissions from both platforms..."
+      : "Scanning recent submissions...",
+    "Building skill metrics...",
+    "Curating problem set...",
+  ];
+}
 
 const line = { hidden: { pathLength: 0, opacity: 0 }, visible: { pathLength: 1, opacity: 1 } };
 const dot = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } };
@@ -105,18 +119,21 @@ function StepRow({ label, status, index, isLast }) {
   );
 }
 
-export default function LoadingState({ step, mode, isFetchingRecs }) {
-  const labels = mode === "deep" ? STEPS_DEEP : STEPS_QUICK;
-  const showRecsStep = isFetchingRecs || step >= 4;
+export default function LoadingState({ step, mode, isFetchingRecs, platform = "cf" }) {
+  const labels = getStepsForPlatform(platform, mode);
 
+  // Always show all 4 steps from the start - no conditional rendering
   const visibleSteps = labels.map((label, i) => {
     const stepNum = i + 1;
     let status;
-    if (stepNum === 4 && !showRecsStep) return null;
-    if (isFetchingRecs && stepNum < 4) {
-      status = "done";
-    } else if (isFetchingRecs && stepNum === 4) {
-      status = "active";
+    
+    // Step 4 is always pending until recommendations are being fetched
+    if (stepNum === 4) {
+      if (isFetchingRecs || step >= 4) {
+        status = "active";
+      } else {
+        status = "pending";
+      }
     } else if (stepNum < step) {
       status = "done";
     } else if (stepNum === step) {
@@ -125,7 +142,7 @@ export default function LoadingState({ step, mode, isFetchingRecs }) {
       status = "pending";
     }
     return { label, status, stepNum };
-  }).filter(Boolean);
+  });
 
   return (
     <motion.div

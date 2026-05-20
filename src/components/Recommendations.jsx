@@ -1,10 +1,46 @@
 import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
-import { ExternalLinkIcon, BookIcon } from "./Icons";
+import { ExternalLinkIcon, BookIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
 
 const BASE_RECOMMEND_RATING = 800;
 const RATING_STEP = 100;
 const NORMAL_RANGE = 350;
+
+function normalizeRec(p) {
+  const isBackendFormat = p.problem_id !== undefined;
+  
+  if (isBackendFormat) {
+    const isCF = p.problem_id.startsWith("cf-");
+    const problemId = p.problem_id.replace(/^(cf-|lc-)/, "");
+    const [contestId, index] = isCF 
+      ? [problemId.slice(0, -1), problemId.slice(-1)]
+      : [null, problemId];
+    
+    return {
+      platform: p.platform || (isCF ? "cf" : "lc"),
+      contestId,
+      index,
+      rating: p.difficulty,
+      solvedCount: p.solve_count || 0,
+      matchedTags: p.matched_topics || [],
+      isStretch: p.is_stretch,
+      name: p.name || "",
+      url: p.url || "",
+    };
+  }
+  
+  return {
+    platform: "cf",
+    contestId: p.contestId,
+    index: p.index,
+    rating: p.rating,
+    solvedCount: p.solvedCount || 0,
+    matchedTags: p.matchedTags || [],
+    isStretch: p.isStretch,
+    name: p.name || "",
+    url: p.url || "",
+  };
+}
 
 export default function Recommendations({ recs, userRating, selectedTopics }) {
   if (!recs.length) return null;
@@ -99,8 +135,10 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
         style={{ display: "flex", flexDirection: "column", gap: 6 }}
       >
         {recs.map((p, i) => {
-          const dc = diffColor(p.rating);
-          const key = `${p.contestId}-${p.index}`;
+          const rec = normalizeRec(p);
+          const dc = diffColor(rec.rating);
+          const key = rec.index ? `${rec.contestId}-${rec.index}` : rec.problem_id || `${rec.name}-${i}`;
+          const platformLabel = rec.platform === "lc" ? "LC" : "CF";
 
           return (
             <motion.a
@@ -108,7 +146,7 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35 + i * 0.06, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-              href={p.url}
+              href={rec.url}
               target="_blank"
               rel="noreferrer"
               style={{
@@ -138,8 +176,13 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
                   flexShrink: 0,
                   fontFamily: "var(--font-heading)",
                   border: "1px solid rgba(128,128,128,0.12)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
                 }}>
-                  {p.rating || "—"}
+                  <span>{rec.rating || "—"}</span>
                 </div>
 
                 <div style={{ minWidth: 0 }}>
@@ -150,11 +193,28 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
                     fontFamily: "var(--font-mono)",
                     marginBottom: 2,
                     letterSpacing: "0.05em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                   }}>
-                    {p.contestId}{p.index}
+                    {rec.contestId && rec.index ? (
+                      <span>{rec.contestId}{rec.index}</span>
+                    ) : (
+                      <span style={{ fontSize: 9 }}>{rec.name.slice(0, 20)}</span>
+                    )}
+                    <span style={{
+                      background: rec.platform === "lc" ? "rgba(40, 167, 69, 0.15)" : "rgba(0, 102, 255, 0.15)",
+                      color: rec.platform === "lc" ? "#28a745" : "#0066ff",
+                      padding: "1px 4px",
+                      borderRadius: 3,
+                      fontSize: 8,
+                      fontWeight: 700,
+                    }}>
+                      {platformLabel}
+                    </span>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "var(--on-surface)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {p.name}
+                    {rec.name}
                   </div>
                 </div>
               </div>
@@ -162,8 +222,8 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
               <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0, marginLeft: 12 }}>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
-                    {p.solvedCount > 0 ? (
-                      `${p.solvedCount.toLocaleString()} solved`
+                    {rec.platform === "lc" ? null : rec.solvedCount > 0 ? (
+                      `${rec.solvedCount.toLocaleString()} solved`
                     ) : (
                       <span style={{ color: "var(--primary-bright)", fontWeight: 700, fontSize: 10, letterSpacing: "0.1em" }}>NEW</span>
                     )}

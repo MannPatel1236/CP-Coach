@@ -67,10 +67,16 @@ export async function fetchSubmissions(handle, mode = "quick", signal) {
   return all;
 }
 
+// Internal tag → Codeforces tag format
+function internalToCfTag(tag) {
+  return tag.replace(/_/g, " ");
+}
+
 // Fetch problems for a single tag
 export async function fetchProblemsByTag(tag, signal) {
+  const cfTag = internalToCfTag(tag);
   const res = await fetch(
-    `${BASE}/problemset.problems?tags=${encodeURIComponent(tag)}`,
+    `${BASE}/problemset.problems?tags=${encodeURIComponent(cfTag)}`,
     { signal }
   );
   const data = await res.json();

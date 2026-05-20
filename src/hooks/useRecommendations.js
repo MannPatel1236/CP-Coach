@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { fetchProblemsForTags, buildRecommendations } from "../api.js";
+import { getRecommendations } from "../api/backendClient.js";
 
-export default function useRecommendations({ solvedSet, user, abortRef, resetAbort, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef }) {
+export default function useRecommendations({ solvedSet, user, abortRef, resetAbort, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, platform, combinedPlatform }) {
+  const useBackend = !!import.meta.env.VITE_API_URL;
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [fetchingRecs, setFetchingRecs] = useState(false);
   const [recs, setRecs] = useState([]);
@@ -25,6 +27,27 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     setActiveWeakTag(tag);
     setFetchingRecs(true);
     setRecs([]);
+
+    const isLC = platform === "lc";
+    const isCombined = combinedPlatform;
+
+    if (useBackend && (isLC || isCombined)) {
+      try {
+        const handle = isCombined ? (user?.handle?.split(" / ")?.[0] || user?.handle) : user?.handle;
+        const platformsStr = isCombined ? "cf,lc" : "lc";
+        const data = await getRecommendations(handle, platformsStr, 12, controller?.signal, tag).catch(() => ({ recommendations: [] }));
+        if (controller?.signal.aborted) return;
+        setRecs(data.recommendations || []);
+        setSelectedTopics([tag]);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Failed to fetch recommendations from backend.", err);
+      } finally {
+        setFetchingRecs(false);
+      }
+      return;
+    }
+
     try {
       const problems = await fetchProblemsForTags([tag], controller?.signal);
       if (controller?.signal.aborted) return;
@@ -37,7 +60,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     } finally {
       setFetchingRecs(false);
     }
-  }, [solvedSet, user?.rating, abortRef, resetAbort]);
+  }, [solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort]);
 
   const toggleTopic = useCallback((tag) => {
     setSelectedTopics((prev) =>
@@ -53,6 +76,27 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
 
     setFetchingRecs(true);
     setRecs([]);
+
+    const isLC = platform === "lc";
+    const isCombined = combinedPlatform;
+
+    if (useBackend && (isLC || isCombined)) {
+      try {
+        const handle = isCombined ? (user?.handle?.split(" / ")?.[0] || user?.handle) : user?.handle;
+        const platformsStr = isCombined ? "cf,lc" : "lc";
+        const focusTopics = selectedTopics.join(",");
+        const data = await getRecommendations(handle, platformsStr, 12, controller?.signal, focusTopics).catch(() => ({ recommendations: [] }));
+        if (controller?.signal.aborted) return;
+        setRecs(data.recommendations || []);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Failed to fetch recommendations from backend.", err);
+      } finally {
+        setFetchingRecs(false);
+      }
+      return;
+    }
+
     try {
       const problems = await fetchProblemsForTags(selectedTopics, controller?.signal);
       if (controller?.signal.aborted) return;
@@ -64,7 +108,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     } finally {
       setFetchingRecs(false);
     }
-  }, [selectedTopics, fetchingRecs, solvedSet, user?.rating, abortRef, resetAbort]);
+  }, [selectedTopics, fetchingRecs, solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort]);
 
   return {
     selectedTopics,
