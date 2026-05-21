@@ -38,6 +38,8 @@ Thumbs.db
 # AI tools
 .claude
 .gemini
+AGENTS.md
+CLAUDE.md
 
 # Vite specific
 *.local
