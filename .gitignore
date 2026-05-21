@@ -38,6 +38,8 @@ Thumbs.db
 # AI tools
 .claude
 .gemini
+CLAUDE_CODE_PROMPTS.md
+VERIFICATION_CHECKLIST.md
 
 # Vite specific
 *.local
