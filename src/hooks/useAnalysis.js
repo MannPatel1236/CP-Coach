@@ -8,7 +8,7 @@ import {
   buildRecommendations,
   findNextTopics,
 } from "../api.js";
-import { analyzeHandle, getRecommendations } from "../api/backendClient.js";
+import { analyzeHandle, getRecommendations, getRecommendationsWithMastery } from "../api/backendClient.js";
 
 export default function useAnalysis() {
   const [handle, setHandle] = useState("");
@@ -37,6 +37,7 @@ export default function useAnalysis() {
   const analysisSelectedTopicsRef = useRef([]);
   const analysisActiveWeakTagRef = useRef(null);
   const masteryScoresRef = useRef({});
+  const modelUsedRef = useRef(null);
 
   const resetAbort = useCallback(() => {
     if (abortRef.current) {
@@ -164,15 +165,24 @@ const analyze = useCallback(async () => {
           hard_solved: lcData?.hard_solved || 0,
         } : null;
 
-        // Get combined recommendations - use CF handle as primary since it has the problem set
+        // Merge mastery scores BEFORE fetching recommendations so POST can use them
+        const mergedMastery = { ...cfData?.mastery_scores, ...lcData?.mastery_scores };
+        masteryScoresRef.current = mergedMastery;
+
+        // Get combined recommendations - use POST with mastery for Graph-DKT
         setLoadingStep(3);
         const recsHandle = cfHandle?.trim() || lcHandle?.trim() || "";
         const weakTopicList = weak.map(w => w.tag).join(",");
-        const recsData = await getRecommendations(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList).catch(() => ({ recommendations: [] }));
+        const recsData = Object.keys(mergedMastery).length > 0
+          ? await getRecommendationsWithMastery(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList, mergedMastery)
+              .catch((e) => { console.warn("Combined POST recs failed, falling back:", e); return { recommendations: [], model_used: "rule_based" }; })
+          : await getRecommendations(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList)
+              .catch(() => ({ recommendations: [], model_used: "rule_based" }));
         if (controller?.signal.aborted) return;
 
         setLoadingStep(4);
         const recommendations = recsData.recommendations || [];
+        modelUsedRef.current = recsData.model_used || null;
 
         setUser(userInfo);
         setCfUser(cfUserInfo);
@@ -185,7 +195,6 @@ const analyze = useCallback(async () => {
         analysisRecommendationsRef.current = recommendations;
         analysisSelectedTopicsRef.current = weak.length > 0 ? [weak[0].tag] : [];
         analysisActiveWeakTagRef.current = weak.length > 0 ? weak[0].tag : null;
-        masteryScoresRef.current = { ...cfData?.mastery_scores, ...lcData?.mastery_scores };
 
       } else if (useBackend && isLC) {
         // LeetCode path: route through FastAPI backend
@@ -206,7 +215,16 @@ const analyze = useCallback(async () => {
 
         setLoadingStep(2);
         const weakTopicList = weak.map(w => w.tag).join(",");
-        const recsData = await getRecommendations(handle.trim(), "lc", 12, controller?.signal, weakTopicList).catch(() => ({ recommendations: [] }));
+        masteryScoresRef.current = data.mastery_scores || {};
+
+        let recsData;
+        if (Object.keys(masteryScoresRef.current).length > 0) {
+          recsData = await getRecommendationsWithMastery(handle.trim(), "lc", 12, controller?.signal, weakTopicList, masteryScoresRef.current)
+            .catch((e) => { console.warn("LC POST recs failed, falling back:", e); return { recommendations: [], model_used: "rule_based" }; });
+        } else {
+          recsData = await getRecommendations(handle.trim(), "lc", 12, controller?.signal, weakTopicList)
+            .catch(() => ({ recommendations: [], model_used: "rule_based" }));
+        }
         if (controller?.signal.aborted) return;
 
         const userInfo = {
@@ -229,9 +247,9 @@ const analyze = useCallback(async () => {
         analysisRecommendationsRef.current = recsData.recommendations || [];
         analysisSelectedTopicsRef.current = weak.length > 0 ? [weak[0].tag] : [];
         analysisActiveWeakTagRef.current = weak.length > 0 ? weak[0].tag : null;
-        masteryScoresRef.current = data.mastery_scores || {};
+        modelUsedRef.current = recsData.model_used || null;
       } else {
-        // Codeforces path: ALL existing CF logic completely untouched
+        // Codeforces path: existing CF logic + mastery score computation
         setLoadingStep(1);
         const userInfo = await fetchUserInfo(handle.trim(), controller?.signal);
         if (controller?.signal.aborted) return;
@@ -246,11 +264,41 @@ const analyze = useCallback(async () => {
 
         if (controller?.signal.aborted) return;
 
+        // Populate masteryScoresRef for Graph-DKT recommendations
+        if (useBackend) {
+          const cfData = await analyzeHandle(handle.trim(), "cf", analysisMode, controller?.signal).catch(() => null);
+          if (cfData?.mastery_scores) {
+            masteryScoresRef.current = cfData.mastery_scores;
+          }
+        } else {
+          // Client-side approximation: solve_rate per topic
+          const scores = {};
+          for (const t of profile) {
+            scores[t.tag] = t.acRate / 100;
+          }
+          masteryScoresRef.current = scores;
+        }
+
         if (weak.length > 0) {
           setLoadingStep(4);
-          const problems = await fetchProblemsForTags([weak[0].tag], controller?.signal);
-          if (controller?.signal.aborted) return;
-          const recommendations = buildRecommendations(problems, solved, userInfo.rating || 800);
+
+          let recommendations;
+          if (useBackend && Object.keys(masteryScoresRef.current).length > 0) {
+            // Use backend POST with mastery scores for Graph-DKT recommendations
+            const weakTopicList = weak[0].tag;
+            const recsData = await getRecommendationsWithMastery(
+              handle.trim(), "cf", 12, controller?.signal, weakTopicList, masteryScoresRef.current
+            ).catch((e) => { console.warn("CF POST recs failed, falling back:", e); return { recommendations: [], model_used: "rule_based" }; });
+            if (controller?.signal.aborted) return;
+            recommendations = recsData.recommendations || [];
+            modelUsedRef.current = recsData.model_used || null;
+          } else {
+            // Client-side fallback
+            const problems = await fetchProblemsForTags([weak[0].tag], controller?.signal);
+            if (controller?.signal.aborted) return;
+            recommendations = buildRecommendations(problems, solved, userInfo.rating || 800);
+            modelUsedRef.current = "rule_based";
+          }
 
           setUser(userInfo);
           setCfUser(null);
@@ -323,5 +371,6 @@ const analyze = useCallback(async () => {
     analysisSelectedTopicsRef,
     analysisActiveWeakTagRef,
     masteryScoresRef,
+    modelUsedRef,
   };
 }

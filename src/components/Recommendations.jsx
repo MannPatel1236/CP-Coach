@@ -6,6 +6,12 @@ const BASE_RECOMMEND_RATING = 800;
 const RATING_STEP = 100;
 const NORMAL_RANGE = 350;
 
+function lcDiffLabel(rating) {
+  if (rating <= 1100) return { label: "Easy", bg: "rgba(0, 175, 155, 0.12)", color: "#00af9b", border: "rgba(0, 175, 155, 0.2)" };
+  if (rating <= 1500) return { label: "Medium", bg: "rgba(255, 176, 46, 0.12)", color: "#ffb02e", border: "rgba(255, 176, 46, 0.2)" };
+  return { label: "Hard", bg: "rgba(239, 71, 67, 0.12)", color: "#ef4743", border: "rgba(239, 71, 67, 0.2)" };
+}
+
 function normalizeRec(p) {
   const isBackendFormat = p.problem_id !== undefined;
   
@@ -42,7 +48,7 @@ function normalizeRec(p) {
   };
 }
 
-export default function Recommendations({ recs, userRating, selectedTopics }) {
+export default function Recommendations({ recs, userRating, selectedTopics, modelUsed }) {
   if (!recs.length) return null;
 
   const lo = Math.max(BASE_RECOMMEND_RATING, Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP);
@@ -74,6 +80,26 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
           <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
             Curated Problem Set
           </div>
+          {modelUsed && (
+            <span style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "3px 8px",
+              borderRadius: 10,
+              background: modelUsed === "graph_dkt"
+                ? "rgba(34, 197, 94, 0.12)"
+                : "rgba(251, 191, 36, 0.12)",
+              color: modelUsed === "graph_dkt"
+                ? "#4ade80"
+                : "#fbbf24",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              border: `1px solid ${modelUsed === "graph_dkt" ? "rgba(34, 197, 94, 0.2)" : "rgba(251, 191, 36, 0.2)"}`,
+              whiteSpace: "nowrap",
+            }}>
+              {modelUsed === "graph_dkt" ? "Graph-DKT" : "Rule-based"}
+            </span>
+          )}
         </div>
 
         <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
@@ -164,26 +190,50 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
               className="problem-item"
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-                <div style={{
-                  background: dc.hoverBg,
-                  color: dc.text,
-                  padding: "4px 0",
-                  width: 54,
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textAlign: "center",
-                  flexShrink: 0,
-                  fontFamily: "var(--font-heading)",
-                  border: "1px solid rgba(128,128,128,0.12)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                }}>
-                  <span>{rec.rating || "—"}</span>
-                </div>
+                {rec.platform === "lc" ? (() => {
+                  const ld = lcDiffLabel(rec.rating);
+                  return (
+                    <div style={{
+                      background: ld.bg,
+                      color: ld.color,
+                      padding: "4px 0",
+                      width: 54,
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textAlign: "center",
+                      flexShrink: 0,
+                      fontFamily: "var(--font-heading)",
+                      border: `1px solid ${ld.border}`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                      {ld.label}
+                    </div>
+                  );
+                })() : (
+                  <div style={{
+                    background: dc.hoverBg,
+                    color: dc.text,
+                    padding: "4px 0",
+                    width: 54,
+                    borderRadius: "var(--radius-sm)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    flexShrink: 0,
+                    fontFamily: "var(--font-heading)",
+                    border: "1px solid rgba(128,128,128,0.12)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                  }}>
+                    <span>{rec.rating || "—"}</span>
+                  </div>
+                )}
 
                 <div style={{ minWidth: 0 }}>
                   <div style={{

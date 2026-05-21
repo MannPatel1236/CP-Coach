@@ -1,0 +1,111 @@
+"""Feature engineering and recency decay preprocessing."""
+
+from collections import defaultdict
+
+
+class Preprocessor:
+    """Converts normalized submissions into model-ready sequences and profiles."""
+
+    # ── Submission sequence ──────────────────────────────────────────
+
+    def build_submission_sequence(self, submissions: list[dict]) -> list[dict]:
+        """Build time-ordered sequence with recency weights matching frontend exactly."""
+        # Sort oldest first
+        subs = sorted(submissions, key=lambda s: s.get("timestamp", 0))
+        total = len(subs)
+        if total == 0:
+            return []
+
+        sequence = []
+        prev_ts = subs[0].get("timestamp", 0) / 1000  # convert ms → seconds
+
+        for i, sub in enumerate(subs):
+            if not sub.get("topics"):
+                continue
+
+            # idx=0 is most recent, idx=total-1 is oldest
+            idx = total - 1 - i
+            weight = 1.0 - (0.8 * idx) / max(total - 1, 1)
+
+            ts_sec = sub.get("timestamp", 0) / 1000
+            delta = (ts_sec - prev_ts) / 86400.0  # normalize by 1 day
+            prev_ts = ts_sec
+
+            sequence.append({
+                "topic": sub["topics"][0],
+                "all_topics": sub["topics"],
+                "solved": 1 if sub.get("verdict") == "OK" else 0,
+                "difficulty": (sub.get("difficulty") or 1500) / 4000.0,
+                "timestamp_delta": max(delta, 0.0),
+                "weight": weight,
+                "platform": sub.get("platform", "cf"),
+            })
+        return sequence
+
+    # ── Topic profile ────────────────────────────────────────────────
+
+    def build_topic_profile(self, submissions: list[dict]) -> list[dict]:
+        """Group normalized submissions by topic and compute per-topic stats."""
+        topic_data: dict[str, dict] = defaultdict(lambda: {
+            "attempted": set(),
+            "solved": set(),
+            "difficulties": [],
+            "weights": [],
+            "cf": 0,
+            "lc": 0,
+        })
+
+        # Sort by timestamp (oldest first) to match sequence order
+        sorted_subs = sorted(submissions, key=lambda s: s.get("timestamp", 0))
+        total = len(sorted_subs)
+
+        for idx, sub in enumerate(sorted_subs):
+            pid = sub.get("problem_id", "")
+            verdict = sub.get("verdict", "")
+            diff = sub.get("difficulty") or 1500
+            platform = sub.get("platform", "cf")
+
+            # idx=0 is oldest, so reverse index for weight calculation (most recent = 1.0)
+            rev_idx = total - 1 - idx
+            weight = 1.0 - (0.8 * rev_idx) / max(total - 1, 1)
+
+            for topic in sub.get("topics", []):
+                td = topic_data[topic]
+                td["attempted"].add(pid)
+                if verdict == "OK":
+                    td["solved"].add(pid)
+                td["difficulties"].append(diff)
+                td["weights"].append(weight)
+                td[platform] += 1
+
+        profile = []
+        for topic, td in topic_data.items():
+            attempts = len(td["attempted"])
+            solved = len(td["solved"])
+            profile.append({
+                "topic": topic,
+                "attempts": attempts,
+                "solved": solved,
+                "solve_rate": solved / attempts if attempts > 0 else 0.0,
+                "avg_difficulty": sum(td["difficulties"]) / len(td["difficulties"]) if td["difficulties"] else 0,
+                "recency_weight": sum(td["weights"]) / len(td["weights"]) if td["weights"] else 0.0,
+                "platform_breakdown": {"cf": td["cf"], "lc": td["lc"]},
+            })
+
+        profile.sort(key=lambda x: x["attempts"], reverse=True)
+        return profile[:20]
+
+    # ── Weak area detection ──────────────────────────────────────────
+
+    def detect_weak_areas(self, topic_profile: list[dict], threshold: float = 0.65) -> list[str]:
+        """Return weakest topics (max 3)."""
+        weak = [t for t in topic_profile if t["solve_rate"] < threshold]
+        weak.sort(key=lambda t: t["solve_rate"])
+
+        if weak:
+            return [t["topic"] for t in weak[:3]]
+
+        # Fallback: topics with fewer than 10 solved
+        low_count = [t for t in topic_profile if t["solved"] < 10]
+        low_count.sort(key=lambda t: t["solved"])
+        return [t["topic"] for t in low_count[:3]]

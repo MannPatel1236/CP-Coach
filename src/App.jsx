@@ -26,6 +26,8 @@ export default function App() {
     analysisRecommendationsRef: analysis.analysisRecommendationsRef,
     analysisSelectedTopicsRef: analysis.analysisSelectedTopicsRef,
     analysisActiveWeakTagRef: analysis.analysisActiveWeakTagRef,
+    analysisMasteryScoresRef: analysis.masteryScoresRef,
+    analysisModelUsedRef: analysis.modelUsedRef,
     platform: analysis.platform,
     combinedPlatform: analysis.combinedPlatform,
   });
@@ -33,7 +35,7 @@ export default function App() {
   const {
     selectedTopics, fetchingRecs, recs: recommendations,
     activeWeakTag, selectWeakTag,
-    toggleTopic, fetchForSelectedTopics,
+    toggleTopic, fetchForSelectedTopics, modelUsed,
   } = recs;
 
   const {
@@ -147,6 +149,7 @@ export default function App() {
                   recs={recommendations}
                   userRating={cfUser?.rating || lcUser?.rating || user?.rating || 800}
                   selectedTopics={selectedTopics}
+                  modelUsed={modelUsed}
                 />
               )}
             </AnimatePresence>
