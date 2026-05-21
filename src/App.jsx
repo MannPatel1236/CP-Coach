@@ -26,19 +26,27 @@ export default function App() {
     analysisRecommendationsRef: analysis.analysisRecommendationsRef,
     analysisSelectedTopicsRef: analysis.analysisSelectedTopicsRef,
     analysisActiveWeakTagRef: analysis.analysisActiveWeakTagRef,
+    analysisMasteryScoresRef: analysis.masteryScoresRef,
+    analysisModelUsedRef: analysis.modelUsedRef,
+    platform: analysis.platform,
+    combinedPlatform: analysis.combinedPlatform,
   });
 
   const {
     selectedTopics, fetchingRecs, recs: recommendations,
     activeWeakTag, selectWeakTag,
-    toggleTopic, fetchForSelectedTopics,
+    toggleTopic, fetchForSelectedTopics, modelUsed,
   } = recs;
 
   const {
     handle, setHandle,
+    cfHandle, setCfHandle,
+    lcHandle, setLcHandle,
     loading, loadingStep, error,
-    user, tagProfile, weakTags,
+    user, cfUser, lcUser, tagProfile, weakTags,
     suggestedTopics, analysisMode, setAnalysisMode,
+    platform, setPlatform,
+    combinedPlatform, setCombinedPlatform,
     analyze, clearAll,
   } = analysis;
 
@@ -50,17 +58,25 @@ export default function App() {
         <SearchBar
           handle={handle}
           setHandle={setHandle}
+          cfHandle={cfHandle}
+          setCfHandle={setCfHandle}
+          lcHandle={lcHandle}
+          setLcHandle={setLcHandle}
           onAnalyze={analyze}
           loading={loading}
           hasResult={!!user}
           onClear={clearAll}
           analysisMode={analysisMode}
           setAnalysisMode={setAnalysisMode}
+          platform={platform}
+          setPlatform={setPlatform}
+          combinedPlatform={combinedPlatform}
+          setCombinedPlatform={setCombinedPlatform}
         />
       )}
 
       {(loading || fetchingRecs) && (
-        <LoadingState step={loadingStep} mode={analysisMode} isFetchingRecs={fetchingRecs} />
+        <LoadingState step={loadingStep} mode={analysisMode} isFetchingRecs={fetchingRecs} platform={combinedPlatform ? "combined" : platform} />
       )}
 
       {error && <ErrorState message={error} />}
@@ -69,11 +85,19 @@ export default function App() {
         <LandingPage
           handle={handle}
           setHandle={setHandle}
+          cfHandle={cfHandle}
+          setCfHandle={setCfHandle}
+          lcHandle={lcHandle}
+          setLcHandle={setLcHandle}
           onAnalyze={analyze}
           loading={loading}
           onClear={clearAll}
           analysisMode={analysisMode}
           setAnalysisMode={setAnalysisMode}
+          platform={platform}
+          setPlatform={setPlatform}
+          combinedPlatform={combinedPlatform}
+          setCombinedPlatform={setCombinedPlatform}
         />
       )}
 
@@ -88,7 +112,18 @@ export default function App() {
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            <ProfileCard user={user} tagCount={tagProfile.length} weakCount={weakTags.length} />
+            {combinedPlatform && cfUser && lcUser ? (
+              <>
+                <ProfileCard user={cfUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+                <ProfileCard user={lcUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+              </>
+            ) : combinedPlatform && cfUser ? (
+              <ProfileCard user={cfUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+            ) : combinedPlatform && lcUser ? (
+              <ProfileCard user={lcUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+            ) : (
+              <ProfileCard user={user} tagCount={tagProfile.length} weakCount={weakTags.length} />
+            )}
             <WeakAreas weakTags={weakTags} selectedTag={activeWeakTag} onSelectTag={selectWeakTag} />
             <TagOverview tags={tagProfile} />
           </div>
@@ -112,8 +147,9 @@ export default function App() {
               {recommendations.length > 0 && (
                 <Recommendations
                   recs={recommendations}
-                  userRating={user.rating || 800}
+                  userRating={cfUser?.rating || lcUser?.rating || user?.rating || 800}
                   selectedTopics={selectedTopics}
+                  modelUsed={modelUsed}
                 />
               )}
             </AnimatePresence>

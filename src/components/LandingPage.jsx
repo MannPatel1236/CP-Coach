@@ -30,7 +30,7 @@ const HOW_IT_WORKS = [
   {
     step: "01",
     title: "Enter Your Handle",
-    desc: "Provide your Codeforces username. Our system fetches your full submission history and rating data."
+    desc: "Provide your Codeforces or LeetCode username. Our system fetches your full submission history and rating data."
   },
   {
     step: "02",
@@ -50,7 +50,15 @@ const STATS = [
   { value: "2–4", label: "Hours/Day Top Coders Practice" },
 ];
 
-export default function LandingPage({ handle, setHandle, onAnalyze, loading, onClear, analysisMode, setAnalysisMode }) {
+export default function LandingPage({ 
+  handle, setHandle, 
+  cfHandle, setCfHandle,
+  lcHandle, setLcHandle,
+  onAnalyze, loading, onClear, 
+  analysisMode, setAnalysisMode, 
+  platform, setPlatform, 
+  combinedPlatform, setCombinedPlatform 
+}) {
   return (
     <div className="hero-landing" style={{ paddingBottom: 80 }}>
       {/* Hero */}
@@ -156,12 +164,20 @@ export default function LandingPage({ handle, setHandle, onAnalyze, loading, onC
           <SearchBar
             handle={handle}
             setHandle={setHandle}
+            cfHandle={cfHandle}
+            setCfHandle={setCfHandle}
+            lcHandle={lcHandle}
+            setLcHandle={setLcHandle}
             onAnalyze={onAnalyze}
             loading={loading}
             hasResult={false}
             onClear={onClear}
             analysisMode={analysisMode}
             setAnalysisMode={setAnalysisMode}
+            platform={platform}
+            setPlatform={setPlatform}
+            combinedPlatform={combinedPlatform}
+            setCombinedPlatform={setCombinedPlatform}
           />
         </motion.div>
 
@@ -380,7 +396,7 @@ export default function LandingPage({ handle, setHandle, onAnalyze, loading, onC
           Ready to improve?
         </h2>
         <p style={{ fontSize: 16, color: "var(--on-surface-variant)", marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
-          Enter your Codeforces handle above and get your personalized
+          Enter your Codeforces or LeetCode handle above and get your personalized
           analysis in seconds.
         </p>
       </motion.div>

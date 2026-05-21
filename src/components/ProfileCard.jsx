@@ -1,8 +1,38 @@
 import { rankColor, ratingColor } from "../utils.js";
-import { UserIcon } from "./Icons";
+import { UserIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
 
 export default function ProfileCard({ user, tagCount, weakCount }) {
-  const rc = rankColor(user.rank);
+  const isLeetCode = user.platform === "lc";
+  const rc = isLeetCode ? "#28a745" : rankColor(user.rank ?? "");
+  const displayRank = isLeetCode ? "LeetCode" : (user.rank || "unrated");
+  const showRating = user.rating != null;
+
+  const stats = [];
+  
+  if (isLeetCode && showRating) {
+    stats.push(
+      { label: "Rating", value: user.rating, color: "var(--on-surface)" },
+      { label: "Max Rating", value: user.maxRating ?? user.rating, color: "var(--on-surface)" },
+      { label: "Easy", value: user.easy_solved ?? 0, color: "#22c55e" },
+      { label: "Medium", value: user.medium_solved ?? 0, color: "#f59e0b" },
+      { label: "Hard", value: user.hard_solved ?? 0, color: "#ef4444" },
+      { label: "Weak Areas", value: weakCount, color: weakCount > 0 ? "var(--error)" : "var(--success)" },
+    );
+  } else if (isLeetCode) {
+    stats.push(
+      { label: "Easy", value: user.easy_solved ?? 0, color: "#22c55e" },
+      { label: "Medium", value: user.medium_solved ?? 0, color: "#f59e0b" },
+      { label: "Hard", value: user.hard_solved ?? 0, color: "#ef4444" },
+      { label: "Weak Areas", value: weakCount, color: weakCount > 0 ? "var(--error)" : "var(--success)" },
+    );
+  } else {
+    stats.push(
+      { label: "Rating", value: user.rating ?? "—", color: ratingColor(user.rating) },
+      { label: "Max Rating", value: user.maxRating ?? "—", color: ratingColor(user.maxRating) },
+      { label: "Topics", value: tagCount, color: "var(--on-surface)" },
+      { label: "Weak Areas", value: weakCount, color: weakCount > 0 ? "var(--error)" : "var(--success)" },
+    );
+  }
 
   return (
     <div className="card" style={{ padding: 24, position: "relative" }}>
@@ -55,20 +85,30 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
           }}>
             {user.handle}
           </div>
-          <div style={{ fontSize: 12, color: rc, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.1em", marginTop: 4, fontFamily: "var(--font-body)" }}>
-            {user.rank || "unrated"}
+          <div style={{ fontSize: 12, color: rc, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.1em", marginTop: 4, fontFamily: "var(--font-body)", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>{displayRank}</span>
+            {isLeetCode && (
+              <span style={{
+                background: "rgba(40, 167, 69, 0.15)",
+                color: "#28a745",
+                padding: "2px 6px",
+                borderRadius: 4,
+                fontSize: 9,
+              }}>
+                LC
+              </span>
+            )}
           </div>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="profile-card-stat-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-        {[
-          { label: "Rating", value: user.rating ?? "—", color: ratingColor(user.rating) },
-          { label: "Max Rating", value: user.maxRating ?? "—", color: ratingColor(user.maxRating) },
-          { label: "Topics", value: tagCount, color: "var(--on-surface)" },
-          { label: "Weak Areas", value: weakCount, color: weakCount > 0 ? "var(--error)" : "var(--success)" },
-        ].map((s) => (
+      <div className="profile-card-stat-grid" style={{ 
+        display: "grid", 
+        gridTemplateColumns: stats.length === 6 ? "1fr 1fr 1fr" : "1fr 1fr", 
+        gap: 18 
+      }}>
+        {stats.map((s) => (
           <div key={s.label}>
             <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, marginBottom: 6, fontFamily: "var(--font-body)" }}>
               {s.label}
