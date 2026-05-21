@@ -81,6 +81,13 @@ const analyze = useCallback(async () => {
       const isLC = platform === "lc";
       const isCombined = combinedPlatform;
 
+      // Guard: LC and combined modes require the backend
+      if (!useBackend && (isLC || isCombined)) {
+        throw new Error(
+          "LeetCode analysis requires the backend service. Please set VITE_API_URL or switch to Codeforces."
+        );
+      }
+
       // Multi-platform unified analysis (both CF + LC)
       if (useBackend && isCombined) {
         setLoadingStep(1);

@@ -16,8 +16,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+from db.connection import create_tables  # noqa: E402
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Initializing database...")
+    try:
+        await create_tables()
+        logger.info("Database tables verified/created.")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
     logger.info("CP Coach API started")
     yield
 

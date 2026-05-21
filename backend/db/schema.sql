@@ -66,3 +66,12 @@ INSERT INTO topic_graph (from_topic, to_topic, weight) VALUES
   ('math', 'two_pointers', 1.0),
   ('two_pointers', 'binary_search', 1.0)
 ON CONFLICT DO NOTHING;
+
+-- Enable Row Level Security (RLS) on all tables to prevent public PostgREST API exposure.
+-- Direct backend connections (connecting as the owner/postgres role) bypass RLS automatically.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE problems ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topic_graph ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kt_states ENABLE ROW LEVEL SECURITY;
+

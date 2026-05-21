@@ -1,6 +1,8 @@
-const ALLOWED_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
+const ALLOWED_ORIGINS = ["http://localhost:5173", "http://localhost:3000", "https://cp-coach.vercel.app"];
 const CF_BASE = "https://codeforces.com/api";
 const FETCH_TIMEOUT = 15000;
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1500;
 
 const ALLOWED_PATHS = [
   /^\/user\.info/,
@@ -19,6 +21,10 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT) {
     clearTimeout(id);
     throw err;
   }
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export default async function handler(req, res) {
@@ -43,34 +49,51 @@ export default async function handler(req, res) {
 
   const cfUrl = `${CF_BASE}${stripped}`;
 
-  try {
-    const response = await fetchWithTimeout(cfUrl, { method: "GET" });
-
-    const text = await response.text();
-    let data;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      data = JSON.parse(text);
-    } catch {
-      res.status(502).json({
-        status: "FAILED",
-        comment: "Codeforces returned a non-JSON response. Try again in a moment.",
-      });
-      return;
-    }
+      const response = await fetchWithTimeout(cfUrl, { method: "GET" });
 
-    res.setHeader("Cache-Control", "s-maxage=60");
-    res.json(data);
-  } catch (err) {
-    if (err.name === "AbortError") {
-      res.status(504).json({
-        status: "FAILED",
-        comment: "Codeforces API timed out. Please try again.",
-      });
-    } else {
-      res.status(500).json({
-        status: "FAILED",
-        comment: "Could not reach Codeforces API.",
-      });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // CF returned HTML (rate-limited / captcha). Retry after delay.
+        if (attempt < MAX_RETRIES - 1) {
+          await sleep(BASE_DELAY_MS * (attempt + 1));
+          continue;
+        }
+        res.status(502).json({
+          status: "FAILED",
+          comment: "Codeforces returned a non-JSON response. Try again in a moment.",
+        });
+        return;
+      }
+
+      res.setHeader("Cache-Control", "s-maxage=60");
+      res.json(data);
+      return;
+    } catch (err) {
+      if (err.name === "AbortError") {
+        if (attempt < MAX_RETRIES - 1) {
+          await sleep(BASE_DELAY_MS * (attempt + 1));
+          continue;
+        }
+        res.status(504).json({
+          status: "FAILED",
+          comment: "Codeforces API timed out. Please try again.",
+        });
+      } else {
+        if (attempt < MAX_RETRIES - 1) {
+          await sleep(BASE_DELAY_MS * (attempt + 1));
+          continue;
+        }
+        res.status(500).json({
+          status: "FAILED",
+          comment: "Could not reach Codeforces API.",
+        });
+      }
+      return;
     }
   }
 }
