@@ -26,6 +26,7 @@ function validateHandle(handle) {
 export async function fetchUserInfo(handle, signal) {
   validateHandle(handle);
   const res = await fetch(`${BASE}/user.info?handles=${encodeURIComponent(handle)}`, { signal });
+  if (!res.ok) throw new Error(`Codeforces API error (${res.status}). Please try again.`);
   const data = await res.json();
   if (data.status !== "OK") throw new Error(data.comment || "Handle not found.");
   return data.result[0];
@@ -38,6 +39,7 @@ export async function fetchSubmissions(handle, mode = "quick", signal) {
       `${BASE}/user.status?handle=${encodeURIComponent(handle)}&count=1000`,
       { signal }
     );
+    if (!res.ok) throw new Error(`Codeforces API error (${res.status}). Please try again.`);
     const data = await res.json();
     if (data.status !== "OK") throw new Error("Could not fetch submissions.");
     return data.result;
@@ -55,6 +57,7 @@ export async function fetchSubmissions(handle, mode = "quick", signal) {
       `${BASE}/user.status?handle=${encodeURIComponent(handle)}&from=${from}&count=${PAGE}`,
       { signal }
     );
+    if (!res.ok) throw new Error(`Codeforces API error (${res.status}). Please try again.`);
     const data = await res.json();
     if (data.status !== "OK") throw new Error("Could not fetch submissions.");
     const batch = data.result;
@@ -79,6 +82,7 @@ export async function fetchProblemsByTag(tag, signal) {
     `${BASE}/problemset.problems?tags=${encodeURIComponent(cfTag)}`,
     { signal }
   );
+  if (!res.ok) throw new Error(`Codeforces API error (${res.status}). Please try again.`);
   const data = await res.json();
   if (data.status !== "OK") throw new Error("Could not fetch problems.");
   return {
