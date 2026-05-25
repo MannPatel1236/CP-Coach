@@ -89,9 +89,11 @@ async def create_tables():
     schema_path = Path(__file__).parent / "schema.sql"
     sql = schema_path.read_text()
 
-    # Use raw connection to run multi-statement SQL
+    # Split on semicolons — asyncpg doesn't allow multi-statement in one exec
+    statements = [s.strip() for s in sql.split(";") if s.strip()]
     async with engine.connect() as conn:
-        await conn.exec_driver_sql(sql)
+        for stmt in statements:
+            await conn.exec_driver_sql(stmt)
         await conn.commit()
 
 
