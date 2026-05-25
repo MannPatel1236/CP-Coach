@@ -187,11 +187,11 @@ LSTM(128 -> 128, dropout=0.2)*
     |          h_graph (64D per topic)
     |              |
     |-----> concat[h_t, h_graph] (192D)
-                  |
-                  v
+                   |
+                   v
             Linear(192 -> 22)
-                  |
-                  v
+                   |
+                   v
             Sigmoid -> p_mastery per topic
 ```
 
@@ -386,41 +386,6 @@ docker build -t cpcoach-backend ./backend
 Enable `pg_trgm` for trigram search indexes:
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
-```
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes
-4. Open a Pull Request
-
-### Code Style
-
-- **Frontend:** ESLint + Prettier
-- **Backend:** `black` formatter
-- **Commits:** Use imperative mood ("Add", "Fix", "Update")
-
----
-
-## Citation
-
-```bibtex
-@inproceedings{cpcoach2025,
-  title={Graph-Augmented Knowledge Tracing for Personalized Competitive Programming Training},
-  author={Patel, Mann and [Co-authors]},
-  year={2025}
-}
-
-@article{wang2025ksap,
-  title={Knowledge Structure-Aware Problem Recommendation},
-  author={Wang, [et al.]},
-  journal={Knowledge and Information Systems},
-  year={2025},
-  publisher={Springer}
-}
 ```
 
 ---
