@@ -54,7 +54,7 @@ CP Coach is a full-stack web application that connects to your **Codeforces** an
 ```
 +--------------------------------------------+
 |                Frontend (React)            |
-|  SearchBar  -  Dashboard  -  Charts       |
+|  SearchBar  -  Dashboard  -  Charts        |
 +--------------------------------------------+
                       |
                       | fetch()
