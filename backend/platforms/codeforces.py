@@ -120,4 +120,6 @@ class CFClient:
                     await asyncio.sleep(2)
                     continue
                 raise RuntimeError(f"Could not reach CF API ({e.response.status_code})")
-            except httpx.HTTPError:
+            except httpx.HTTPError as e:
+                logger.error("CF request failed: %s", e)
+                raise RuntimeError("CF API unavailable")
