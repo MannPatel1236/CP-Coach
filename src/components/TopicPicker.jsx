@@ -9,10 +9,10 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
   return (
     <div className="card" style={{ padding: 24 }}>
       <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em", marginBottom: 8 }}>
-        Expand Strategic Reach
+        Choose Focus Topics
       </div>
       <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)", marginBottom: 20 }}>
-        Foundational mastery achieved. Select new territories for strategic advancement.
+        No weak areas found — great job! Select new topics to challenge yourself.
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
@@ -106,10 +106,10 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
       >
         <TargetIcon size={16} />
         {loading
-          ? "SYNCHRONIZING..."
+          ? "GETTING RECOMMENDATIONS..."
           : selected.length === 0
-          ? "SELECT DOMAINS"
-          : `SYNTHESIZE PATH FOR ${selected.length} TOPIC${selected.length > 1 ? "S" : ""}`}
+          ? "SELECT TOPICS"
+          : `GET RECOMMENDATIONS FOR ${selected.length} TOPIC${selected.length > 1 ? "S" : ""}`}
       </button>
     </div>
   );

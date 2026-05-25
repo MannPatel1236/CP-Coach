@@ -52,7 +52,7 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
         {user.avatar ? (
           <img
             src={user.avatar}
-            alt=""
+            alt={`${user.handle} avatar`}
             style={{
               width: 50, height: 50,
               borderRadius: "50%",

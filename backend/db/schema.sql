@@ -1,6 +1,9 @@
 -- CP Coach database schema
 -- Run against PostgreSQL
 
+-- Required extensions
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   cf_handle VARCHAR(50),
@@ -8,6 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
   primary_platform VARCHAR(5) DEFAULT 'cf',
   last_synced TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_cf_handle ON users(cf_handle);
+CREATE INDEX IF NOT EXISTS idx_users_lc_handle ON users(lc_handle);
 
 CREATE TABLE IF NOT EXISTS submissions (
   id BIGSERIAL PRIMARY KEY,
@@ -20,6 +26,11 @@ CREATE TABLE IF NOT EXISTS submissions (
   submitted_at TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions(user_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_platform ON submissions(platform);
+CREATE INDEX IF NOT EXISTS idx_submissions_user_platform ON submissions(user_id, platform);
+CREATE INDEX IF NOT EXISTS idx_submissions_submitted_at ON submissions(submitted_at);
+
 CREATE TABLE IF NOT EXISTS problems (
   problem_id VARCHAR(60) PRIMARY KEY,
   platform VARCHAR(5),
@@ -29,6 +40,10 @@ CREATE TABLE IF NOT EXISTS problems (
   solve_count INTEGER,
   url TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_problems_platform ON problems(platform);
+CREATE INDEX IF NOT EXISTS idx_problems_difficulty ON problems(difficulty);
+CREATE INDEX IF NOT EXISTS idx_problems_name_trgm ON problems(name gin_trgm_ops);
 
 CREATE TABLE IF NOT EXISTS topic_graph (
   from_topic VARCHAR(50),
@@ -44,6 +59,9 @@ CREATE TABLE IF NOT EXISTS kt_states (
   updated_at TIMESTAMP,
   PRIMARY KEY (user_id, topic)
 );
+
+CREATE INDEX IF NOT EXISTS idx_kt_states_user ON kt_states(user_id);
+CREATE INDEX IF NOT EXISTS idx_kt_states_topic ON kt_states(topic);
 
 -- Seed prerequisite graph (18 directed edges)
 INSERT INTO topic_graph (from_topic, to_topic, weight) VALUES

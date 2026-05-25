@@ -3,6 +3,11 @@
 from collections import defaultdict
 
 
+def _recency_weight(idx: int, total: int) -> float:
+    """Recency decay: weight=1.0 at idx=0 (most recent), weight=0.2 at oldest."""
+    return 1.0 - (0.8 * idx) / max(total - 1, 1)
+
+
 class Preprocessor:
     """Converts normalized submissions into model-ready sequences and profiles."""
 
@@ -25,7 +30,7 @@ class Preprocessor:
 
             # idx=0 is most recent, idx=total-1 is oldest
             idx = total - 1 - i
-            weight = 1.0 - (0.8 * idx) / max(total - 1, 1)
+            weight = _recency_weight(idx, total)
 
             ts_sec = sub.get("timestamp", 0) / 1000
             delta = (ts_sec - prev_ts) / 86400.0  # normalize by 1 day
@@ -67,7 +72,7 @@ class Preprocessor:
 
             # idx=0 is oldest, so reverse index for weight calculation (most recent = 1.0)
             rev_idx = total - 1 - idx
-            weight = 1.0 - (0.8 * rev_idx) / max(total - 1, 1)
+            weight = _recency_weight(rev_idx, total)
 
             for topic in sub.get("topics", []):
                 td = topic_data[topic]
@@ -90,6 +95,7 @@ class Preprocessor:
                 "avg_difficulty": sum(td["difficulties"]) / len(td["difficulties"]) if td["difficulties"] else 0,
                 "recency_weight": sum(td["weights"]) / len(td["weights"]) if td["weights"] else 0.0,
                 "platform_breakdown": {"cf": td["cf"], "lc": td["lc"]},
+                "solved_problems": sorted(list(td["solved"])),
             })
 
         profile.sort(key=lambda x: x["attempts"], reverse=True)

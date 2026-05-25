@@ -11,7 +11,6 @@ class CPTopicGraph:
         "two_pointers", "sortings", "strings", "number_theory", "combinatorics",
         "dfs_and_similar", "graphs", "trees", "dp", "dp_on_trees", "data_structures",
         "bitmasks", "divide_and_conquer", "hashing", "geometry", "flows", "brute_force",
-        "shortest_paths",
     ]
 
     EDGES = [
@@ -33,7 +32,6 @@ class CPTopicGraph:
         ("sortings", "data_structures"),
         ("math", "two_pointers"),
         ("two_pointers", "binary_search"),
-        ("graphs", "shortest_paths"),
     ]
 
     def __init__(self):

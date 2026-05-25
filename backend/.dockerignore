@@ -1,0 +1,11 @@
+.env
+.env.*
+venv/
+__pycache__/
+*.pyc
+weights/
+.DS_Store
+*.pt
+*.pth
+node_modules/
+.git/

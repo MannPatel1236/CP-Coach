@@ -5,12 +5,16 @@ import logging
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 load_dotenv()
 
-from routes import analyze, recommend, progress, graph  # noqa: E402
+from rate_limiter import limiter  # noqa: E402
+from routes import analyze, recommend, progress, graph, user  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +36,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="CP Coach API", version="2.0", lifespan=lifespan)
 
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS
 origins = [
     o.strip()
@@ -50,6 +69,7 @@ app.include_router(analyze.router)
 app.include_router(recommend.router)
 app.include_router(progress.router)
 app.include_router(graph.router)
+app.include_router(user.router)
 
 
 @app.get("/health")

@@ -143,12 +143,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(165deg, rgba(255,255,255,0.04) 0%, transparent 40%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  background: linear-gradient(165deg, rgba(255,255,255,0.025) 0%, transparent 50%);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -275,6 +270,15 @@ body {
   background: var(--text-dim);
 }
 
+/* ── Reduced Motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* Selection */
 
 ::selection {
@@ -286,6 +290,25 @@ body {
 
 .tag-pill:hover {
   opacity: 0.8;
+}
+
+/* ── Utility Classes ─────────────────────────────────────────── */
+
+.flex-col { display: flex; flex-direction: column; }
+.flex-row { display: flex; align-items: center; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 24px;
+  padding: 32px 48px 80px;
+}
+
+.column-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────────── */

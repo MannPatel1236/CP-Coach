@@ -18,9 +18,10 @@ function normalizeRec(p) {
   if (isBackendFormat) {
     const isCF = p.problem_id.startsWith("cf-");
     const problemId = p.problem_id.replace(/^(cf-|lc-)/, "");
-    const [contestId, index] = isCF 
-      ? [problemId.slice(0, -1), problemId.slice(-1)]
-      : [null, problemId];
+    const match = isCF ? problemId.match(/^(\d+)([A-Z]\d*)$/) : null;
+    const [contestId, index] = match
+      ? [match[1], match[2]]
+      : isCF ? [problemId, ""] : [null, problemId];
     
     return {
       platform: p.platform || (isCF ? "cf" : "lc"),
@@ -48,7 +49,7 @@ function normalizeRec(p) {
   };
 }
 
-export default function Recommendations({ recs, userRating, selectedTopics, modelUsed }) {
+export default function Recommendations({ recs, userRating, selectedTopics }) {
   if (!recs.length) return null;
 
   const lo = Math.max(BASE_RECOMMEND_RATING, Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP);
@@ -80,26 +81,6 @@ export default function Recommendations({ recs, userRating, selectedTopics, mode
           <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>
             Curated Problem Set
           </div>
-          {modelUsed && (
-            <span style={{
-              fontSize: 9,
-              fontWeight: 700,
-              padding: "3px 8px",
-              borderRadius: 10,
-              background: modelUsed === "graph_dkt"
-                ? "rgba(34, 197, 94, 0.12)"
-                : "rgba(251, 191, 36, 0.12)",
-              color: modelUsed === "graph_dkt"
-                ? "#4ade80"
-                : "#fbbf24",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              border: `1px solid ${modelUsed === "graph_dkt" ? "rgba(34, 197, 94, 0.2)" : "rgba(251, 191, 36, 0.2)"}`,
-              whiteSpace: "nowrap",
-            }}>
-              {modelUsed === "graph_dkt" ? "Graph-DKT" : "Rule-based"}
-            </span>
-          )}
         </div>
 
         <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
@@ -173,6 +154,7 @@ export default function Recommendations({ recs, userRating, selectedTopics, mode
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35 + i * 0.06, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
               href={rec.url}
+              aria-label={`${rec.name} (${rec.platform.toUpperCase()}, ${rec.rating || "—"})`}
               target="_blank"
               rel="noreferrer"
               style={{

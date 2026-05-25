@@ -37,7 +37,6 @@ export default function useAnalysis() {
   const analysisSelectedTopicsRef = useRef([]);
   const analysisActiveWeakTagRef = useRef(null);
   const masteryScoresRef = useRef({});
-  const modelUsedRef = useRef(null);
 
   const resetAbort = useCallback(() => {
     if (abortRef.current) {
@@ -59,6 +58,10 @@ export default function useAnalysis() {
     setHandle("");
     setCfHandle("");
     setLcHandle("");
+    analysisRecommendationsRef.current = [];
+    analysisSelectedTopicsRef.current = [];
+    analysisActiveWeakTagRef.current = null;
+    masteryScoresRef.current = {};
   }, [resetAbort]);
 
 const analyze = useCallback(async () => {
@@ -93,54 +96,88 @@ const analyze = useCallback(async () => {
         setLoadingStep(1);
         
         // Analyze both platforms with their respective handles
-        const cfData = cfHandle?.trim() 
-          ? await analyzeHandle(cfHandle.trim(), "cf", analysisMode, controller?.signal).catch(() => null)
+        const cfData = cfHandle?.trim()
+          ? await analyzeHandle(cfHandle.trim(), "cf", analysisMode, controller?.signal).catch(e => {
+              console.warn("CF backend analysis failed:", e);
+              return { _error: e.message || "CF analysis failed" };
+            })
           : null;
         if (controller?.signal.aborted) return;
 
         setLoadingStep(2);
-        const lcData = lcHandle?.trim() 
-          ? await analyzeHandle(lcHandle.trim(), "lc", analysisMode, controller?.signal).catch(() => null)
+        const lcData = lcHandle?.trim()
+          ? await analyzeHandle(lcHandle.trim(), "lc", analysisMode, controller?.signal).catch(e => {
+              console.warn("LC backend analysis failed:", e);
+              return { _error: e.message || "LC analysis failed" };
+            })
           : null;
         if (controller?.signal.aborted) return;
+
+        // Track per-platform errors
+        const platformErrors = [];
+        if (cfData?._error) platformErrors.push(cfData._error);
+        if (lcData?._error) platformErrors.push(lcData._error);
+        if (platformErrors.length === 2) {
+          throw new Error("Analysis failed for both platforms. Please verify the usernames and try again.");
+        }
 
         // Merge CF and LC data
         const cfProfile = cfData?.topic_profile || [];
         const lcProfile = lcData?.topic_profile || [];
         const mergedProfile = {};
-        
-        for (const t of [...cfProfile, ...lcProfile]) {
-          if (!mergedProfile[t.topic]) {
-            mergedProfile[t.topic] = {
-              topic: t.topic,
-              attempts: 0,
-              solved: 0,
-              solve_rate: 0,
-              platform_breakdown: { cf: 0, lc: 0 },
-            };
+
+        // Track per-platform attempts so breakdown is accurate
+        const _add = (arr, source) => {
+          for (const t of arr) {
+            if (!mergedProfile[t.topic]) {
+              mergedProfile[t.topic] = { topic: t.topic, solved: 0, cf_attempts: 0, lc_attempts: 0 };
+            }
+            if (source === "cf") {
+              mergedProfile[t.topic].cf_attempts += t.attempts;
+            } else {
+              mergedProfile[t.topic].lc_attempts += t.attempts;
+            }
+            // Union of solved problems — avoid double-counting if CF and LC share problem IDs
+            if (!mergedProfile[t.topic].solvedSet) {
+              mergedProfile[t.topic].solvedSet = new Set();
+            }
+            for (const pid of t.solved_problems || []) {
+              mergedProfile[t.topic].solvedSet.add(pid);
+            }
           }
-          const pb = t.platform === "lc" ? "lc" : "cf";
-          mergedProfile[t.topic].attempts += t.attempts;
-          mergedProfile[t.topic].solved += t.solved;
-          mergedProfile[t.topic].platform_breakdown[pb] += t.attempts;
-        }
-        
-        // Recalculate solve rates after merge
+        };
+        _add(cfProfile, "cf");
+        _add(lcProfile, "lc");
+
+        // Convert to uniform shape
         for (const topic of Object.values(mergedProfile)) {
-          topic.solve_rate = topic.attempts > 0 ? topic.solved / topic.attempts : 0;
+          const attempts = topic.cf_attempts + topic.lc_attempts;
+          topic.attempts = attempts;
+          topic.solved = topic.solvedSet.size;
+          topic.solve_rate = attempts > 0 ? topic.solved / attempts : 0;
+          topic.platform_breakdown = { cf: topic.cf_attempts, lc: topic.lc_attempts };
         }
 
         const mergedProfileArray = Object.values(mergedProfile);
         const profile = mergedProfileArray.map((t) => ({
           tag: t.topic,
-          attempted: t.attempts,
+          attempts: t.attempts,
           solved: t.solved,
           acRate: Math.round(t.solve_rate * 100),
         }));
 
-        const weak = (cfData?.weak_areas || []).concat(lcData?.weak_areas || []).slice(0, 3).map((tag) => {
+        // Deduplicate weak areas and rank by lowest AC rate
+        const seenWeak = new Set();
+        const allWeakTags = (cfData?.weak_areas || [])
+          .concat(lcData?.weak_areas || [])
+          .filter((tag) => {
+            if (seenWeak.has(tag)) return false;
+            seenWeak.add(tag);
+            return true;
+          });
+        const weak = allWeakTags.slice(0, 3).map((tag) => {
           const tp = profile.find((p) => p.tag === tag);
-          return { tag, acRate: tp ? tp.acRate : 0 };
+          return { tag, acRate: tp ? tp.acRate : 0, solved: tp ? tp.solved : 0, attempts: tp ? tp.attempts : 0 };
         });
 
         // Combine user info
@@ -182,22 +219,31 @@ const analyze = useCallback(async () => {
         const weakTopicList = weak.map(w => w.tag).join(",");
         const recsData = Object.keys(mergedMastery).length > 0
           ? await getRecommendationsWithMastery(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList, mergedMastery)
-              .catch((e) => { console.warn("Combined POST recs failed, falling back:", e); return { recommendations: [], model_used: "rule_based" }; })
+              .catch((e) => { console.warn("Combined POST recs failed, falling back:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; })
           : await getRecommendations(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList)
-              .catch(() => ({ recommendations: [], model_used: "rule_based" }));
+              .catch((e) => { console.warn("Combined GET recs failed, falling back:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; });
         if (controller?.signal.aborted) return;
 
         setLoadingStep(4);
         const recommendations = recsData.recommendations || [];
-        modelUsedRef.current = recsData.model_used || null;
 
         setUser(userInfo);
         setCfUser(cfUserInfo);
         setLcUser(lcUserInfo);
         setTagProfile(profile);
         setWeakTags(weak);
-        setSolvedSet(new Set());
         setSuggestedTopics([]);
+
+        // Build combined solved set from both CF and LC backend data
+        const combinedSolved = new Set();
+        for (const platformData of [cfData, lcData]) {
+          for (const t of platformData?.topic_profile || []) {
+            if (t.solved_problems) {
+              for (const pid of t.solved_problems) combinedSolved.add(pid);
+            }
+          }
+        }
+        setSolvedSet(combinedSolved);
 
         analysisRecommendationsRef.current = recommendations;
         analysisSelectedTopicsRef.current = weak.length > 0 ? [weak[0].tag] : [];
@@ -211,13 +257,13 @@ const analyze = useCallback(async () => {
 
         const profile = (data.topic_profile || []).map((t) => ({
           tag: t.topic,
-          attempted: t.attempts,
+          attempts: t.attempts,
           solved: t.solved,
           acRate: Math.round(t.solve_rate * 100),
         }));
         const weak = (data.weak_areas || []).map((tag) => {
           const tp = profile.find((p) => p.tag === tag);
-          return { tag, acRate: tp ? tp.acRate : 0 };
+          return { tag, acRate: tp ? tp.acRate : 0, solved: tp ? tp.solved : 0, attempts: tp ? tp.attempts : 0 };
         });
 
         setLoadingStep(2);
@@ -227,10 +273,10 @@ const analyze = useCallback(async () => {
         let recsData;
         if (Object.keys(masteryScoresRef.current).length > 0) {
           recsData = await getRecommendationsWithMastery(handle.trim(), "lc", 12, controller?.signal, weakTopicList, masteryScoresRef.current)
-            .catch((e) => { console.warn("LC POST recs failed, falling back:", e); return { recommendations: [], model_used: "rule_based" }; });
+            .catch((e) => { console.warn("LC POST recs failed, falling back:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; });
         } else {
           recsData = await getRecommendations(handle.trim(), "lc", 12, controller?.signal, weakTopicList)
-            .catch(() => ({ recommendations: [], model_used: "rule_based" }));
+            .catch((e) => { console.warn("LC GET recs failed, falling back:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; });
         }
         if (controller?.signal.aborted) return;
 
@@ -248,37 +294,90 @@ const analyze = useCallback(async () => {
         setLcUser(userInfo);
         setTagProfile(profile);
         setWeakTags(weak);
-        setSolvedSet(new Set());
         setSuggestedTopics([]);
+
+        // Build solved set from backend profile data
+        const lcSolved = new Set();
+        for (const t of data.topic_profile || []) {
+          if (t.solved_problems) {
+            for (const pid of t.solved_problems) lcSolved.add(pid);
+          }
+        }
+        setSolvedSet(lcSolved);
 
         analysisRecommendationsRef.current = recsData.recommendations || [];
         analysisSelectedTopicsRef.current = weak.length > 0 ? [weak[0].tag] : [];
         analysisActiveWeakTagRef.current = weak.length > 0 ? weak[0].tag : null;
-        modelUsedRef.current = recsData.model_used || null;
       } else {
-        // Codeforces path: existing CF logic + mastery score computation
-        setLoadingStep(1);
-        const userInfo = await fetchUserInfo(handle.trim(), controller?.signal);
-        if (controller?.signal.aborted) return;
+        // Codeforces path: backend first when available, client-only fallback
+        let userInfo, profile, weak, solved, recommendations;
 
-        setLoadingStep(2);
-        const submissions = await fetchSubmissions(handle.trim(), analysisMode, controller?.signal);
-        if (controller?.signal.aborted) return;
-
-        setLoadingStep(3);
-        const { profile, solvedSet: solved } = buildTagProfile(submissions);
-        const weak = findWeakTags(profile);
-
-        if (controller?.signal.aborted) return;
-
-        // Populate masteryScoresRef for Graph-DKT recommendations
         if (useBackend) {
-          const cfData = await analyzeHandle(handle.trim(), "cf", analysisMode, controller?.signal).catch(() => null);
-          if (cfData?.mastery_scores) {
-            masteryScoresRef.current = cfData.mastery_scores;
+          // Backend path: single API call, no duplicate client-side fetches
+          setLoadingStep(1);
+          const data = await analyzeHandle(handle.trim(), "cf", analysisMode, controller?.signal).catch(e => {
+            console.warn("CF backend analysis failed, falling back to client:", e);
+            setError(`Backend failed, falling back: ${e.message || String(e)}`);
+            return null;
+          });
+          if (controller?.signal.aborted) return;
+
+          if (data) {
+            userInfo = {
+              handle: data.handle,
+              platform: data.platform || "cf",
+              rating: data.rating,
+              rank: data.rank,
+              maxRating: data.maxRating,
+              maxRank: data.maxRank,
+              avatar: data.avatar,
+              country: data.country,
+              organization: data.organization,
+            };
+            profile = (data.topic_profile || []).map((t) => ({
+              tag: t.topic,
+              attempts: t.attempts,
+              solved: t.solved,
+              acRate: Math.round(t.solve_rate * 100),
+            }));
+            weak = (data.weak_areas || []).slice(0, 3).map((tag) => {
+              const tp = profile.find((p) => p.tag === tag);
+              return { tag, acRate: tp ? tp.acRate : 0, solved: tp ? tp.solved : 0, attempts: tp ? tp.attempts : 0 };
+            });
+            masteryScoresRef.current = data.mastery_scores || {};
+            // Build solved set from backend normalize profile
+            solved = new Set();
+            for (const t of data.topic_profile || []) {
+              if (t.solved_problems) {
+                for (const pid of t.solved_problems) solved.add(pid);
+              }
+            }
+
+            setLoadingStep(2);
+            setLoadingStep(3);
+            setLoadingStep(4);
           }
-        } else {
-          // Client-side approximation: solve_rate per topic
+        }
+
+        if (!useBackend || !userInfo) {
+          // Client-only path (or backend failed — use fallback)
+          setLoadingStep(1);
+          userInfo = await fetchUserInfo(handle.trim(), controller?.signal);
+          if (controller?.signal.aborted) return;
+
+          setLoadingStep(2);
+          const submissions = await fetchSubmissions(handle.trim(), analysisMode, controller?.signal);
+          if (controller?.signal.aborted) return;
+
+          setLoadingStep(3);
+          const tagResult = buildTagProfile(submissions);
+          profile = tagResult.profile;
+          solved = tagResult.solvedSet;
+          weak = findWeakTags(profile);
+
+          if (controller?.signal.aborted) return;
+
+          // Client-side mastery approximation
           const scores = {};
           for (const t of profile) {
             scores[t.tag] = t.acRate / 100;
@@ -289,22 +388,19 @@ const analyze = useCallback(async () => {
         if (weak.length > 0) {
           setLoadingStep(4);
 
-          let recommendations;
+          // Get recommendations from backend if available and has mastery scores
           if (useBackend && Object.keys(masteryScoresRef.current).length > 0) {
-            // Use backend POST with mastery scores for Graph-DKT recommendations
             const weakTopicList = weak[0].tag;
             const recsData = await getRecommendationsWithMastery(
               handle.trim(), "cf", 12, controller?.signal, weakTopicList, masteryScoresRef.current
-            ).catch((e) => { console.warn("CF POST recs failed, falling back:", e); return { recommendations: [], model_used: "rule_based" }; });
+            ).catch((e) => { console.warn("CF POST recs failed, falling back:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; });
             if (controller?.signal.aborted) return;
             recommendations = recsData.recommendations || [];
-            modelUsedRef.current = recsData.model_used || null;
           } else {
             // Client-side fallback
             const problems = await fetchProblemsForTags([weak[0].tag], controller?.signal);
             if (controller?.signal.aborted) return;
             recommendations = buildRecommendations(problems, solved, userInfo.rating || 800);
-            modelUsedRef.current = "rule_based";
           }
 
           setUser(userInfo);
@@ -312,7 +408,7 @@ const analyze = useCallback(async () => {
           setLcUser(null);
           setTagProfile(profile);
           setWeakTags(weak);
-          setSolvedSet(new Set());
+          setSolvedSet(solved || new Set());
           setSuggestedTopics([]);
 
           analysisRecommendationsRef.current = recommendations;
@@ -326,7 +422,7 @@ const analyze = useCallback(async () => {
           setLcUser(null);
           setTagProfile(profile);
           setWeakTags(weak);
-          setSolvedSet(solved);
+          setSolvedSet(solved || new Set());
           setSuggestedTopics(suggested);
 
           analysisRecommendationsRef.current = [];
@@ -378,6 +474,5 @@ const analyze = useCallback(async () => {
     analysisSelectedTopicsRef,
     analysisActiveWeakTagRef,
     masteryScoresRef,
-    modelUsedRef,
   };
 }

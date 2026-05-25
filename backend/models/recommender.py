@@ -69,10 +69,7 @@ class Recommender:
             p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
             p_copy["is_stretch"] = False
             matched = len(p_copy["matched_topics"])
-            if p["platform"] == "lc":
-                p_copy["rank_score"] = (matched * 100_000) + 5_000
-            else:
-                p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
+            p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
             normal_pool.append(p_copy)
 
         # ── 4. RANKING ───────────────────────────────────────────────
@@ -98,34 +95,30 @@ class Recommender:
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
                 matched = len(p_copy["matched_topics"])
-                if p["platform"] == "lc":
-                    p_copy["rank_score"] = (matched * 100_000) + 5_000
-                else:
-                    p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
+                p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
                 normal_pool.append(p_copy)
 
         # ── 6. ABSOLUTE FALLBACK ─────────────────────────────────────
         if len(normal_pool) < 5:
             sorted_problems = sorted(all_problems, key=lambda x: (
                 len([t for t in x.get("topics", []) if t in final_topics]) * 100_000 +
-                (5_000 if x["platform"] == "lc" else min(x.get("solve_count", 0), 10_000))
+                min(x.get("solve_count", 0), 10_000)
             ), reverse=True)
+            normal_ids = {p["problem_id"] for p in normal_pool}
             for p in sorted_problems:
                 if p["problem_id"] in solved_problem_ids:
                     continue
                 if p["platform"] not in platforms:
                     continue
-                if any(p["problem_id"] == ep["problem_id"] for ep in normal_pool):
+                if p["problem_id"] in normal_ids:
                     continue
                 p_copy = dict(p)
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
                 matched = len(p_copy["matched_topics"])
-                if p["platform"] == "lc":
-                    p_copy["rank_score"] = (matched * 100_000) + 5_000
-                else:
-                    p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
+                p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
                 normal_pool.append(p_copy)
+                normal_ids.add(p["problem_id"])
                 if len(normal_pool) >= top_k:
                     break
 
@@ -136,9 +129,6 @@ class Recommender:
             interleaved = []
             cf_idx, lc_idx = 0, 0
             while len(interleaved) < top_k and (cf_idx < len(cf_problems) or lc_idx < len(lc_problems)):
-                if cf_idx < len(cf_problems):
-                    interleaved.append(cf_problems[cf_idx])
-                    cf_idx += 1
                 if cf_idx < len(cf_problems) and len(interleaved) < top_k:
                     interleaved.append(cf_problems[cf_idx])
                     cf_idx += 1

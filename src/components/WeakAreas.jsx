@@ -37,6 +37,7 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
           <div
             role="button"
             tabIndex={0}
+            aria-pressed={isActive}
             key={t.tag}
             onClick={() => onSelectTag(t.tag)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelectTag(t.tag); }}
@@ -72,7 +73,7 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
               <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500, fontFamily: "var(--font-body)" }}>
-                {t.solved} / {t.attempts} solved
+                {(t.solved ?? 0)} / {(t.attempts ?? 0)} solved
                 {t.avgRating ? ` · ${t.avgRating} Rating` : ""}
               </span>
               {isActive && (

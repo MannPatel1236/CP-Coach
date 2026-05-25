@@ -85,6 +85,7 @@ export async function fetchProblemsByTag(tag, signal) {
   if (!res.ok) throw new Error(`Codeforces API error (${res.status}). Please try again.`);
   const data = await res.json();
   if (data.status !== "OK") throw new Error("Could not fetch problems.");
+  if (!data.result) return { problems: [], stats: [] };
   return {
     problems: data.result.problems,
     stats: data.result.problemStatistics,

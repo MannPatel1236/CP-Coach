@@ -256,6 +256,7 @@ export default function SearchBar({
               type="button"
               key={opt.value}
               aria-pressed={platform === opt.value && !combinedPlatform}
+              aria-label={`Select ${opt.label === 'CF' ? 'Codeforces' : 'LeetCode'} platform`}
               onClick={() => { setPlatform(opt.value); setCombinedPlatform && setCombinedPlatform(false); }}
               style={{
                 background: platform === opt.value && !combinedPlatform
@@ -286,6 +287,7 @@ export default function SearchBar({
             <button
               type="button"
               aria-pressed={combinedPlatform}
+              aria-label="Select combined Codeforces and LeetCode platform"
               onClick={() => setCombinedPlatform(!combinedPlatform)}
               style={{
                 background: combinedPlatform

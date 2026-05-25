@@ -24,7 +24,8 @@ class DKTModel(nn.Module):
 
         self.topic_embedding = nn.Embedding(num_topics, embedding_dim)
         self.input_proj = nn.Linear(embedding_dim + 3, hidden_dim)  # +solved +difficulty +ts_delta
-        self.lstm = nn.LSTM(hidden_dim, hidden_dim, num_layers=1, batch_first=True, dropout=dropout)
+        self.lstm = nn.LSTM(hidden_dim, hidden_dim, num_layers=1, batch_first=True)
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
         self.output_head = nn.Sequential(
             nn.Linear(hidden_dim, num_topics),
             nn.Sigmoid(),
@@ -40,6 +41,7 @@ class DKTModel(nn.Module):
         x = torch.cat([embedded, batch["solved"], batch["difficulty"], batch["ts_delta"]], dim=-1)
         x = torch.relu(self.input_proj(x))                         # (B,T,hidden)
         out, (h, c) = self.lstm(x)                                 # (B,T,hidden)
+        out = self.dropout(out)                                     # apply explicit dropout after LSTM
         predictions = self.output_head(out)                        # (B,T,num_topics)
 
         # Zero out padded positions
@@ -71,7 +73,7 @@ class DKTModel(nn.Module):
         torch.save({"state_dict": model.state_dict(), "config": model.config}, path)
 
     @classmethod
-    def load(cls, path: str):
+    def load(cls, path: str, **kwargs):
         import os
         if not os.path.exists(path):
             logger.warning("No weights found at %s, using untrained model", path)

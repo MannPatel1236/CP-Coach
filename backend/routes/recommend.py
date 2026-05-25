@@ -1,11 +1,13 @@
 """Recommend route — GET /api/recommend/{handle} and POST /api/recommend/{handle}"""
 
 import logging
+import time
 from typing import Optional
 
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Request
 from pydantic import BaseModel
 
+from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
@@ -31,19 +33,37 @@ _topic_graph = CPTopicGraph()
 _normalizer = Normalizer()
 _preprocessor = Preprocessor()
 
+# Module-level problemset cache (TTL = 1 hour = 3600 seconds)
+_CACHE_TTL = 3600
+_problemset_cache: dict = {}
+_cache_timestamps: dict = {}
+
+
+def _get_cached(key: str):
+    ts = _cache_timestamps.get(key)
+    if ts and (time.time() - ts) < _CACHE_TTL:
+        return _problemset_cache.get(key)
+    return None
+
+
+def _set_cached(key: str, value):
+    _problemset_cache[key] = value
+    _cache_timestamps[key] = time.time()
+
 
 async def _fetch_platform_data(
     handle: str, platform_list: list[str]
-) -> tuple[list, list, set, int]:
-    """Fetch problems, submissions, solved IDs, and user rating from requested platforms.
+) -> tuple[list, list, set, int, list[str]]:
+    """Fetch problems, submissions, solved IDs, user rating, and errors from requested platforms.
 
-    Returns (all_problems, normalized_subs, solved_ids, user_rating).
+    Returns (all_problems, normalized_subs, solved_ids, user_rating, errors).
     """
     cf_client = CFClient()
     all_problems: list = []
     normalized_subs: list = []
     solved_ids: set = set()
     user_rating: int = 1200
+    errors: list[str] = []
 
     # Fetch CF data if needed
     if "cf" in platform_list:
@@ -56,10 +76,15 @@ async def _fetch_platform_data(
             info = await cf_client.get_user_info(handle)
             user_rating = info.get("rating", 1200)
 
-            cf_problems = await cf_client.get_problemset()
+            cf_problems = _get_cached("cf_problemset")
+            if cf_problems is None:
+                cf_problems = await cf_client.get_problemset()
+                _set_cached("cf_problemset", cf_problems)
             all_problems.extend(cf_problems)
-        except Exception as e:
-            logger.warning(f"Failed to fetch CF data: {e}")
+        except ValueError as e:
+            errors.append(f"CF validation: {e}")
+        except RuntimeError as e:
+            errors.append(f"CF API: {e}")
 
     # Fetch LC data if needed
     if "lc" in platform_list:
@@ -76,29 +101,43 @@ async def _fetch_platform_data(
                     user_rating = lc_rating
 
             try:
-                lc_problems = await lc_client.get_all_problems(limit=500)
+                lc_problems = _get_cached("lc_problemset")
+                if lc_problems is None:
+                    lc_problems = await lc_client.get_all_problems(limit=500)
+                    _set_cached("lc_problemset", lc_problems)
                 for p in lc_problems:
                     all_problems.append(_normalizer.normalize_lc_problem(p))
-            except Exception as e:
-                logger.warning(f"Failed to fetch LC problems from API: {e}")
-        except Exception as e:
-            logger.warning(f"Failed to fetch LC data: {e}")
+            except RuntimeError as e:
+                errors.append(f"LC problemset: {e}")
+        except ValueError as e:
+            errors.append(f"LC validation: {e}")
+        except RuntimeError as e:
+            errors.append(f"LC API: {e}")
 
-    return all_problems, normalized_subs, solved_ids, user_rating
+    # If ALL platforms failed with validation errors, propagate as 400
+    if errors and not normalized_subs and not all_problems:
+        raise ValueError(errors[0])
+
+    return all_problems, normalized_subs, solved_ids, user_rating, errors
 
 
 @router.get("/recommend/{handle}")
+@limiter.limit("30/minute")
 async def recommend(
+    request: Request,
     handle: str,
     platforms: str = Query("cf"),
     top_k: int = Query(20),
     focus_topics: str = Query(""),
 ):
-    platform_list = [p.strip() for p in platforms.split(",") if p.strip()]
-
-    all_problems, normalized_subs, solved_ids, user_rating = await _fetch_platform_data(
-        handle, platform_list
-    )
+    try:
+        all_problems, normalized_subs, solved_ids, user_rating, fetch_errors = (
+            await _fetch_platform_data(handle, [p.strip() for p in platforms.split(",") if p.strip()])
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     # Build topic profile from all submissions
     topic_profile = _preprocessor.build_topic_profile(normalized_subs)
@@ -116,30 +155,41 @@ async def recommend(
         solved_problem_ids=solved_ids,
         all_problems=all_problems,
         focus_topics=focus,
-        platforms=platform_list,
+        platforms=[p.strip() for p in platforms.split(",") if p.strip()],
         top_k=top_k,
     )
 
-    return {
+    response = {
         "handle": handle,
-        "platforms": platform_list,
+        "platforms": [p.strip() for p in platforms.split(",") if p.strip()],
         "focus_topics": focus or [],
         "recommendations": recs,
         "model_used": "rule_based",
     }
+    if fetch_errors:
+        response["partial_success"] = True
+        response["errors"] = fetch_errors
+    return response
 
 
 @router.post("/recommend/{handle}")
+@limiter.limit("30/minute")
 async def recommend_post(
+    request: Request,
     handle: str,
     body: RecommendRequest = Body(...),
 ):
     platform_list = [p.strip() for p in body.platforms.split(",") if p.strip()]
     focus = [t.strip() for t in body.focus_topics.split(",") if t.strip()] if body.focus_topics else None
 
-    all_problems, normalized_subs, fetched_solved_ids, fetched_user_rating = (
-        await _fetch_platform_data(handle, platform_list)
-    )
+    try:
+        all_problems, normalized_subs, fetched_solved_ids, fetched_user_rating, fetch_errors = (
+            await _fetch_platform_data(handle, platform_list)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     # Use body-provided solved_ids when non-empty, otherwise use fetched
     if body.solved_ids:
@@ -151,7 +201,7 @@ async def recommend_post(
     user_rating = body.user_rating if body.user_rating is not None else fetched_user_rating
 
     # Use provided mastery_scores if explicitly provided and non-empty,
-    # otherwise build from fetched submissions (Bug 3 fix: NOT from empty [])
+    # otherwise build from fetched submissions
     if body.mastery_scores is not None and len(body.mastery_scores) > 0:
         mastery_scores = body.mastery_scores
     else:
@@ -172,12 +222,14 @@ async def recommend_post(
         top_k=body.top_k,
     )
 
-    model_used = "graph_dkt" if body.mastery_scores is not None and len(body.mastery_scores) > 0 else "rule_based"
-
-    return {
+    response = {
         "handle": handle,
         "platforms": platform_list,
         "focus_topics": focus or [],
         "recommendations": recs,
-        "model_used": model_used,
+        "model_used": "graph_dkt" if (body.mastery_scores is not None and len(body.mastery_scores) > 0) else "rule_based",
     }
+    if fetch_errors:
+        response["partial_success"] = True
+        response["errors"] = fetch_errors
+    return response

@@ -2,14 +2,23 @@ import { useState, useCallback, useEffect } from "react";
 import { fetchProblemsForTags, buildRecommendations } from "../api.js";
 import { getRecommendations, getRecommendationsWithMastery } from "../api/backendClient.js";
 
-export default function useRecommendations({ solvedSet, user, abortRef, resetAbort, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, analysisMasteryScoresRef, analysisModelUsedRef, platform, combinedPlatform }) {
+export default function useRecommendations({ solvedSet, user, abortRef, resetAbort, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, analysisMasteryScoresRef, platform, combinedPlatform }) {
   const useBackend = !!import.meta.env.VITE_API_URL;
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [fetchingRecs, setFetchingRecs] = useState(false);
   const [recs, setRecs] = useState([]);
   const [activeWeakTag, setActiveWeakTag] = useState(null);
   const [initialized, setInitialized] = useState(false);
-  const [modelUsed, setModelUsed] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Reset on new user search so recommendations from analyze() are picked up
+  useEffect(() => {
+    setInitialized(false);
+    setRecs([]);
+    setSelectedTopics([]);
+    setActiveWeakTag(null);
+    setError(null);
+  }, [user?.handle]);
 
   // Helpers to avoid duplicated ternary logic
   const getHandle = useCallback(() => {
@@ -27,10 +36,9 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
       setRecs(analysisRecommendationsRef.current);
       setSelectedTopics(analysisSelectedTopicsRef.current);
       setActiveWeakTag(analysisActiveWeakTagRef.current);
-      setModelUsed(analysisModelUsedRef?.current || null);
       setInitialized(true);
     }
-  }, [initialized, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, analysisModelUsedRef]);
+  }, [initialized, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef]);
 
   const selectWeakTag = useCallback(async (tag) => {
     resetAbort();
@@ -39,6 +47,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     setActiveWeakTag(tag);
     setFetchingRecs(true);
     setRecs([]);
+    setError(null);
 
     const isLC = platform === "lc";
     const isCombined = combinedPlatform;
@@ -53,11 +62,9 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
 
         let data;
         if (hasMasteryScores) {
-          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, tag, analysisMasteryScoresRef.current, solvedIds, userRating)
-            .catch((e) => { console.warn("Recommendation POST failed:", e); return null; });
+          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, tag, analysisMasteryScoresRef.current, solvedIds, userRating);
         } else {
-          data = await getRecommendations(handle, platformsStr, 12, controller?.signal, tag)
-            .catch((e) => { console.warn("Recommendation GET failed:", e); return null; });
+          data = await getRecommendations(handle, platformsStr, 12, controller?.signal, tag);
         }
         if (controller?.signal.aborted) return;
 
@@ -68,17 +75,16 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
             if (controller?.signal.aborted) return;
             const fallbackRecs = buildRecommendations(problems, solvedSet, user?.rating || 800);
             setRecs(fallbackRecs);
-            setModelUsed("rule_based");
             setSelectedTopics([tag]);
             return;
           }
         }
 
         setRecs(data?.recommendations || []);
-        setModelUsed(data?.model_used || null);
         setSelectedTopics([tag]);
       } catch (err) {
         if (err.name === "AbortError") return;
+        setError(err.message || "Failed to load recommendations.");
         console.error("Failed to fetch recommendations from backend.", err);
       } finally {
         setFetchingRecs(false);
@@ -91,7 +97,6 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
       if (controller?.signal.aborted) return;
       const recommendations = buildRecommendations(problems, solvedSet, user?.rating || 800);
       setRecs(recommendations);
-      setModelUsed("rule_based");
       setSelectedTopics([tag]);
     } catch (err) {
       if (err.name === "AbortError") return;
@@ -115,6 +120,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
 
     setFetchingRecs(true);
     setRecs([]);
+    setError(null);
 
     const isLC = platform === "lc";
     const isCombined = combinedPlatform;
@@ -130,11 +136,9 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
 
         let data;
         if (hasMasteryScores) {
-          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, focusTopics, analysisMasteryScoresRef.current, solvedIds, userRating)
-            .catch((e) => { console.warn("Recommendation POST failed:", e); return null; });
+          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, focusTopics, analysisMasteryScoresRef.current, solvedIds, userRating);
         } else {
-          data = await getRecommendations(handle, platformsStr, 12, controller?.signal, focusTopics)
-            .catch((e) => { console.warn("Recommendation GET failed:", e); return null; });
+          data = await getRecommendations(handle, platformsStr, 12, controller?.signal, focusTopics);
         }
         if (controller?.signal.aborted) return;
 
@@ -145,15 +149,14 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
             if (controller?.signal.aborted) return;
             const fallbackRecs = buildRecommendations(problems, solvedSet, user?.rating || 800);
             setRecs(fallbackRecs);
-            setModelUsed("rule_based");
             return;
           }
         }
 
         setRecs(data?.recommendations || []);
-        setModelUsed(data?.model_used || null);
       } catch (err) {
         if (err.name === "AbortError") return;
+        setError(err.message || "Failed to load recommendations.");
         console.error("Failed to fetch recommendations from backend.", err);
       } finally {
         setFetchingRecs(false);
@@ -166,7 +169,6 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
       if (controller?.signal.aborted) return;
       const recommendations = buildRecommendations(problems, solvedSet, user?.rating || 800);
       setRecs(recommendations);
-      setModelUsed("rule_based");
     } catch (err) {
       if (err.name === "AbortError") return;
       console.error("Synchronization error.", err);
@@ -186,6 +188,6 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     selectWeakTag,
     toggleTopic,
     fetchForSelectedTopics,
-    modelUsed,
+    error,
   };
 }

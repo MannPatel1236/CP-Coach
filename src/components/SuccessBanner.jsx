@@ -2,7 +2,7 @@ import { CheckIcon } from "./Icons";
 
 export default function SuccessBanner() {
   return (
-    <div style={{
+    <div role="status" aria-live="polite" style={{
       background: "linear-gradient(135deg, rgba(52, 211, 153, 0.04), transparent)",
       border: "1px solid rgba(52, 211, 153, 0.12)",
       borderRadius: "var(--radius-lg)",
@@ -24,10 +24,10 @@ export default function SuccessBanner() {
       </div>
       <div>
         <div className="font-heading" style={{ fontWeight: 600, fontSize: 16, color: "var(--success)", marginBottom: 2 }}>
-          Strategic Optimization Achieved
+          Well Done!
         </div>
         <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.5, fontFamily: "var(--font-body)" }}>
-          You have maintained an efficiency rating above 65% across all domains.
+          Your AC rate is above 65% across all topics. No weak areas found.
         </div>
       </div>
     </div>

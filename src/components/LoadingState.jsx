@@ -28,7 +28,6 @@ function getStepsForPlatform(platform, mode) {
   ];
 }
 
-const line = { hidden: { pathLength: 0, opacity: 0 }, visible: { pathLength: 1, opacity: 1 } };
 const dot = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } };
 
 function StepRow({ label, status, index, isLast }) {
@@ -53,7 +52,7 @@ function StepRow({ label, status, index, isLast }) {
               initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
               <circle cx="10" cy="10" r="9" fill="rgba(52, 211, 153, 0.08)" stroke="rgba(52, 211, 153, 0.3)" strokeWidth="1.5" />
               <motion.path d="M6 10.5L8.5 13L14 7.5" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                initial={line.hidden} animate={line.visible} transition={{ duration: 0.3, delay: 0.15 }} />
+                initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 0.3, delay: 0.15 }} />
             </motion.svg>
           ) : active ? (
             <motion.div

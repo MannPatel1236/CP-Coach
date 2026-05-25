@@ -6,7 +6,7 @@
       "pythonPath": "backend/venv/bin/python"
     }
   ],
-  "pythonVersion": "3.14",
+  "pythonVersion": "3.11",
   "pythonPlatform": "Darwin",
   "typeCheckingMode": "basic",
   "reportMissingImports": "warning",

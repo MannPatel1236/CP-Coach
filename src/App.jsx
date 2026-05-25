@@ -1,6 +1,9 @@
 import { AnimatePresence } from "framer-motion";
+import { useEffect, useRef } from "react";
 import useAnalysis from "./hooks/useAnalysis.js";
 import useRecommendations from "./hooks/useRecommendations.js";
+import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts.js";
+import { showToast } from "./components/ToastContainer.jsx";
 
 import Header from "./components/Header.jsx";
 import SearchBar from "./components/SearchBar.jsx";
@@ -10,10 +13,13 @@ import TagOverview from "./components/TagOverview.jsx";
 import SkillChart from "./components/SkillChart.jsx";
 import TopicPicker from "./components/TopicPicker.jsx";
 import Recommendations from "./components/Recommendations.jsx";
+import TopicGraphViz from "./components/TopicGraphViz.jsx";
+import ModelInsight from "./components/ModelInsight.jsx";
 import LandingPage from "./components/LandingPage.jsx";
 import LoadingState from "./components/LoadingState.jsx";
 import ErrorState from "./components/ErrorState.jsx";
 import SuccessBanner from "./components/SuccessBanner.jsx";
+import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
 
 export default function App() {
   const analysis = useAnalysis();
@@ -27,7 +33,6 @@ export default function App() {
     analysisSelectedTopicsRef: analysis.analysisSelectedTopicsRef,
     analysisActiveWeakTagRef: analysis.analysisActiveWeakTagRef,
     analysisMasteryScoresRef: analysis.masteryScoresRef,
-    analysisModelUsedRef: analysis.modelUsedRef,
     platform: analysis.platform,
     combinedPlatform: analysis.combinedPlatform,
   });
@@ -35,7 +40,7 @@ export default function App() {
   const {
     selectedTopics, fetchingRecs, recs: recommendations,
     activeWeakTag, selectWeakTag,
-    toggleTopic, fetchForSelectedTopics, modelUsed,
+    toggleTopic, fetchForSelectedTopics, error: recError,
   } = recs;
 
   const {
@@ -50,8 +55,45 @@ export default function App() {
     analyze, clearAll,
   } = analysis;
 
+  const focusSearch = () => {
+    const input = document.querySelector(".search-input");
+    if (input) input.focus();
+  };
+
+  const handlePlatformToggle = (key) => {
+    if (key === "1") setPlatform("cf");
+    if (key === "2") setPlatform("lc");
+    if (key === "3") setCombinedPlatform(!combinedPlatform);
+  };
+
+  useKeyboardShortcuts({
+    onFocusSearch: focusSearch,
+    onClear: clearAll,
+    onPlatformToggle: handlePlatformToggle,
+    disabled: !user,
+  });
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", overflowX: "hidden", width: "100%" }}>
+      <a
+        href="#main-content"
+        style={{
+          position: "absolute",
+          top: -40,
+          left: 0,
+          zIndex: 100,
+          padding: 8,
+          background: "var(--primary-container, #6366f1)",
+          color: "#fff",
+          textDecoration: "none",
+          borderRadius: "0 0 4px 0",
+          transition: "top 0.2s",
+        }}
+        onFocus={(e) => { e.currentTarget.style.top = 0; }}
+        onBlur={(e) => { e.currentTarget.style.top = -40; }}
+      >
+        Skip to content
+      </a>
       <Header onHome={clearAll} />
 
       {user && (
@@ -102,16 +144,11 @@ export default function App() {
       )}
 
       {user && (
-        <div
-          className="fade-in dashboard-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "300px 1fr",
-            gap: 24,
-            padding: "32px 48px 80px",
-          }}
+        <main
+          id="main-content"
+          className="fade-in dashboard-grid dashboard-layout"
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div className="column-panel" style={{ minWidth: 0 }}>
             {combinedPlatform && cfUser && lcUser ? (
               <>
                 <ProfileCard user={cfUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
@@ -128,8 +165,9 @@ export default function App() {
             <TagOverview tags={tagProfile} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div className="column-panel" style={{ minWidth: 0 }}>
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
+            {user && <TopicGraphViz weakTags={weakTags} />}
 
             {tagProfile.length > 0 && weakTags.length === 0 && <SuccessBanner />}
 
@@ -143,19 +181,29 @@ export default function App() {
               />
             )}
 
+            {recError && (
+              <div style={{ padding: "12px 16px", background: "var(--error-container)", border: "1px solid var(--error)", borderRadius: "var(--radius-sm)", color: "var(--error)", fontSize: 14 }}>
+                {recError}
+              </div>
+            )}
+
             <AnimatePresence>
               {recommendations.length > 0 && (
                 <Recommendations
                   recs={recommendations}
                   userRating={cfUser?.rating || lcUser?.rating || user?.rating || 800}
                   selectedTopics={selectedTopics}
-                  modelUsed={modelUsed}
                 />
               )}
             </AnimatePresence>
+
+            {tagProfile.length > 0 && (
+              <ModelInsight topicProfile={tagProfile} selectedTopics={selectedTopics} />
+            )}
           </div>
-        </div>
+        </main>
       )}
+      <PrivacyPolicy />
     </div>
   );
 }

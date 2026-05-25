@@ -1,15 +1,24 @@
 """LeetCode GraphQL API client."""
 
 import os
+import re
 import asyncio
 import logging
 
 import httpx
-from fastapi import HTTPException
 
 from platforms.normalizer import Normalizer
 
 logger = logging.getLogger(__name__)
+
+
+class UsernameError(ValueError):
+    """Raised for invalid LeetCode usernames."""
+
+
+class LeetCodeAPIError(RuntimeError):
+    """Raised for unexpected LeetCode GraphQL errors."""
+
 
 LC_URL = os.getenv("LC_GRAPHQL_URL", "https://leetcode.com/graphql")
 HEADERS = {
@@ -19,8 +28,24 @@ HEADERS = {
 }
 TIMEOUT = 20.0
 
+_shared_client = httpx.AsyncClient(timeout=TIMEOUT)
+
+_MAX_HANDLE_LENGTH = 40
+_HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_\\-]+$")
+
 # Module-level problem cache
 _problem_cache: dict[str, dict] = {}
+
+
+def _validate_username(username: str) -> None:
+    if not username or not isinstance(username, str):
+        raise UsernameError("Username is required.")
+    if not username.strip():
+        raise UsernameError("Username cannot be blank.")
+    if len(username) > _MAX_HANDLE_LENGTH:
+        raise UsernameError("Username too long.")
+    if not _HANDLE_PATTERN.match(username):
+        raise UsernameError("Invalid characters in username.")
 
 
 class LeetCodeClient:
@@ -36,26 +61,31 @@ class LeetCodeClient:
         retried = False
         while True:
             try:
-                async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-                    resp = await client.post(LC_URL, json=payload, headers=HEADERS)
-                    if resp.status_code == 429:
-                        if not retried:
-                            retried = True
-                            logger.warning("LC rate limited, retrying in 2s …")
-                            await asyncio.sleep(2)
-                            continue
-                    data = resp.json()
-                    if "errors" in data:
-                        logger.warning("LC GraphQL errors: %s", data["errors"])
-                        return {}
-                    return data.get("data", {})
+                resp = await _shared_client.post(LC_URL, json=payload, headers=HEADERS)
+                if resp.status_code == 429 or resp.status_code >= 500:
+                    if not retried:
+                        retried = True
+                        reason = "rate limited" if resp.status_code == 429 else f"server error {resp.status_code}"
+                        logger.warning("LC %s, retrying in 2s …", reason)
+                        await asyncio.sleep(2)
+                        continue
+                    else:
+                        reason = "rate limited" if resp.status_code == 429 else f"server error {resp.status_code}"
+                        raise LeetCodeAPIError(f"LeetCode {reason} after retry")
+                resp.raise_for_status()
+                data = resp.json()
+                if "errors" in data:
+                    logger.error("LC GraphQL errors: %s", data["errors"])
+                    raise LeetCodeAPIError(f"LeetCode GraphQL error: {data['errors']}")
+                return data.get("data", {})
             except httpx.HTTPError as e:
                 logger.error("LC GraphQL request failed: %s", e)
-                return {}
+                raise LeetCodeAPIError("LeetCode API unavailable") from e
 
     # ── User profile ─────────────────────────────────────────────────
 
     async def get_user_profile(self, username: str) -> dict:
+        _validate_username(username)
         query = """
         query getUserProfile($username: String!) {
             matchedUser(username: $username) {
@@ -69,7 +99,7 @@ class LeetCodeClient:
         data = await self._gql(query, {"username": username})
         user = data.get("matchedUser")
         if user is None:
-            raise HTTPException(404, detail=f"LeetCode user '{username}' not found")
+            raise UsernameError(f"LeetCode user '{username}' not found")
 
         stats = {s["difficulty"]: s["count"] for s in user["submitStats"]["acSubmissionNum"]}
         return {
@@ -85,6 +115,7 @@ class LeetCodeClient:
     # ── Contest ranking ──────────────────────────────────────────────
 
     async def get_contest_ranking(self, username: str) -> dict | None:
+        _validate_username(username)
         query = """
         query getUserContestRanking($username: String!) {
             userContestRanking(username: $username) {
@@ -98,6 +129,7 @@ class LeetCodeClient:
     # ── Recent submissions ───────────────────────────────────────────
 
     async def get_recent_submissions(self, username: str, limit: int = 50) -> list[dict]:
+        _validate_username(username)
         query = """
         query getRecentSubmissions($username: String!, $limit: Int) {
             recentSubmissionList(username: $username, limit: $limit) {
@@ -166,6 +198,7 @@ class LeetCodeClient:
     # ── Full submission pipeline ─────────────────────────────────────
 
     async def get_user_submissions(self, username: str, limit: int = 50) -> list[dict]:
+        _validate_username(username)
         raw_subs = await self.get_recent_submissions(username, limit)
         if not raw_subs:
             return []

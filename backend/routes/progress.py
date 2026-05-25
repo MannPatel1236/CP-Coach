@@ -4,9 +4,11 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from rate_limiter import limiter
 from platforms.codeforces import CFClient
+from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
 
 logger = logging.getLogger(__name__)
@@ -16,12 +18,26 @@ router = APIRouter(prefix="/api", tags=["progress"])
 _normalizer = Normalizer()
 
 
+async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
+    """Fetch normalized submissions for the given platform."""
+    if platform == "lc":
+        client = LeetCodeClient()
+        return await client.get_user_submissions(handle, limit=50)
+    else:
+        client = CFClient()
+        raw_subs = await client.get_all_submissions(handle, max_count=8000)
+        return [_normalizer.normalize_cf_submission(s) for s in raw_subs]
+
+
 @router.get("/progress/{handle}")
-async def progress(handle: str, platform: str = Query("cf")):
-    # Fetch submissions
-    client = CFClient()
-    raw_subs = await client.get_all_submissions(handle, max_count=8000)
-    normalized = [_normalizer.normalize_cf_submission(s) for s in raw_subs]
+@limiter.limit("30/minute")
+async def progress(request: Request, handle: str, platform: str = Query("cf")):
+    try:
+        normalized = await _fetch_normalized_subs(handle, platform)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     # Group by week and topic
     topic_weeks: dict[str, dict[str, dict]] = defaultdict(lambda: defaultdict(lambda: {"solved": 0, "total": 0}))
@@ -49,5 +65,6 @@ async def progress(handle: str, platform: str = Query("cf")):
 
     return {
         "handle": handle,
+        "platform": platform,
         "topic_progress": topic_progress,
     }

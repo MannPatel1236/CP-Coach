@@ -42,7 +42,8 @@ else:
             # Step 1 — DKT backbone (same as DKTModel)
             self.topic_embedding = nn.Embedding(num_topics, embedding_dim)
             self.input_proj = nn.Linear(embedding_dim + 3, hidden_dim)
-            self.lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True, dropout=dropout)
+            self.lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
             # Step 2 — GCN layers
             self.gcn1 = GCNConv(hidden_dim, gcn_hidden)
@@ -66,6 +67,7 @@ else:
             x = torch.cat([embedded, batch["solved"], batch["difficulty"], batch["ts_delta"]], dim=-1)
             x = torch.relu(self.input_proj(x))                       # (B,T,hidden)
             lstm_out, (h, c) = self.lstm(x)                          # (B,T,hidden)
+            lstm_out = self.dropout(lstm_out)
 
             B, T, H = lstm_out.shape
 

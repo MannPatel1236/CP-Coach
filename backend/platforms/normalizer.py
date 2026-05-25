@@ -43,7 +43,7 @@ class Normalizer:
         "trie": "data_structures",
         "segment-tree": "data_structures",
         "binary-indexed-tree": "data_structures",
-        "shortest-path": "shortest_paths",
+        "shortest-path": "graphs",
     }
 
     LC_DIFFICULTY_MAP = {
@@ -110,6 +110,12 @@ class Normalizer:
     def normalize_lc_problem(self, raw: dict) -> dict:
         diff_raw = raw.get("difficulty", "")
         diff_key = diff_raw.upper() if diff_raw else "MEDIUM"
+        # LeetCode API does not provide solve counts; use difficulty as a popularity proxy
+        _lc_fallback_solves = {
+            "EASY": 5000,
+            "MEDIUM": 2500,
+            "HARD": 1000,
+        }
         return {
             "problem_id": f"lc-{raw['titleSlug']}",
             "platform": "lc",
@@ -123,7 +129,7 @@ class Normalizer:
                 ]
                 if t
             ],
-            "solve_count": 0,
+            "solve_count": _lc_fallback_solves.get(diff_key, 2500),
             "url": f"https://leetcode.com/problems/{raw['titleSlug']}/",
         }
 

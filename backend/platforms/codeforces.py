@@ -1,11 +1,11 @@
 """Codeforces REST API client."""
 
 import os
+import re
 import asyncio
 import logging
 
 import httpx
-from fastapi import HTTPException
 
 from platforms.normalizer import Normalizer
 
@@ -15,6 +15,26 @@ CF_BASE = os.getenv("CF_API_BASE", "https://codeforces.com/api")
 TIMEOUT = 15.0
 PAGE_SIZE = 1000
 PAGE_DELAY = 0.3
+
+_MAX_HANDLE_LENGTH = 40
+_HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_\\-]+$")
+
+
+class HandleError(ValueError):
+    """Raised for invalid Codeforces handles."""
+
+def _validate_handle(handle: str) -> None:
+    if not handle or not isinstance(handle, str):
+        raise HandleError("Handle is required.")
+    if not handle.strip():
+        raise HandleError("Handle cannot be blank.")
+    if len(handle) > _MAX_HANDLE_LENGTH:
+        raise HandleError("Handle too long.")
+    if not _HANDLE_PATTERN.match(handle):
+        raise HandleError("Invalid characters in handle.")
+
+
+_shared_client = httpx.AsyncClient(timeout=TIMEOUT)
 
 
 class CFClient:
@@ -26,17 +46,19 @@ class CFClient:
     # ── User info ────────────────────────────────────────────────────
 
     async def get_user_info(self, handle: str) -> dict:
+        _validate_handle(handle)
         data = await self._get(f"/user.info?handles={handle}")
         if data.get("status") != "OK":
-            raise HTTPException(404, detail=f"CF handle '{handle}' not found")
+            raise HandleError(f"CF handle '{handle}' not found")
         return data["result"][0]
 
     # ── Submissions ──────────────────────────────────────────────────
 
     async def get_submissions(self, handle: str, count: int = 1000, offset: int = 1) -> list[dict]:
+        _validate_handle(handle)
         data = await self._get(f"/user.status?handle={handle}&count={count}&from={offset}")
         if data.get("status") != "OK":
-            raise HTTPException(502, detail="Could not fetch CF submissions")
+            raise RuntimeError("Could not fetch CF submissions")
         return data["result"]
 
     async def get_all_submissions(self, handle: str, max_count: int = 8000) -> list[dict]:
@@ -56,7 +78,7 @@ class CFClient:
     async def get_problemset(self) -> list[dict]:
         data = await self._get("/problemset.problems")
         if data.get("status") != "OK":
-            raise HTTPException(502, detail="Could not fetch CF problemset")
+            raise RuntimeError("Could not fetch CF problemset")
 
         problems = data["result"]["problems"]
         stats = data["result"]["problemStatistics"]
@@ -81,15 +103,21 @@ class CFClient:
         retried = False
         while True:
             try:
-                async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-                    resp = await client.get(url)
-                    return resp.json()
+                resp = await _shared_client.get(url)
+                resp.raise_for_status()
+                return resp.json()
             except httpx.TimeoutException:
                 if not retried:
                     retried = True
                     logger.warning("CF API timeout, retrying in 1s …")
                     await asyncio.sleep(1)
                     continue
-                raise HTTPException(504, detail="CF API timed out")
+                raise RuntimeError("CF API timed out")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500 and not retried:
+                    retried = True
+                    logger.warning("CF server error %s, retrying in 2s ...", e.response.status_code)
+                    await asyncio.sleep(2)
+                    continue
+                raise RuntimeError(f"Could not reach CF API ({e.response.status_code})")
             except httpx.HTTPError:
-                raise HTTPException(502, detail="Could not reach CF API")

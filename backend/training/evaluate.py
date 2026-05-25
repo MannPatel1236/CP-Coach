@@ -53,17 +53,14 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
                     per_topic_preds[topic_name].append(pred_val)
                     per_topic_labels[topic_name].append(label_val)
 
-                    # Loss
-                    p = torch.tensor(pred_val)
-                    label_t = torch.tensor(label_val)
-                    total_loss += criterion(p, label_t).item()
-                    total_steps += 1
-
     # Compute metrics
     result = {"auc": 0.0, "accuracy": 0.0, "per_topic_auc": {}, "loss": 0.0}
 
-    if total_steps > 0:
-        result["loss"] = total_loss / total_steps
+    # Vectorized loss computation to avoid per-iteration torch.tensor() overhead
+    if all_preds:
+        preds_tensor = torch.tensor(all_preds)
+        labels_tensor = torch.tensor(all_labels, dtype=torch.float32)
+        result["loss"] = criterion(preds_tensor, labels_tensor).mean().item()
 
     if len(set(all_labels)) > 1:
         result["auc"] = roc_auc_score(all_labels, all_preds)

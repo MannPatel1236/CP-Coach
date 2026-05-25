@@ -6,6 +6,8 @@ import sys
 from collections import defaultdict
 
 import pandas as pd
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -94,8 +96,21 @@ def main():
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--out", default="weights/graph_dkt.pt")
     args = parser.parse_args()
+
+    # Set random seeds for reproducibility
+    seed = args.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    logger.info("Random seed set to: %d", seed)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Device: %s", device)

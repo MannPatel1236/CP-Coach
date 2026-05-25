@@ -40,6 +40,12 @@ export const AlertIcon = ({ size = 18, className = "" }) => (
   </BaseIcon>
 );
 
+export const InfoIcon = ({ size = 18, className = "" }) => (
+  <BaseIcon size={size} className={className}>
+    <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+  </BaseIcon>
+);
+
 export const CheckIcon = ({ size = 18, className = "" }) => (
   <BaseIcon size={size} className={className}>
     <polyline points="20 6 9 17 4 12"/>
@@ -94,6 +100,24 @@ export const CodeforcesIcon = ({ size = 18, className = "" }) => (
     <rect x="9" y="3" width="6" height="18" rx="1" fill="#1480C4"/>
     <rect x="17" y="12" width="6" height="9" rx="1" fill="#B11E26"/>
   </svg>
+);
+
+export const CloseIcon = ({ size = 18, className = "" }) => (
+  <BaseIcon size={size} className={className}>
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </BaseIcon>
+);
+
+export const CopyIcon = ({ size = 18, className = "" }) => (
+  <BaseIcon size={size} className={className}>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+  </BaseIcon>
+);
+
+export const RefreshIcon = ({ size = 18, className = "" }) => (
+  <BaseIcon size={size} className={className}>
+    <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" /><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+  </BaseIcon>
 );
 
 export const LeetCodeIcon = ({ size = 18, className = "" }) => (
