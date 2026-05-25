@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Use SKIP_LOCAL_DB env var to skip local Postgres setup (production/cloud)
-if [ -n "$SKIP_LOCAL_DB" ]; then
-  echo "SKIP_LOCAL_DB set. Assuming cloud environment."
+# Skip local Postgres setup when DATABASE_URL is set (production/cloud) or SKIP_LOCAL_DB is explicit
+if [ -n "$DATABASE_URL" ] || [ -n "$SKIP_LOCAL_DB" ]; then
+  echo "Cloud/production mode detected. Skipping local PostgreSQL."
   PORT_NUM=${PORT:-8000}
   echo "Starting server on port $PORT_NUM..."
   exec uvicorn main:app --host 0.0.0.0 --port "$PORT_NUM"
