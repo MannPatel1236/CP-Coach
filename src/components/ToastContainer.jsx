@@ -4,12 +4,14 @@ import { CloseIcon } from "./Icons";
 const ToastContext = createContext(null);
 
 let globalAddToast = null;
+let _toastId = 0;
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const addToast = useCallback((message, type = "info") => {
-    const id = Date.now() + Math.random();
+    _toastId += 1;
+    const id = _toastId;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));

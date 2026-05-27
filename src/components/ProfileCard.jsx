@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { rankColor, ratingColor } from "../utils.js";
 import { UserIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
 
-export default function ProfileCard({ user, tagCount, weakCount }) {
+function ProfileCard({ user, tagCount, weakCount }) {
   const isLeetCode = user.platform === "lc";
   const rc = isLeetCode ? "#28a745" : rankColor(user.rank ?? "");
   const displayRank = isLeetCode ? "LeetCode" : (user.rank || "unrated");
@@ -150,3 +151,5 @@ export default function ProfileCard({ user, tagCount, weakCount }) {
     </div>
   );
 }
+
+export default memo(ProfileCard);

@@ -22,8 +22,6 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
     all_labels = []
     per_topic_preds = defaultdict(list)
     per_topic_labels = defaultdict(list)
-    total_loss = 0.0
-    total_steps = 0
 
     with torch.no_grad():
         for batch_seqs in dataloader:

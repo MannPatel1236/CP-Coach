@@ -145,19 +145,23 @@ export default function LoadingState({ step, mode, isFetchingRecs, platform = "c
 
   return (
     <motion.div
-      className="card"
       initial={{ opacity: 0, y: 16, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-      style={{
-        maxWidth: 480, margin: "20px 48px",
-        padding: "22px 26px",
-        display: "flex", flexDirection: "column", gap: 6,
-      }}
+      style={{ margin: "20px 48px" }}
     >
+      <div
+        className="card"
+        style={{
+          maxWidth: 480,
+          padding: "22px 26px",
+          display: "flex", flexDirection: "column", gap: 6,
+        }}
+      >
       {visibleSteps.map((s, i) => (
         <StepRow key={s.stepNum} label={s.label} status={s.status} index={i} isLast={i === visibleSteps.length - 1} />
       ))}
+    </div>
     </motion.div>
   );
 }

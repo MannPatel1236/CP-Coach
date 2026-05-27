@@ -30,6 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_platform ON submissions(platform);
 CREATE INDEX IF NOT EXISTS idx_submissions_user_platform ON submissions(user_id, platform);
 CREATE INDEX IF NOT EXISTS idx_submissions_submitted_at ON submissions(submitted_at);
+CREATE INDEX IF NOT EXISTS idx_submissions_user_at ON submissions(user_id, submitted_at DESC);
 
 CREATE TABLE IF NOT EXISTS problems (
   problem_id VARCHAR(60) PRIMARY KEY,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   fetchUserInfo,
   fetchSubmissions,
@@ -43,6 +43,15 @@ export default function useAnalysis() {
       abortRef.current.abort();
     }
     abortRef.current = new AbortController();
+  }, []);
+
+  // Abort in-flight requests on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
   }, []);
 
   const clearAll = useCallback(() => {

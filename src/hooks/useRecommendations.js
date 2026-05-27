@@ -84,6 +84,19 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
         setSelectedTopics([tag]);
       } catch (err) {
         if (err.name === "AbortError") return;
+        // CF-only failover for single-tag
+        if (!isLC && !isCombined) {
+          try {
+            const problems = await fetchProblemsForTags([tag], controller?.signal);
+            if (controller?.signal.aborted) return;
+            setRecs(buildRecommendations(problems, solvedSet, user?.rating || 800));
+            setSelectedTopics([tag]);
+            setFetchingRecs(false);
+            return;
+          } catch {
+            // pass through to setError
+          }
+        }
         setError(err.message || "Failed to load recommendations.");
         console.error("Failed to fetch recommendations from backend.", err);
       } finally {
@@ -156,6 +169,18 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
         setRecs(data?.recommendations || []);
       } catch (err) {
         if (err.name === "AbortError") return;
+        // CF-only failover: try client-side before giving up
+        if (!isLC && !isCombined) {
+          try {
+            const problems = await fetchProblemsForTags(selectedTopics, controller?.signal);
+            if (controller?.signal.aborted) return;
+            setRecs(buildRecommendations(problems, solvedSet, user?.rating || 800));
+            setFetchingRecs(false);
+            return;
+          } catch {
+            // pass through to setError
+          }
+        }
         setError(err.message || "Failed to load recommendations.");
         console.error("Failed to fetch recommendations from backend.", err);
       } finally {

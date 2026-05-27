@@ -28,13 +28,18 @@ HEADERS = {
 }
 TIMEOUT = 20.0
 
-_shared_client = httpx.AsyncClient(timeout=TIMEOUT)
+_shared_client = httpx.AsyncClient(
+    timeout=TIMEOUT,
+    limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+)
 
 _MAX_HANDLE_LENGTH = 40
 _HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_\\-]+$")
 
-# Module-level problem cache
-_problem_cache: dict[str, dict] = {}
+# Module-level problem cache (bounded, max 256 entries, TTL 3600s)
+_MAX_CACHE_SIZE = 256
+_CACHE_TTL = 3600
+_problem_cache: dict[str, tuple[dict, float]] = {}
 
 
 def _validate_username(username: str) -> None:
@@ -143,8 +148,12 @@ class LeetCodeClient:
     # ── Problem details (cached) ─────────────────────────────────────
 
     async def get_problem_details(self, title_slug: str) -> dict:
+        now = time.time()
         if title_slug in _problem_cache:
-            return _problem_cache[title_slug]
+            entry, ts = _problem_cache[title_slug]
+            if now - ts < _CACHE_TTL:
+                return entry
+            # stale — fall through to re-fetch
 
         query = """
         query getProblemDetails($titleSlug: String!) {
@@ -156,7 +165,14 @@ class LeetCodeClient:
         """
         data = await self._gql(query, {"titleSlug": title_slug})
         question = data.get("question") or {}
-        _problem_cache[title_slug] = question
+
+        # Evict stale entries before FIFO eviction
+        _problem_cache.pop(title_slug, None)
+        if len(_problem_cache) >= _MAX_CACHE_SIZE:
+            oldest_key = next(iter(_problem_cache))
+            del _problem_cache[oldest_key]
+
+        _problem_cache[title_slug] = (question, time.time())
         return question
 
     # ── All problems (for recommendations) ───────────────────────────
@@ -215,7 +231,8 @@ class LeetCodeClient:
         # Merge and normalize
         normalized = []
         for sub in raw_subs:
-            details = _problem_cache.get(sub["titleSlug"], {})
+            entry, _ts = _problem_cache.get(sub["titleSlug"], ({}, 0))
+            details = entry if entry else {}
             merged = {
                 "titleSlug": sub["titleSlug"],
                 "statusDisplay": sub["statusDisplay"],

@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import { acColor, shortenTag } from "../utils.js";
 
-function ChartTooltip({ active, payload }) {
+const ChartTooltip = memo(function ChartTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -25,9 +25,9 @@ function ChartTooltip({ active, payload }) {
       </div>
     </div>
   );
-}
+});
 
-export default function SkillChart({ tags }) {
+const SkillChart = memo(function SkillChart({ tags }) {
   const chartData = useMemo(() => tags.map((t) => ({ ...t, short: shortenTag(t.tag) })), [tags]);
 
   return (
@@ -68,4 +68,6 @@ export default function SkillChart({ tags }) {
       </div>
     </div>
   );
-}
+});
+
+export default SkillChart;

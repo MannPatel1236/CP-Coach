@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { acColor } from "../utils.js";
 
 const AC_STYLES = {
@@ -12,7 +13,7 @@ function acStyle(rate) {
   return AC_STYLES.high;
 }
 
-export default function TagOverview({ tags }) {
+function TagOverview({ tags }) {
   return (
     <div className="card" style={{ padding: 20 }}>
       <div style={{
@@ -58,3 +59,5 @@ export default function TagOverview({ tags }) {
     </div>
   );
 }
+
+export default memo(TagOverview);

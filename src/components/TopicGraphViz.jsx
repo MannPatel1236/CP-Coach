@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import dagre from "dagre";
 import { InfoIcon } from "./Icons";
+
+// Lazily loaded dagre (~200 KB). Only downloads when the graph is visible.
+const dagrePromise = import("dagre").then((mod) => mod.default || mod);
 
 const PILL_H = 28;
 const PILL_RX = 14;
@@ -30,7 +32,8 @@ const ORPHAN_DIFFICULTY_RANK = {
 //  producing a clean left-to-right DAG with minimal edge crossings.
 //  Positions are normalized to fit within the SVG viewport.
 // ------------------------------------------------------------------
-function getLayout(eds, rawNodes) {
+async function getLayout(eds, rawNodes) {
+  const dagre = await dagrePromise;
   const g = new dagre.graphlib.Graph();
   g.setGraph({ rankdir: "LR", nodesep: 55, ranksep: 130, marginx: 20, marginy: 20 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -223,12 +226,14 @@ export default function TopicGraphViz({ weakTags = [] }) {
   const [graphData, setGraphData] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const base = import.meta.env.VITE_API_URL || "";
         const res = await fetch(`${base}/api/graph`, {
           signal: AbortSignal.timeout(5000),
         });
+        if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
           setGraphData(data);
@@ -236,9 +241,11 @@ export default function TopicGraphViz({ weakTags = [] }) {
           setGraphData(FALLBACK_GRAPH);
         }
       } catch {
+        if (cancelled) return;
         setGraphData(FALLBACK_GRAPH);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const weakSet = useMemo(() => new Set(weakTags.map((t) => t.tag)), [weakTags]);
@@ -259,24 +266,40 @@ export default function TopicGraphViz({ weakTags = [] }) {
     return orphans;
   }, [graphData]);
 
-  const { nodes, edges, svgWidth, svgHeight } = useMemo(() => {
-    if (!graphData) return { nodes: [], edges: [], svgWidth: 1000, svgHeight: 620 };
-    const { positions, svgWidth, svgHeight } = getLayout(graphData.edges || [], graphData.nodes || []);
-    const processedNodes = (graphData.nodes || []).map((n) => {
-      const id = n.id || n;
-      const pos = positions[id] || { x: 500, y: 310 };
-      return { ...n, id, x: pos.x, y: pos.y };
-    });
+  const [{ nodes, edges, svgWidth, svgHeight }, setGraphLayout] = useState({
+    nodes: [],
+    edges: [],
+    svgWidth: 1000,
+    svgHeight: 620,
+  });
 
-    const processedEdges = (graphData.edges || [])
-      .map((e) => {
-        const src = processedNodes.find((n) => n.id === e.source);
-        const tgt = processedNodes.find((n) => n.id === e.target);
-        return src && tgt ? { ...e, source: src, target: tgt } : null;
-      })
-      .filter(Boolean);
+  useEffect(() => {
+    let cancelled = false;
+    if (!graphData) return;
+    (async () => {
+      const { positions, svgWidth, svgHeight } = await getLayout(
+        graphData.edges || [],
+        graphData.nodes || []
+      );
+      if (cancelled) return;
 
-    return { nodes: processedNodes, edges: processedEdges, svgWidth, svgHeight };
+      const processedNodes = (graphData.nodes || []).map((n) => {
+        const id = n.id || n;
+        const pos = positions[id] || { x: 500, y: 310 };
+        return { ...n, id, x: pos.x, y: pos.y };
+      });
+
+      const processedEdges = (graphData.edges || [])
+        .map((e) => {
+          const src = processedNodes.find((n) => n.id === e.source);
+          const tgt = processedNodes.find((n) => n.id === e.target);
+          return src && tgt ? { ...e, source: src, target: tgt } : null;
+        })
+        .filter(Boolean);
+
+      setGraphLayout({ nodes: processedNodes, edges: processedEdges, svgWidth, svgHeight });
+    })();
+    return () => { cancelled = true; };
   }, [graphData]);
 
   const connectedToHovered = useMemo(() => {
@@ -357,12 +380,12 @@ export default function TopicGraphViz({ weakTags = [] }) {
 
   return (
     <motion.div
-      className="card"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      style={{ padding: 24 }}
+      style={{ margin: 0 }}
     >
+      <div className="card" style={{ padding: 24 }}>
       <div
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, cursor: "pointer" }}
         onClick={() => setExpanded((v) => !v)}
@@ -590,6 +613,7 @@ export default function TopicGraphViz({ weakTags = [] }) {
           </div>
         </>
       )}
+    </div>
     </motion.div>
   );
 }

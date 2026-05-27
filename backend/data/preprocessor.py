@@ -36,15 +36,17 @@ class Preprocessor:
             delta = (ts_sec - prev_ts) / 86400.0  # normalize by 1 day
             prev_ts = ts_sec
 
-            sequence.append({
-                "topic": sub["topics"][0],
-                "all_topics": sub["topics"],
-                "solved": 1 if sub.get("verdict") == "OK" else 0,
-                "difficulty": (sub.get("difficulty") or 1500) / 4000.0,
-                "timestamp_delta": max(delta, 0.0),
-                "weight": weight,
-                "platform": sub.get("platform", "cf"),
-            })
+            # Emit one sequence entry per topic so all tags contribute signal
+            for topic in sub["topics"]:
+                sequence.append({
+                    "topic": topic,
+                    "all_topics": sub["topics"],
+                    "solved": 1 if sub.get("verdict") == "OK" else 0,
+                    "difficulty": (sub.get("difficulty") or 1500) / 4000.0,
+                    "timestamp_delta": max(delta, 0.0),
+                    "weight": weight,
+                    "platform": sub.get("platform", "cf"),
+                })
         return sequence
 
     # ── Topic profile ────────────────────────────────────────────────

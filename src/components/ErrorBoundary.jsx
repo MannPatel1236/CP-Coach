@@ -5,6 +5,7 @@ export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null, copied: false };
+    this._copyTimer = null;
   }
 
   static getDerivedStateFromError(error) {
@@ -15,12 +16,18 @@ export default class ErrorBoundary extends React.Component {
     console.error("ErrorBoundary caught:", error, info);
   }
 
+  componentWillUnmount() {
+    if (this._copyTimer) {
+      clearTimeout(this._copyTimer);
+    }
+  }
+
   copyError = () => {
     const { error } = this.state;
     const text = error?.stack || error?.message || "Unknown error";
     navigator.clipboard?.writeText(text).catch(() => null);
     this.setState({ copied: true });
-    setTimeout(() => this.setState({ copied: false }), 2000);
+    this._copyTimer = setTimeout(() => this.setState({ copied: false }), 2000);
   };
 
   render() {

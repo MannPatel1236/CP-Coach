@@ -65,8 +65,8 @@ CP Coach is a full-stack web application that connects to your **Codeforces** an
 +--------------------------------------------+
       |              |              |
       v              v              v
- Codeforces    LeetCode      PostgreSQL
-    REST        GraphQL         |
+ Codeforces       LeetCode       PostgreSQL
+    REST          GraphQL         
 ```
 
 ---
@@ -387,14 +387,6 @@ Enable `pg_trgm` for trigram search indexes:
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ```
-
----
-
-## License
-
-Developed as part of Innovative Product Development (IPD) at **DJ Sanghvi College of Engineering**.
-
----
 
 <div align="center">
 

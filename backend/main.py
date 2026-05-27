@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -14,6 +14,7 @@ from slowapi.errors import RateLimitExceeded
 load_dotenv()
 
 from rate_limiter import limiter  # noqa: E402
+from models.errors import handle_http_exception, handle_catchall  # noqa: E402
 from routes import analyze, recommend, progress, graph, user  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,10 @@ app = FastAPI(title="CP Coach API", version="2.0", lifespan=lifespan)
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Structured error responses for all other exceptions
+app.add_exception_handler(HTTPException, handle_http_exception)
+app.add_exception_handler(Exception, handle_catchall)
 
 # Security headers middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

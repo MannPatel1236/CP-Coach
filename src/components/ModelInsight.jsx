@@ -44,12 +44,12 @@ export default function ModelInsight({ topicProfile, selectedTopics }) {
 
   return (
     <motion.div
-      className="card"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      style={{ padding: 24 }}
+      style={{ margin: 0 }}
     >
+      <div className="card" style={{ padding: 24 }}>
       <div
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isExpanded ? 16 : 0, cursor: "pointer" }}
         onClick={() => setIsExpanded((v) => !v)}
@@ -94,6 +94,7 @@ export default function ModelInsight({ topicProfile, selectedTopics }) {
           </div>
         </div>
       )}
+    </div>
     </motion.div>
   );
 }

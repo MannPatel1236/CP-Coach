@@ -6,6 +6,11 @@ from data.topic_graph import CPTopicGraph
 class Recommender:
     """Graph-aware problem recommender with prerequisite gating."""
 
+    TOPIC_MATCH_WEIGHT = 100_000
+    SOLVE_COUNT_CAP = 10_000
+    DEFAULT_MASTERY_THRESHOLD = 0.6
+    STRETCH_MULTIPLIER = 2
+
     def __init__(self, topic_graph: CPTopicGraph, mastery_threshold=0.6, difficulty_band=350):
         self.topic_graph = topic_graph
         self.mastery_threshold = mastery_threshold
@@ -69,7 +74,7 @@ class Recommender:
             p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
             p_copy["is_stretch"] = False
             matched = len(p_copy["matched_topics"])
-            p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
+            p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + min(p.get("solve_count", 0), self.SOLVE_COUNT_CAP)
             normal_pool.append(p_copy)
 
         # ── 4. RANKING ───────────────────────────────────────────────
@@ -77,7 +82,7 @@ class Recommender:
 
         # ── 5. STRETCH FALLBACK ──────────────────────────────────────
         if len(normal_pool) < 5:
-            hi_stretch = user_rating + self.difficulty_band * 2
+            hi_stretch = user_rating + self.difficulty_band * self.STRETCH_MULTIPLIER
             normal_ids = {p["problem_id"] for p in normal_pool}
             for p in all_problems:
                 if p["platform"] not in platforms:
@@ -95,14 +100,14 @@ class Recommender:
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
                 matched = len(p_copy["matched_topics"])
-                p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
+                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + min(p.get("solve_count", 0), self.SOLVE_COUNT_CAP)
                 normal_pool.append(p_copy)
 
         # ── 6. ABSOLUTE FALLBACK ─────────────────────────────────────
         if len(normal_pool) < 5:
             sorted_problems = sorted(all_problems, key=lambda x: (
-                len([t for t in x.get("topics", []) if t in final_topics]) * 100_000 +
-                min(x.get("solve_count", 0), 10_000)
+                len([t for t in x.get("topics", []) if t in final_topics]) * self.TOPIC_MATCH_WEIGHT +
+                min(x.get("solve_count", 0), self.SOLVE_COUNT_CAP)
             ), reverse=True)
             normal_ids = {p["problem_id"] for p in normal_pool}
             for p in sorted_problems:
@@ -116,7 +121,7 @@ class Recommender:
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
                 matched = len(p_copy["matched_topics"])
-                p_copy["rank_score"] = (matched * 100_000) + min(p.get("solve_count", 0), 10_000)
+                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + min(p.get("solve_count", 0), self.SOLVE_COUNT_CAP)
                 normal_pool.append(p_copy)
                 normal_ids.add(p["problem_id"])
                 if len(normal_pool) >= top_k:

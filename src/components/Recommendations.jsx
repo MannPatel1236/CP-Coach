@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
 import { ExternalLinkIcon, BookIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
@@ -49,7 +50,7 @@ function normalizeRec(p) {
   };
 }
 
-export default function Recommendations({ recs, userRating, selectedTopics }) {
+function Recommendations({ recs, userRating, selectedTopics }) {
   if (!recs.length) return null;
 
   const lo = Math.max(BASE_RECOMMEND_RATING, Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP);
@@ -59,12 +60,12 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
 
   return (
     <motion.div
-      className="card"
       initial={{ opacity: 0, y: 30, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
-      style={{ padding: 24 }}
+      style={{ margin: 0 }}
     >
+      <div className="card" style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -269,7 +270,9 @@ export default function Recommendations({ recs, userRating, selectedTopics }) {
           );
         })}
       </motion.div>
-
+    </div>
     </motion.div>
   );
 }
+
+export default memo(Recommendations);

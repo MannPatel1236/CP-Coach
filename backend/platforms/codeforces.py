@@ -34,7 +34,10 @@ def _validate_handle(handle: str) -> None:
         raise HandleError("Invalid characters in handle.")
 
 
-_shared_client = httpx.AsyncClient(timeout=TIMEOUT)
+_shared_client = httpx.AsyncClient(
+    timeout=TIMEOUT,
+    limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+)
 
 
 class CFClient:

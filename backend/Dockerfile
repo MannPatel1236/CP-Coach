@@ -10,5 +10,8 @@ RUN pip install -r requirements.txt
 # Install psql client for startup.sh schema init
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
 COPY . .
+# Run as non-root for security
+RUN useradd -m appuser
+USER appuser
 EXPOSE 8000
 CMD ["/bin/bash", "/app/startup.sh"]

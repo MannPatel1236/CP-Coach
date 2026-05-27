@@ -1,20 +1,14 @@
+import { memo } from "react";
 import { acColor } from "../utils.js";
 import { AlertIcon } from "./Icons";
 
-export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
+function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
   if (!weakTags.length) return null;
 
   const isLowVolume = weakTags.some(t => t.lowVolume);
 
   return (
-    <div style={{
-      background: "linear-gradient(145deg, var(--surface-1), rgba(10, 13, 20, 0.8))",
-      border: "1px solid var(--outline)",
-      borderRadius: "var(--radius-lg)",
-      padding: 24,
-      position: "relative",
-      overflow: "hidden",
-    }}>
+    <div className="card">
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -95,3 +89,5 @@ export default function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
     </div>
   );
 }
+
+export default memo(WeakAreas);

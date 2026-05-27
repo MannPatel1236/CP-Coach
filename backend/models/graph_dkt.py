@@ -43,7 +43,7 @@ else:
             self.topic_embedding = nn.Embedding(num_topics, embedding_dim)
             self.input_proj = nn.Linear(embedding_dim + 3, hidden_dim)
             self.lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
-        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+            self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
             # Step 2 — GCN layers
             self.gcn1 = GCNConv(hidden_dim, gcn_hidden)

@@ -10,16 +10,47 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
 
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 
-AsyncSessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+def _ensure_db_url():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is required")
+    return DATABASE_URL
+
+
+class _LazyEngine:
+    """Lazily initializes the async engine on first connect()."""
+    def __init__(self):
+        self._engine = None
+
+    def _get(self):
+        if self._engine is None:
+            self._engine = create_async_engine(
+                _ensure_db_url(), echo=False, future=True,
+            )
+        return self._engine
+
+    def connect(self):
+        return self._get().connect()
+
+
+class _LazySessionmaker:
+    """Lazily initializes the sessionmaker on first call."""
+    def __init__(self):
+        self._sm = None
+
+    def __call__(self):
+        if self._sm is None:
+            self._sm = sessionmaker(
+                bind=engine._get(),  # engine is defined at module level below
+                class_=AsyncSession,
+                expire_on_commit=False,
+            )
+        return self._sm()
+
+
+engine = _LazyEngine()
+AsyncSessionLocal = _LazySessionmaker()
 
 Base = declarative_base()
 
