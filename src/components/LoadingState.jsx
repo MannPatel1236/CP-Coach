@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 function getStepsForPlatform(platform, mode) {
   const isCombined = platform === "combined";
   const isLC = platform === "lc";
-  const isCF = platform === "cf";
-  
+
   const platformName = isCombined ? "Codeforces & LeetCode" : isLC ? "LeetCode" : "Codeforces";
   
   if (mode === "deep") {
@@ -30,7 +29,7 @@ function getStepsForPlatform(platform, mode) {
 
 const dot = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } };
 
-function StepRow({ label, status, index, isLast }) {
+function StepRow({ label, status, isLast }) {
   const done = status === "done";
   const active = status === "active";
 
@@ -159,7 +158,7 @@ export default function LoadingState({ step, mode, isFetchingRecs, platform = "c
         }}
       >
       {visibleSteps.map((s, i) => (
-        <StepRow key={s.stepNum} label={s.label} status={s.status} index={i} isLast={i === visibleSteps.length - 1} />
+        <StepRow key={s.stepNum} label={s.label} status={s.status} isLast={i === visibleSteps.length - 1} />
       ))}
     </div>
     </motion.div>

@@ -5,7 +5,7 @@ const BASE = import.meta.env.PROD ? "/api/cf" : "/cf-api";
 
 const REQUEST_DELAY_MS = 800;
 const MAX_HANDLE_LENGTH = 40;
-const HANDLE_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+const HANDLE_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -70,14 +70,9 @@ export async function fetchSubmissions(handle, mode = "quick", signal) {
   return all;
 }
 
-// Internal tag → Codeforces tag format
-function internalToCfTag(tag) {
-  return tag.replace(/_/g, " ");
-}
-
 // Fetch problems for a single tag
 export async function fetchProblemsByTag(tag, signal) {
-  const cfTag = internalToCfTag(tag);
+  const cfTag = tag.replace(/_/g, " ");
   const res = await fetch(
     `${BASE}/problemset.problems?tags=${encodeURIComponent(cfTag)}`,
     { signal }

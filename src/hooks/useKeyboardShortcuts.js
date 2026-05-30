@@ -17,15 +17,17 @@ export default function useKeyboardShortcuts({
 
       // Cmd/Ctrl+K → focus search
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        onFocusSearch?.();
+        if (onFocusSearch) {
+          e.preventDefault();
+          onFocusSearch();
+        }
         return;
       }
 
       // 1/2/3 → platform toggle (only when not in an input)
       if (onPlatformToggle && (e.key === "1" || e.key === "2" || e.key === "3")) {
-        e.preventDefault();
         onPlatformToggle(e.key);
+        e.preventDefault();
         return;
       }
 

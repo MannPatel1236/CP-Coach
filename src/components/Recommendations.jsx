@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
-import { ExternalLinkIcon, BookIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
+import { ExternalLinkIcon, BookIcon } from "./Icons";
 
 const BASE_RECOMMEND_RATING = 800;
 const RATING_STEP = 100;
@@ -115,7 +115,7 @@ function Recommendations({ recs, userRating, selectedTopics }) {
               lineHeight: 1.5,
               fontWeight: 500,
             }}>
-              You've solved all <strong>{firstTag || "this topic"}</strong> problems in your normal range. Showing harder stretch problems instead.
+              You&apos;ve solved all <strong>{firstTag || "this topic"}</strong> problems in your normal range. Showing harder stretch problems instead.
             </div>
           )}
         </div>

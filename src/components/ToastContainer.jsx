@@ -3,11 +3,20 @@ import { CloseIcon } from "./Icons";
 
 const ToastContext = createContext(null);
 
+let _pendingToasts = [];
 let globalAddToast = null;
 let _toastId = 0;
 
 export function ToastProvider({ children }) {
-  const [toasts, setToasts] = useState([]);
+  const [toasts, setToasts] = useState(() => {
+    // Replay pending toasts as initial state (queued before mount)
+    const pending = _pendingToasts;
+    _pendingToasts = [];
+    return pending.map(({ message, type }) => {
+      _toastId += 1;
+      return { id: _toastId, message, type };
+    });
+  });
 
   const addToast = useCallback((message, type = "info") => {
     _toastId += 1;
@@ -98,6 +107,9 @@ export function ToastProvider({ children }) {
 export function showToast(message, type = "info") {
   if (globalAddToast) {
     globalAddToast(message, type);
+  } else {
+    // Queue for replay when provider mounts
+    _pendingToasts.push({ message, type });
   }
 }
 

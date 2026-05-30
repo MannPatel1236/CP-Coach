@@ -1,9 +1,8 @@
 import { AnimatePresence } from "framer-motion";
-import { useEffect, useRef } from "react";
 import useAnalysis from "./hooks/useAnalysis.js";
 import useRecommendations from "./hooks/useRecommendations.js";
 import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts.js";
-import { showToast } from "./components/ToastContainer.jsx";
+import { AnalysisContext } from "./hooks/AnalysisContext.jsx";
 
 import Header from "./components/Header.jsx";
 import SearchBar from "./components/SearchBar.jsx";
@@ -48,7 +47,7 @@ export default function App() {
     cfHandle, setCfHandle,
     lcHandle, setLcHandle,
     loading, loadingStep, error,
-    user, cfUser, lcUser, tagProfile, weakTags,
+    user, cfUser, lcUser, tagProfile, weakTags, solvedSet,
     suggestedTopics, analysisMode, setAnalysisMode,
     platform, setPlatform,
     combinedPlatform, setCombinedPlatform,
@@ -74,6 +73,15 @@ export default function App() {
   });
 
   return (
+    <AnalysisContext.Provider value={{
+      handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle,
+      loading, loadingStep, error,
+      user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics,
+      analysisMode, setAnalysisMode, platform, setPlatform,
+      combinedPlatform, setCombinedPlatform, analyze, clearAll,
+      selectedTopics, fetchingRecs, recommendations,
+      activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
+    }}>
     <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", overflowX: "hidden", width: "100%" }}>
       <a
         href="#main-content"
@@ -97,50 +105,17 @@ export default function App() {
       <Header onHome={clearAll} />
 
       {user && (
-        <SearchBar
-          handle={handle}
-          setHandle={setHandle}
-          cfHandle={cfHandle}
-          setCfHandle={setCfHandle}
-          lcHandle={lcHandle}
-          setLcHandle={setLcHandle}
-          onAnalyze={analyze}
-          loading={loading}
-          hasResult={!!user}
-          onClear={clearAll}
-          analysisMode={analysisMode}
-          setAnalysisMode={setAnalysisMode}
-          platform={platform}
-          setPlatform={setPlatform}
-          combinedPlatform={combinedPlatform}
-          setCombinedPlatform={setCombinedPlatform}
-        />
+        <SearchBar />
       )}
 
       {(loading || fetchingRecs) && (
         <LoadingState step={loadingStep} mode={analysisMode} isFetchingRecs={fetchingRecs} platform={combinedPlatform ? "combined" : platform} />
       )}
 
-      {error && <ErrorState message={error} />}
+      {(error || recError) && <ErrorState message={error || recError} />}
 
       {!user && !loading && !error && (
-        <LandingPage
-          handle={handle}
-          setHandle={setHandle}
-          cfHandle={cfHandle}
-          setCfHandle={setCfHandle}
-          lcHandle={lcHandle}
-          setLcHandle={setLcHandle}
-          onAnalyze={analyze}
-          loading={loading}
-          onClear={clearAll}
-          analysisMode={analysisMode}
-          setAnalysisMode={setAnalysisMode}
-          platform={platform}
-          setPlatform={setPlatform}
-          combinedPlatform={combinedPlatform}
-          setCombinedPlatform={setCombinedPlatform}
-        />
+        <LandingPage />
       )}
 
       {user && (
@@ -181,12 +156,6 @@ export default function App() {
               />
             )}
 
-            {recError && (
-              <div style={{ padding: "12px 16px", background: "var(--error-container)", border: "1px solid var(--error)", borderRadius: "var(--radius-sm)", color: "var(--error)", fontSize: 14 }}>
-                {recError}
-              </div>
-            )}
-
             <AnimatePresence>
               {recommendations.length > 0 && (
                 <Recommendations
@@ -205,5 +174,6 @@ export default function App() {
       )}
       <PrivacyPolicy />
     </div>
+    </AnalysisContext.Provider>
   );
 }

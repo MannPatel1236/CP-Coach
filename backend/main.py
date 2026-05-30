@@ -31,6 +31,25 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables verified/created.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+
+    # Pre-load Graph-DKT model once at startup
+    try:
+        from models.graph_dkt import GraphDKTModel
+        from data.topic_graph import CPTopicGraph
+        import os
+        weights_path = os.getenv("MODEL_WEIGHTS_PATH", "./weights/graph_dkt.pt")
+        if os.path.exists(weights_path):
+            topic_graph = CPTopicGraph()
+            model = GraphDKTModel.load(weights_path, topic_graph=topic_graph)
+            app.state.graph_dkt_model = model
+            logger.info("Graph-DKT model loaded successfully")
+        else:
+            app.state.graph_dkt_model = None
+            logger.info("No model weights found at %s — using rule-based fallback", weights_path)
+    except Exception as e:
+        app.state.graph_dkt_model = None
+        logger.error("Failed to load Graph-DKT model: %s", e)
+
     logger.info("CP Coach API started")
     yield
 
@@ -80,4 +99,32 @@ app.include_router(user.router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "2.0", "platforms": ["cf", "lc"]}
+
+
+@app.get("/health/deep")
+async def health_deep():
+    """Check downstream API availability (CF + LeetCode)."""
+    import httpx
+    results = {}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        # Check Codeforces
+        try:
+            r = await client.get("https://codeforces.com/api/user.info?handles=tourist")
+            results["codeforces"] = "ok" if r.status_code == 200 else f"error_{r.status_code}"
+        except Exception:
+            results["codeforces"] = "unreachable"
+
+        # Check LeetCode
+        try:
+            r = await client.post(
+                "https://leetcode.com/graphql",
+                json={"query": "{ matchedUser(username: \"leetcode\") { username } }"},
+                headers={"Content-Type": "application/json", "Referer": "https://leetcode.com"},
+            )
+            results["leetcode"] = "ok" if r.status_code == 200 else f"error_{r.status_code}"
+        except Exception:
+            results["leetcode"] = "unreachable"
+
+    all_ok = all(v == "ok" for v in results.values())
+    return {"status": "ok" if all_ok else "degraded", "downstream": results}
 

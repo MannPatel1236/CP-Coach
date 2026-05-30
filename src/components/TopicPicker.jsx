@@ -1,9 +1,6 @@
-import { useState } from "react";
 import { CheckIcon, TargetIcon } from "./Icons";
 
 export default function TopicPicker({ topics, selected, onToggle, onConfirm, loading }) {
-  const [hoveredTag, setHoveredTag] = useState(null);
-
   if (!topics.length) return null;
 
   return (
@@ -18,28 +15,20 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
         {topics.map((tag, i) => {
           const isSelected = selected.includes(tag);
-          const isHovered = hoveredTag === tag;
           return (
             <div
               role="button"
               tabIndex={0}
               key={tag}
-              onClick={() => onToggle(tag)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onToggle(tag); }}
-              onMouseEnter={() => setHoveredTag(tag)}
-              onMouseLeave={() => setHoveredTag(null)}
+              className="topic-picker-item"
+              data-selected={isSelected ? "true" : undefined}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "12px 16px",
                 background: isSelected ? "rgba(99, 102, 241, 0.08)" : "var(--surface-dim)",
-                border: "1px solid",
-                borderColor: isSelected
-                  ? "var(--primary-container)"
-                  : isHovered
-                  ? "var(--outline-variant)"
-                  : "var(--outline)",
+                border: "1px solid var(--outline)",
                 boxShadow: isSelected ? "0 0 16px var(--primary-glow)" : "none",
                 borderRadius: "var(--radius-sm)",
                 cursor: "pointer",
@@ -47,6 +36,10 @@ export default function TopicPicker({ topics, selected, onToggle, onConfirm, loa
                 userSelect: "none",
                 fontFamily: "var(--font-body)",
               }}
+              onClick={() => onToggle(tag)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onToggle(tag); }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--outline-variant)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = isSelected ? "var(--primary-container)" : "var(--outline)"; }}
               aria-pressed={isSelected}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

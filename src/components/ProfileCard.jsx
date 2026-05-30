@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { rankColor, ratingColor } from "../utils.js";
-import { UserIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
+import { UserIcon } from "./Icons";
 
 function ProfileCard({ user, tagCount, weakCount }) {
   const isLeetCode = user.platform === "lc";

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchProblemsForTags, buildRecommendations } from "../api.js";
 import { getRecommendations, getRecommendationsWithMastery } from "../api/backendClient.js";
 
@@ -11,14 +11,28 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState(null);
 
+  const prevHandleRef = useRef(null);
+
   // Reset on new user search so recommendations from analyze() are picked up
-  useEffect(() => {
+  if (user?.handle !== prevHandleRef.current) {
+    prevHandleRef.current = user?.handle;
     setInitialized(false);
     setRecs([]);
     setSelectedTopics([]);
     setActiveWeakTag(null);
     setError(null);
-  }, [user?.handle]);
+  }
+
+  // Abort in-flight requests on unmount — read abortRef.current at unmount time
+  // (not at mount time) so we catch any request started after the effect mounted.
+  useEffect(() => {
+    return () => {
+      /* abortRef is a manually-managed AbortController, not a React DOM ref — stale-access
+         warning is a false positive here. suppress it inline. */
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      abortRef.current?.abort();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helpers to avoid duplicated ternary logic
   const getHandle = useCallback(() => {
@@ -30,7 +44,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     return combinedPlatform ? "cf,lc" : platform;
   }, [combinedPlatform, platform]);
 
-  // Initialize with recommendations from analyze() (matching original logic from ebf47fc)
+  // Initialize with recommendations from analyze()
   useEffect(() => {
     if (!initialized && analysisRecommendationsRef.current.length > 0) {
       setRecs(analysisRecommendationsRef.current);
@@ -40,93 +54,9 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     }
   }, [initialized, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef]);
 
-  const selectWeakTag = useCallback(async (tag) => {
-    resetAbort();
-    const controller = abortRef.current;
-
-    setActiveWeakTag(tag);
-    setFetchingRecs(true);
-    setRecs([]);
-    setError(null);
-
-    const isLC = platform === "lc";
-    const isCombined = combinedPlatform;
-    const hasMasteryScores = analysisMasteryScoresRef.current != null && Object.keys(analysisMasteryScoresRef.current).length > 0;
-
-    if (useBackend && (isLC || isCombined || hasMasteryScores)) {
-      try {
-        const handle = getHandle();
-        const platformsStr = getPlatformsStr();
-        const solvedIds = solvedSet ? [...solvedSet] : [];
-        const userRating = user?.rating || null;
-
-        let data;
-        if (hasMasteryScores) {
-          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, tag, analysisMasteryScoresRef.current, solvedIds, userRating);
-        } else {
-          data = await getRecommendations(handle, platformsStr, 12, controller?.signal, tag);
-        }
-        if (controller?.signal.aborted) return;
-
-        // CF-only fallback: if backend returned nothing, use client-side recs
-        if (!data || (data.recommendations || []).length === 0) {
-          if (!isLC && !isCombined) {
-            const problems = await fetchProblemsForTags([tag], controller?.signal);
-            if (controller?.signal.aborted) return;
-            const fallbackRecs = buildRecommendations(problems, solvedSet, user?.rating || 800);
-            setRecs(fallbackRecs);
-            setSelectedTopics([tag]);
-            return;
-          }
-        }
-
-        setRecs(data?.recommendations || []);
-        setSelectedTopics([tag]);
-      } catch (err) {
-        if (err.name === "AbortError") return;
-        // CF-only failover for single-tag
-        if (!isLC && !isCombined) {
-          try {
-            const problems = await fetchProblemsForTags([tag], controller?.signal);
-            if (controller?.signal.aborted) return;
-            setRecs(buildRecommendations(problems, solvedSet, user?.rating || 800));
-            setSelectedTopics([tag]);
-            setFetchingRecs(false);
-            return;
-          } catch {
-            // pass through to setError
-          }
-        }
-        setError(err.message || "Failed to load recommendations.");
-        console.error("Failed to fetch recommendations from backend.", err);
-      } finally {
-        setFetchingRecs(false);
-      }
-      return;
-    }
-
-    try {
-      const problems = await fetchProblemsForTags([tag], controller?.signal);
-      if (controller?.signal.aborted) return;
-      const recommendations = buildRecommendations(problems, solvedSet, user?.rating || 800);
-      setRecs(recommendations);
-      setSelectedTopics([tag]);
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      console.error("Failed to fetch problems.", err);
-    } finally {
-      setFetchingRecs(false);
-    }
-  }, [solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort, analysisMasteryScoresRef, getHandle, getPlatformsStr]);
-
-  const toggleTopic = useCallback((tag) => {
-    setSelectedTopics((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }, []);
-
-  const fetchForSelectedTopics = useCallback(async () => {
-    if (!selectedTopics.length || fetchingRecs) return;
+  // Shared recommendation fetch — called by selectWeakTag and fetchForSelectedTopics
+  const fetchRecommendations = useCallback(async (topics) => {
+    if (!topics.length) return;
 
     resetAbort();
     const controller = abortRef.current;
@@ -139,11 +69,12 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     const isCombined = combinedPlatform;
     const hasMasteryScores = analysisMasteryScoresRef.current != null && Object.keys(analysisMasteryScoresRef.current).length > 0;
 
+    const focusTopics = topics.join(",");
+
     if (useBackend && (isLC || isCombined || hasMasteryScores)) {
       try {
         const handle = getHandle();
         const platformsStr = getPlatformsStr();
-        const focusTopics = selectedTopics.join(",");
         const solvedIds = solvedSet ? [...solvedSet] : [];
         const userRating = user?.rating || null;
 
@@ -158,23 +89,26 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
         // CF-only fallback: if backend returned nothing, use client-side recs
         if (!data || (data.recommendations || []).length === 0) {
           if (!isLC && !isCombined) {
-            const problems = await fetchProblemsForTags(selectedTopics, controller?.signal);
+            const problems = await fetchProblemsForTags(topics, controller?.signal);
             if (controller?.signal.aborted) return;
             const fallbackRecs = buildRecommendations(problems, solvedSet, user?.rating || 800);
             setRecs(fallbackRecs);
+            setSelectedTopics(topics);
             return;
           }
         }
 
         setRecs(data?.recommendations || []);
+        setSelectedTopics(topics);
       } catch (err) {
         if (err.name === "AbortError") return;
         // CF-only failover: try client-side before giving up
         if (!isLC && !isCombined) {
           try {
-            const problems = await fetchProblemsForTags(selectedTopics, controller?.signal);
+            const problems = await fetchProblemsForTags(topics, controller?.signal);
             if (controller?.signal.aborted) return;
             setRecs(buildRecommendations(problems, solvedSet, user?.rating || 800));
+            setSelectedTopics(topics);
             setFetchingRecs(false);
             return;
           } catch {
@@ -189,18 +123,36 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
       return;
     }
 
+    // Client-only path
     try {
-      const problems = await fetchProblemsForTags(selectedTopics, controller?.signal);
+      const problems = await fetchProblemsForTags(topics, controller?.signal);
       if (controller?.signal.aborted) return;
       const recommendations = buildRecommendations(problems, solvedSet, user?.rating || 800);
       setRecs(recommendations);
+      setSelectedTopics(topics);
     } catch (err) {
       if (err.name === "AbortError") return;
-      console.error("Synchronization error.", err);
+      console.error("Failed to fetch problems.", err);
     } finally {
       setFetchingRecs(false);
     }
-  }, [selectedTopics, fetchingRecs, solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort, analysisMasteryScoresRef, getHandle, getPlatformsStr]);
+  }, [solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort, analysisMasteryScoresRef, getHandle, getPlatformsStr]);
+
+  const selectWeakTag = useCallback(async (tag) => {
+    setActiveWeakTag(tag);
+    await fetchRecommendations([tag]);
+  }, [fetchRecommendations]);
+
+  const toggleTopic = useCallback((tag) => {
+    setSelectedTopics((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }, []);
+
+  const fetchForSelectedTopics = useCallback(async () => {
+    if (!selectedTopics.length || fetchingRecs) return;
+    await fetchRecommendations(selectedTopics);
+  }, [selectedTopics, fetchingRecs, fetchRecommendations]);
 
   return {
     selectedTopics,

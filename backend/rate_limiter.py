@@ -28,4 +28,9 @@ def _get_client_ip(request: Request) -> str:
             return xr.strip()
     return remote
 
+# NOTE: In-memory storage means rate limits are per-worker.
+# For single-worker docker-compose this is fine. For multi-worker
+# production, switch to slowapi.storage.RedisStorage:
+#   from slowapi.storage import RedisStorage
+#   limiter = Limiter(key_func=_get_client_ip, storage_uri="redis://localhost:6379")
 limiter = Limiter(key_func=_get_client_ip)

@@ -81,9 +81,13 @@ else:
             h_graph = self.gcn2(h_graph, batch_edge_index)              # (B*num_topics, gcn_hidden)
             h_graph = h_graph.reshape(B, self.num_topics, -1)           # (B, num_topics, gcn_hidden)
 
-            # Step 3: Fusion
-            h_graph_mean = h_graph.mean(dim=1).unsqueeze(1).expand(-1, T, -1)  # (B,T,gcn_hidden)
-            h_fused = torch.cat([lstm_out, h_graph_mean], dim=-1)      # (B,T,hidden+gcn_hidden)
+            # Step 3: Fusion — per-timestep topic selection (not mean-pooling)
+            # Index h_graph[b, topic_ids[b,t]] at each timestep for structured graph signal
+            topic_ids = batch["topic_ids"]  # (B, T)
+            # Use gather to select the GCN embedding for each timestep's active topic
+            idx = topic_ids.unsqueeze(-1).expand(-1, -1, h_graph.size(-1))  # (B, T, gcn_hidden)
+            h_graph_per_topic = torch.gather(h_graph, 1, idx)             # (B, T, gcn_hidden)
+            h_fused = torch.cat([lstm_out, h_graph_per_topic], dim=-1)   # (B,T,hidden+gcn_hidden)
             predictions = torch.sigmoid(self.fusion(h_fused))          # (B,T,num_topics)
 
             # Mask padded positions

@@ -1,8 +1,8 @@
 """Recommend route — GET /api/recommend/{handle} and POST /api/recommend/{handle}"""
 
+import asyncio
 import logging
 import time
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Body, Request
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ class RecommendRequest(BaseModel):
     focus_topics: str | None = ""
     mastery_scores: dict | None = None
     solved_ids: list[str] = []
-    user_rating: Optional[int] = None
+    user_rating: int | None = None
 
 
 _topic_graph = CPTopicGraph()
@@ -38,6 +38,7 @@ _CACHE_TTL = 3600
 _MAX_CACHED_KEYS = 4
 _problemset_cache: dict = {}
 _cache_timestamps: dict = {}
+_cache_locks: dict[str, asyncio.Lock] = {}
 
 
 def _get_cached(key: str):
@@ -56,7 +57,25 @@ def _set_cached(key: str, value):
     _cache_timestamps[key] = time.time()
 
 
-async def _fetch_platform_data(
+async def _get_or_fetch(key: str, fetch_fn):
+    """Single-flight cache: concurrent callers await the first request."""
+    cached = _get_cached(key)
+    if cached is not None:
+        return cached
+
+    if key not in _cache_locks:
+        _cache_locks[key] = asyncio.Lock()
+    async with _cache_locks[key]:
+        # Re-check after acquiring lock (another coroutine may have populated it)
+        cached = _get_cached(key)
+        if cached is not None:
+            return cached
+        result = await fetch_fn()
+        _set_cached(key, result)
+        return result
+
+
+async def _fetch_platform_data_cached(
     handle: str, platform_list: list[str]
 ) -> tuple[list, list, set, int, list[str]]:
     """Fetch problems, submissions, solved IDs, user rating, and errors from requested platforms.
@@ -81,10 +100,7 @@ async def _fetch_platform_data(
             info = await cf_client.get_user_info(handle)
             user_rating = info.get("rating", 1200)
 
-            cf_problems = _get_cached("cf_problemset")
-            if cf_problems is None:
-                cf_problems = await cf_client.get_problemset()
-                _set_cached("cf_problemset", cf_problems)
+            cf_problems = await _get_or_fetch("cf_problemset", cf_client.get_problemset)
             all_problems.extend(cf_problems)
         except ValueError as e:
             errors.append(f"CF validation: {e}")
@@ -106,10 +122,7 @@ async def _fetch_platform_data(
                     user_rating = lc_rating
 
             try:
-                lc_problems = _get_cached("lc_problemset")
-                if lc_problems is None:
-                    lc_problems = await lc_client.get_all_problems(limit=500)
-                    _set_cached("lc_problemset", lc_problems)
+                lc_problems = await _get_or_fetch("lc_problemset", lambda: lc_client.get_all_problems(limit=500))
                 for p in lc_problems:
                     all_problems.append(_normalizer.normalize_lc_problem(p))
             except RuntimeError as e:
@@ -202,7 +215,7 @@ async def recommend(
     platform_list = [p.strip() for p in platforms.split(",") if p.strip()]
     try:
         all_problems, normalized_subs, solved_ids, user_rating, fetch_errors = (
-            await _fetch_platform_data(handle, platform_list)
+            await _fetch_platform_data_cached(handle, platform_list)
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -237,7 +250,7 @@ async def recommend_post(
 
     try:
         all_problems, normalized_subs, fetched_solved_ids, fetched_user_rating, fetch_errors = (
-            await _fetch_platform_data(handle, platform_list)
+            await _fetch_platform_data_cached(handle, platform_list)
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

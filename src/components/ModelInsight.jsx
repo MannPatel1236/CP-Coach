@@ -36,7 +36,7 @@ function getInsightExplanation(topicProfile) {
   return null;
 }
 
-export default function ModelInsight({ topicProfile, selectedTopics }) {
+export default function ModelInsight({ topicProfile }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const insight = getInsightExplanation(topicProfile || []);
 

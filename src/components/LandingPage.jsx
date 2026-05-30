@@ -50,15 +50,7 @@ const STATS = [
   { value: "2–4", label: "Hours/Day Top Coders Practice" },
 ];
 
-export default function LandingPage({ 
-  handle, setHandle, 
-  cfHandle, setCfHandle,
-  lcHandle, setLcHandle,
-  onAnalyze, loading, onClear, 
-  analysisMode, setAnalysisMode, 
-  platform, setPlatform, 
-  combinedPlatform, setCombinedPlatform 
-}) {
+export default function LandingPage() {
   return (
     <div className="hero-landing" style={{ paddingBottom: 80 }}>
       {/* Hero */}
@@ -161,24 +153,7 @@ export default function LandingPage({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.45 }}
         >
-          <SearchBar
-            handle={handle}
-            setHandle={setHandle}
-            cfHandle={cfHandle}
-            setCfHandle={setCfHandle}
-            lcHandle={lcHandle}
-            setLcHandle={setLcHandle}
-            onAnalyze={onAnalyze}
-            loading={loading}
-            hasResult={false}
-            onClear={onClear}
-            analysisMode={analysisMode}
-            setAnalysisMode={setAnalysisMode}
-            platform={platform}
-            setPlatform={setPlatform}
-            combinedPlatform={combinedPlatform}
-            setCombinedPlatform={setCombinedPlatform}
-          />
+          <SearchBar />
         </motion.div>
 
         {/* Stats row */}

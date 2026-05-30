@@ -1,26 +1,32 @@
 import { SearchIcon, CodeforcesIcon, LeetCodeIcon } from "./Icons";
+import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
 
-export default function SearchBar({ 
-  handle, setHandle, 
-  cfHandle, setCfHandle,
-  lcHandle, setLcHandle,
-  onAnalyze, loading, hasResult, onClear, 
-  analysisMode, setAnalysisMode, 
-  platform, setPlatform, 
-  combinedPlatform, setCombinedPlatform 
-}) {
+export default function SearchBar() {
+  const ctx = useAnalysisContext();
+  const {
+    handle, setHandle,
+    cfHandle, setCfHandle,
+    lcHandle, setLcHandle,
+    analyze, loading, user, clearAll,
+    analysisMode, setAnalysisMode,
+    platform, setPlatform,
+    combinedPlatform, setCombinedPlatform,
+  } = ctx;
+
+  const hasResult = !!user;
+
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") onAnalyze();
+    if (e.key === "Enter") analyze();
   };
 
-  const canAnalyze = combinedPlatform 
+  const canAnalyze = combinedPlatform
     ? (cfHandle?.trim() || lcHandle?.trim())
     : handle?.trim();
 
-  const placeholder = combinedPlatform 
+  const placeholder = combinedPlatform
     ? null
-    : platform === "lc" 
-    ? "Enter LeetCode username..." 
+    : platform === "lc"
+    ? "Enter LeetCode username..."
     : "Enter Codeforces handle...";
 
   const platformOptions = [
@@ -153,7 +159,7 @@ export default function SearchBar({
 
         <button
           type="button"
-          onClick={onAnalyze}
+          onClick={analyze}
           disabled={loading || !canAnalyze}
           className="btn-primary analyze-btn"
           style={{
@@ -174,7 +180,7 @@ export default function SearchBar({
 
         {hasResult && (
           <button
-            onClick={onClear}
+            onClick={clearAll}
             style={{
               background: "transparent",
               border: "1px solid var(--outline)",
@@ -316,4 +322,3 @@ export default function SearchBar({
     </div>
   );
 }
-
