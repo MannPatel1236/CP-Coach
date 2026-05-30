@@ -5,9 +5,8 @@ can switch on `code` instead of parsing human-readable strings.
 """
 
 import logging
-from typing import Any
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -38,8 +37,6 @@ def _infer_error_code(status_code: int) -> str:
 
 
 # ── Exception handlers (registered in main.py) ────────────────────────────────
-
-from fastapi import HTTPException
 
 
 async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
