@@ -23,7 +23,7 @@ class Recommender:
         solved_problem_ids: set[str],
         all_problems: list[dict],
         focus_topics: list[str] | None = None,
-        platforms: list[str] = None,
+        platforms: list[str] | None = None,
         top_k: int = 20,
     ) -> list[dict]:
         if platforms is None:

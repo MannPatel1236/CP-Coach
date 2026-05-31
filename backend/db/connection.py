@@ -7,7 +7,7 @@ from sqlalchemy import (
     Column, Integer, String, Float, BigInteger, ForeignKey, TIMESTAMP, ARRAY, Text,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -34,23 +34,15 @@ class _LazyEngine:
         return self._get().connect()
 
 
-class _LazySessionmaker:
-    """Lazily initializes the sessionmaker on first call."""
-    def __init__(self):
-        self._sm = None
-
-    def __call__(self):
-        if self._sm is None:
-            self._sm = sessionmaker(
-                bind=engine._get(),  # engine is defined at module level below
-                class_=AsyncSession,
-                expire_on_commit=False,
-            )
-        return self._sm()
-
-
 engine = _LazyEngine()
-AsyncSessionLocal = _LazySessionmaker()
+
+
+def create_session():
+    """Returns a new AsyncSession instance bound to the engine."""
+    return AsyncSession(bind=engine._get())
+
+
+AsyncSessionLocal = create_session
 
 Base = declarative_base()
 

@@ -136,8 +136,9 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
             profile, normalized_subs, easy_solved = await _analyze_cf(handle, mode, None)
 
         # 2. Build sequence + topic profile
-        sequence = _preprocessor.build_submission_sequence(normalized_subs)
-        topic_profile = _preprocessor.build_topic_profile(normalized_subs)
+        subs = normalized_subs or []
+        sequence = _preprocessor.build_submission_sequence(subs)
+        topic_profile = _preprocessor.build_topic_profile(subs)
         weak_areas = _preprocessor.detect_weak_areas(topic_profile)
 
         # 3. Mastery scores (use pre-loaded model from startup)
@@ -163,7 +164,7 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
             "weak_areas": weak_areas,
             "mastery_scores": mastery_scores,
             "model_used": model_used,
-            "total_submissions": len(normalized_subs),
+            "total_submissions": len(subs),
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

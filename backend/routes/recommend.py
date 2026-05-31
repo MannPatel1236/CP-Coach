@@ -50,7 +50,7 @@ def _get_cached(key: str):
 
 def _set_cached(key: str, value):
     if len(_problemset_cache) >= _MAX_CACHED_KEYS and key not in _problemset_cache:
-        oldest = min(_cache_timestamps, key=_cache_timestamps.get)
+        oldest = min(_cache_timestamps, key=lambda k: _cache_timestamps[k])
         del _problemset_cache[oldest]
         del _cache_timestamps[oldest]
     _problemset_cache[key] = value
