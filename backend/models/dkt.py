@@ -2,9 +2,17 @@
 
 import logging
 
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset
+try:
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import Dataset
+except ImportError:
+    raise ImportError(
+        "PyTorch is required for the backend. Install:\n"
+        "  pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu\n"
+        "  pip install torch-geometric==2.5.3\n"
+        "See backend/README.md for full instructions."
+    ) from None
 
 logger = logging.getLogger(__name__)
 

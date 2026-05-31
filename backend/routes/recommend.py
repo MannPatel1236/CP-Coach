@@ -257,7 +257,7 @@ async def recommend_post(
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    model_used = "graph_dkt" if (body.mastery_scores is not None and len(body.mastery_scores) > 0) else "rule_based"
+    model_used = "mastery_guided" if (body.mastery_scores is not None and len(body.mastery_scores) > 0) else "rule_based"
 
     return _run_recommender(
         handle=handle,

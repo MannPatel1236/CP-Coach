@@ -17,7 +17,7 @@ PAGE_SIZE = 1000
 PAGE_DELAY = 0.3
 
 _MAX_HANDLE_LENGTH = 40
-_HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_\\-]+$")
+_HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 class HandleError(ValueError):

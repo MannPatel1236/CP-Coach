@@ -11,7 +11,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate        # macOS/Linux
 pip install -r requirements.txt
-pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
 pip install torch-geometric
 
 # Copy env template
