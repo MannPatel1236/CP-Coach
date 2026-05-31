@@ -27,7 +27,7 @@ CP Coach is a full-stack web application that connects to your **Codeforces** an
 ### Key Features
 
 - **Multi-Platform Analysis** - Supports Codeforces + LeetCode, individually or combined
-- **Skill Visualization** - Radar and bar charts showing recency-weighted topic mastery
+- **Skill Visualization** - Bar charts showing recency-weighted topic mastery
 - **Weak Area Detection** - Identifies your weakest topics with severity indicators
 - **Graph-DKT Model** - LSTM + GCN hybrid for personalized mastery prediction
 - **Smart Matching** - Difficulty band recommendation with stretch fallback

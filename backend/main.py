@@ -60,14 +60,14 @@ app = FastAPI(title="CP Coach API", version="2.0", lifespan=lifespan)
 app.state.limiter = limiter
 
 
-async def _slowapi_handler(request: Request, exc: RateLimitExceeded):
-    return _rate_limit_exceeded_handler(exc, request)
+async def _slowapi_handler(request: Request, exc: RateLimitExceeded):  # pyright: ignore[reportGeneralTypeIssues]
+    return _rate_limit_exceeded_handler(request, exc)  # pyright: ignore[reportArgumentType]
 
 
-app.add_exception_handler(RateLimitExceeded, _slowapi_handler)
+app.add_exception_handler(RateLimitExceeded, _slowapi_handler)  # pyright: ignore[reportArgumentType]
 
 # Structured error responses for all other exceptions
-app.add_exception_handler(HTTPException, handle_http_exception)
+app.add_exception_handler(HTTPException, handle_http_exception)  # pyright: ignore[reportArgumentType]
 app.add_exception_handler(Exception, handle_catchall)
 
 # Security headers middleware
