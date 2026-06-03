@@ -40,7 +40,7 @@ def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph) -> list[list[di
             "solved": int(row["solved"]),
             "difficulty": float(row["difficulty"]),
             "timestamp_delta": float(row["timestamp_delta"]),
-            "weight": float(row.get("weight", 1.0)),
+            "weight": float(row["weight"]) if "weight" in row.index else 1.0,
         })
 
     # Filter out very short sequences

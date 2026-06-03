@@ -47,7 +47,7 @@ class CPTopicGraph:
         for src, tgt in self.EDGES:
             self._prereqs[tgt].append(src)
 
-    def get_edge_index(self) -> "torch.Tensor":
+    def get_edge_index(self):  # returns torch.Tensor when torch is installed
         """PyG format: shape (2, num_edges), dtype=torch.long."""
         if torch is None:
             raise ImportError("torch is required for CPTopicGraph.get_edge_index()")
