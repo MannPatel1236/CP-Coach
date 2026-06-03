@@ -2,8 +2,10 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 
+from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,8 +20,21 @@ router = APIRouter(prefix="/api", tags=["user"])
 
 @router.delete("/user/{handle}")
 @limiter.limit("30/minute")
-async def delete_user(request: Request, handle: str):
-    """Delete all data for a user (GDPR Right to Erasure)."""
+async def delete_user(
+    request: Request,
+    handle: str,
+    _auth: None = Depends(verify_hmac),
+):
+    """Delete all data for a user (GDPR Right to Erasure).
+
+    Requires HMAC authentication when CP_API_SECRET is configured.
+    """
+    verify_handle_signature(
+        handle=handle,
+        authorization=request.headers.get("Authorization"),
+        x_timestamp=request.headers.get("X-Timestamp"),
+    )
+
     async with AsyncSessionLocal() as session:
         # Find user by CF or LC handle (case-insensitive)
         stmt = select(User).where(
@@ -35,7 +50,11 @@ async def delete_user(request: Request, handle: str):
             await session.delete(user)
             await session.commit()
             logger.info("Deleted user data for handle: %s", handle)
-            return {"message": f"All data for '{handle}' has been deleted."}
+            response = JSONResponse(
+                content={"message": f"All data for '{handle}' has been deleted."},
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate, private"},
+            )
+            return response
         except SQLAlchemyError as e:
             await session.rollback()
             logger.error("Failed to delete user %s: %s", handle, e)

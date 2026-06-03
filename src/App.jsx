@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import useAnalysis from "./hooks/useAnalysis.js";
 import useRecommendations from "./hooks/useRecommendations.js";
@@ -72,16 +73,18 @@ export default function App() {
     disabled: !user,
   });
 
+  const contextValue = useMemo(() => ({
+    handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle,
+    loading, loadingStep, error,
+    user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics,
+    analysisMode, setAnalysisMode, platform, setPlatform,
+    combinedPlatform, setCombinedPlatform, analyze, clearAll,
+    selectedTopics, fetchingRecs, recommendations,
+    activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
+  }), [handle, cfHandle, lcHandle, loading, loadingStep, error, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, platform, combinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError]);
+
   return (
-    <AnalysisContext.Provider value={{
-      handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle,
-      loading, loadingStep, error,
-      user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics,
-      analysisMode, setAnalysisMode, platform, setPlatform,
-      combinedPlatform, setCombinedPlatform, analyze, clearAll,
-      selectedTopics, fetchingRecs, recommendations,
-      activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
-    }}>
+    <AnalysisContext.Provider value={contextValue}>
     <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", overflowX: "hidden", width: "100%" }}>
       <a
         href="#main-content"

@@ -83,7 +83,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS
 origins = [
-    o.strip()
+    o.strip().lower()
     for o in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173").split(",")
     if o.strip()
 ]

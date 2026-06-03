@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS submissions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions(user_id);
-CREATE INDEX IF NOT EXISTS idx_submissions_platform ON submissions(platform);
 CREATE INDEX IF NOT EXISTS idx_submissions_user_platform ON submissions(user_id, platform);
 CREATE INDEX IF NOT EXISTS idx_submissions_submitted_at ON submissions(submitted_at);
 CREATE INDEX IF NOT EXISTS idx_submissions_user_at ON submissions(user_id, submitted_at DESC);
@@ -56,13 +55,12 @@ CREATE TABLE IF NOT EXISTS topic_graph (
 CREATE TABLE IF NOT EXISTS kt_states (
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   topic VARCHAR(50),
-  p_mastery FLOAT,
+  p_mastery FLOAT NOT NULL DEFAULT 0.0,
   updated_at TIMESTAMP,
   PRIMARY KEY (user_id, topic)
 );
 
 CREATE INDEX IF NOT EXISTS idx_kt_states_user ON kt_states(user_id);
-CREATE INDEX IF NOT EXISTS idx_kt_states_topic ON kt_states(topic);
 
 -- Seed prerequisite graph (18 directed edges)
 INSERT INTO topic_graph (from_topic, to_topic, weight) VALUES
@@ -93,4 +91,17 @@ ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE problems ENABLE ROW LEVEL SECURITY;
 ALTER TABLE topic_graph ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kt_states ENABLE ROW LEVEL SECURITY;
+
+-- Permissive policies: the backend connects as the DB owner which bypasses RLS anyway,
+-- but these ensure non-superuser connections also work reliably.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all_users ON users FOR ALL USING (true);
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all_submissions ON submissions FOR ALL USING (true);
+ALTER TABLE problems ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all_problems ON problems FOR ALL USING (true);
+ALTER TABLE topic_graph ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all_topic_graph ON topic_graph FOR ALL USING (true);
+ALTER TABLE kt_states ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all_kt_states ON kt_states FOR ALL USING (true);
 

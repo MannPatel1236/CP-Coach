@@ -27,6 +27,8 @@ class _LazyEngine:
         if self._engine is None:
             self._engine = create_async_engine(
                 _ensure_db_url(), echo=False, future=True,
+                pool_recycle=1800,   # 30 min — match PgBouncer/Neon idle timeouts
+                pool_pre_ping=True,  # liveness check on checkout
             )
         return self._engine
 
@@ -99,7 +101,7 @@ class KTState(Base):
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     topic = Column(String(50), primary_key=True)
-    p_mastery = Column(Float, nullable=True)
+    p_mastery = Column(Float, nullable=False, default=0.0)
     updated_at = Column(TIMESTAMP, nullable=True)
 
 

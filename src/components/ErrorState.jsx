@@ -2,7 +2,7 @@ import { AlertIcon } from "./Icons";
 
 export default function ErrorState({ message }) {
   return (
-    <div className="error-wrapper" style={{
+    <div className="error-wrapper" role="alert" aria-live="polite" style={{
       margin: "16px 48px",
       padding: "18px 24px",
       background: "var(--error-container)",

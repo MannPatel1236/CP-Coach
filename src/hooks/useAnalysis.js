@@ -100,6 +100,15 @@ export default function useAnalysis() {
     if (platformErrors.length === 2) {
       throw new Error("Analysis failed for both platforms. Please verify the usernames and try again.");
     }
+    if (platformErrors.length === 1) {
+      const failed = cfData?._error ? "Codeforces" : "LeetCode";
+      const hasOtherHandle = cfData?._error ? lcHandle?.trim() : cfHandle?.trim();
+      if (!hasOtherHandle) {
+        throw new Error(`${failed} analysis failed: ${platformErrors[0]}. Please check the username and try again.`);
+      }
+      const success = cfData?._error ? "LeetCode" : "Codeforces";
+      setError(`${failed} analysis failed: ${platformErrors[0]}. Showing ${success} data only.`);
+    }
 
     // Merge CF and LC topic profiles
     const cfProfile = cfData?.topic_profile || [];
@@ -298,8 +307,8 @@ export default function useAnalysis() {
         }
 
         setLoadingStep(2);
-        setLoadingStep(3);
-        setLoadingStep(4);
+        setTimeout(() => setLoadingStep(3), 0);
+        setTimeout(() => setLoadingStep(4), 0);
       }
     }
 

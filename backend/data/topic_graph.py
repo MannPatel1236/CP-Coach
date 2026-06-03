@@ -1,6 +1,9 @@
 """CP prerequisite topic graph."""
 
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None  # type: ignore
 
 
 class CPTopicGraph:
@@ -44,8 +47,10 @@ class CPTopicGraph:
         for src, tgt in self.EDGES:
             self._prereqs[tgt].append(src)
 
-    def get_edge_index(self) -> torch.Tensor:
+    def get_edge_index(self) -> "torch.Tensor":
         """PyG format: shape (2, num_edges), dtype=torch.long."""
+        if torch is None:
+            raise ImportError("torch is required for CPTopicGraph.get_edge_index()")
         src_indices = []
         tgt_indices = []
         for src, tgt in self.EDGES:

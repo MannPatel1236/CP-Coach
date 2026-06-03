@@ -45,6 +45,8 @@ class Recommender:
         final_topics = []
         for topic in weak_topics:
             if self.topic_graph.are_prerequisites_met(topic, mastery_scores, threshold=0.5):
+                # threshold 0.5 — 10% gap from weak-area detection (0.6 in preprocessor.py).
+                # Topics with 0.5-0.6 mastery may pass gating but aren't flagged as weak.
                 final_topics.append(topic)
             else:
                 unmet = [
@@ -58,6 +60,8 @@ class Recommender:
         # ── 3. PROBLEM FILTERING (normal range) ─────────────────────
         lo = max(800, user_rating - 100)
         hi = user_rating + self.difficulty_band
+        # Expand lower bound for LC to include EASY (1000) problems at lower ratings
+        lo_lc = max(800, user_rating - 250)
 
         normal_pool = []
         for p in all_problems:
@@ -68,7 +72,11 @@ class Recommender:
             if not any(t in final_topics for t in p.get("topics", [])):
                 continue
             diff = p.get("difficulty")
-            if diff is not None and not (lo <= diff <= hi):
+            if diff is None:
+                continue
+            # Use LC-friendly lower bound for LC problems
+            lo_ = lo_lc if p["platform"] == "lc" else lo
+            if not (lo_ <= diff <= hi):
                 continue
             p_copy = dict(p)
             p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
@@ -94,7 +102,7 @@ class Recommender:
                 if not any(t in final_topics for t in p.get("topics", [])):
                     continue
                 diff = p.get("difficulty")
-                if diff is not None and not (lo <= diff <= hi_stretch):
+                if diff is not None and not ((lo_lc if p["platform"] == "lc" else lo) <= diff <= hi_stretch):
                     continue
                 p_copy = dict(p)
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]

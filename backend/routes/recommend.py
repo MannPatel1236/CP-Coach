@@ -4,9 +4,10 @@ import asyncio
 import logging
 import time
 
-from fastapi import APIRouter, HTTPException, Query, Body, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
+from pydantic import BaseModel, Field
 
+from auth import verify_hmac
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/api", tags=["recommend"])
 
 class RecommendRequest(BaseModel):
     platforms: str = "cf"
-    top_k: int = 20
+    top_k: int = Field(default=20, ge=1, le=100)
     focus_topics: str | None = ""
     mastery_scores: dict | None = None
     solved_ids: list[str] = []
@@ -203,16 +204,21 @@ def _run_recommender(
     return response
 
 
+_VALID_PLATFORMS = {"cf", "lc"}
+
 @router.get("/recommend/{handle}")
 @limiter.limit("30/minute")
 async def recommend(
     request: Request,
     handle: str,
     platforms: str = Query("cf"),
-    top_k: int = Query(20),
+    top_k: int = Query(20, ge=1, le=100),
     focus_topics: str = Query(""),
+    _auth: None = Depends(verify_hmac),
 ):
-    platform_list = [p.strip() for p in platforms.split(",") if p.strip()]
+    platform_list = [p.strip() for p in platforms.split(",") if p.strip() in _VALID_PLATFORMS]
+    if not platform_list:
+        raise HTTPException(status_code=400, detail="Invalid platforms; use 'cf' and/or 'lc'")
     try:
         all_problems, normalized_subs, solved_ids, user_rating, fetch_errors = (
             await _fetch_platform_data_cached(handle, platform_list)
@@ -245,9 +251,11 @@ async def recommend_post(
     request: Request,
     handle: str,
     body: RecommendRequest = Body(...),
+    _auth: None = Depends(verify_hmac),
 ):
-    platform_list = [p.strip() for p in body.platforms.split(",") if p.strip()]
-
+    platform_list = [p.strip() for p in body.platforms.split(",") if p.strip() in _VALID_PLATFORMS]
+    if not platform_list:
+        raise HTTPException(status_code=400, detail="Invalid platforms; use 'cf' and/or 'lc'")
     try:
         all_problems, normalized_subs, fetched_solved_ids, fetched_user_rating, fetch_errors = (
             await _fetch_platform_data_cached(handle, platform_list)

@@ -4,8 +4,9 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from auth import verify_hmac
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
@@ -31,7 +32,7 @@ async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
 
 @router.get("/progress/{handle}")
 @limiter.limit("30/minute")
-async def progress(request: Request, handle: str, platform: str = Query("cf")):
+async def progress(request: Request, handle: str, platform: str = Query("cf"), _auth: None = Depends(verify_hmac)):
     try:
         normalized = await _fetch_normalized_subs(handle, platform)
     except ValueError as e:

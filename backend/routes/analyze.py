@@ -3,8 +3,9 @@
 import os
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from auth import verify_hmac
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
@@ -21,7 +22,7 @@ _normalizer = Normalizer()
 _preprocessor = Preprocessor()
 
 
-async def _analyze_cf(handle: str, mode: str, controller):
+async def _analyze_cf(handle: str, mode: str, _controller):
     """Analyze a Codeforces user. Returns (profile_dict, normalized_subs, easy_solved)."""
     client = CFClient()
     raw_info = await client.get_user_info(handle)
@@ -50,7 +51,7 @@ async def _analyze_cf(handle: str, mode: str, controller):
     return profile, normalized_subs, None
 
 
-async def _analyze_lc(handle: str, mode: str, controller):
+async def _analyze_lc(handle: str, mode: str, _controller):
     """Analyze a LeetCode user. Returns (profile_dict, normalized_subs, easy_solved|None).
 
     If LC submissions are private but stats exist, returns a special 'stats_only' result.
@@ -123,7 +124,7 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
 
 @router.get("/analyze/{handle}")
 @limiter.limit("30/minute")
-async def analyze(request: Request, handle: str, platform: str = Query("cf"), mode: str = Query("quick")):
+async def analyze(request: Request, handle: str, platform: str = Query("cf"), mode: str = Query("quick"), _auth: None = Depends(verify_hmac)):
     try:
         # 1. Fetch profile + submissions via platform-specific helper
         if platform == "lc":

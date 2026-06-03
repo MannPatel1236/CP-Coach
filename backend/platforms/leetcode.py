@@ -35,7 +35,7 @@ _shared_client = httpx.AsyncClient(
 )
 
 _MAX_HANDLE_LENGTH = 40
-_HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_\\-]+$")
+_HANDLE_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 # Module-level problem cache (bounded, max 256 entries, TTL 3600s)
 _MAX_CACHE_SIZE = 256
@@ -223,11 +223,15 @@ class LeetCodeClient:
         # Collect unique slugs
         unique_slugs = list(dict.fromkeys(s["titleSlug"] for s in raw_subs))
 
-        # Fetch problem details with rate-limit delay
-        for slug in unique_slugs:
-            if slug not in _problem_cache:
-                await self.get_problem_details(slug)
-                await asyncio.sleep(0.1)
+        # Fetch problem details with bounded concurrency (3 concurrent, 0.1s rate limit per fetch)
+        slugs_to_fetch = [s for s in unique_slugs if s not in _problem_cache]
+        if slugs_to_fetch:
+            semaphore = asyncio.Semaphore(3)
+            async def fetch_with_delay(slug):
+                async with semaphore:
+                    await asyncio.sleep(0.1)
+                    return await self.get_problem_details(slug)
+            await asyncio.gather(*[fetch_with_delay(s) for s in slugs_to_fetch])
 
         # Merge and normalize
         normalized = []

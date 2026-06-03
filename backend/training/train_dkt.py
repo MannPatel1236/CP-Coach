@@ -40,7 +40,7 @@ def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph) -> list[list[di
             "solved": int(row["solved"]),
             "difficulty": float(row["difficulty"]),
             "timestamp_delta": float(row["timestamp_delta"]),
-            "weight": 1.0,
+            "weight": float(row.get("weight", 1.0)),
         })
 
     # Filter out very short sequences
@@ -68,15 +68,15 @@ def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device):
         mask = batch["mask"]
         topic_ids = batch["topic_ids"]
         solved = batch["solved"].squeeze(-1)
+        weights = batch["weight"].squeeze(-1)
 
         # Gather predictions at the correct topic index
-        B, T, N = predictions.shape
-        topic_ids_expanded = topic_ids.unsqueeze(-1)  # (B, T, 1)
-        pred_at_topic = predictions.gather(2, topic_ids_expanded).squeeze(-1)  # (B, T)
+        topic_ids_expanded = topic_ids.unsqueeze(-1)
+        pred_at_topic = predictions.gather(2, topic_ids_expanded).squeeze(-1)
 
-        # Masked loss
-        loss_raw = criterion(pred_at_topic, solved)  # (B, T)
-        loss_masked = (loss_raw * mask.float()).sum() / mask.float().sum().clamp(min=1)
+        # Recency-weighted masked loss
+        loss_raw = criterion(pred_at_topic, solved)
+        loss_masked = (loss_raw * weights * mask.float()).sum() / (weights * mask.float()).sum().clamp(min=1)
 
         optimizer.zero_grad()
         loss_masked.backward()

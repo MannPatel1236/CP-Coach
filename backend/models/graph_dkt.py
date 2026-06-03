@@ -80,6 +80,7 @@ else:
             h_graph = torch.relu(self.gcn1(h_topic, batch_edge_index))  # (B*num_topics, gcn_hidden)
             h_graph = self.gcn2(h_graph, batch_edge_index)              # (B*num_topics, gcn_hidden)
             h_graph = h_graph.reshape(B, self.num_topics, -1)           # (B, num_topics, gcn_hidden)
+            h_graph = self.dropout(h_graph)                     # mirror LSTM path regularization
 
             # Step 3: Fusion — per-timestep topic selection (not mean-pooling)
             # Index h_graph[b, topic_ids[b,t]] at each timestep for structured graph signal

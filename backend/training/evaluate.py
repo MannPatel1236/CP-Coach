@@ -29,16 +29,15 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
             predictions, _ = model(batch)  # (B, T, num_topics)
-            mask = batch["mask"]           # (B, T)
 
             # Build target: for each timestep, target is solved (0/1) at the topic_id
             topic_ids = batch["topic_ids"]  # (B, T)
             solved = batch["solved"].squeeze(-1)  # (B, T)
-
-            B, T, N = predictions.shape
+            batch_mask = batch["mask"]  # (B, T)
+            B, T = topic_ids.shape
             for b in range(B):
                 for t in range(T):
-                    if not mask[b, t]:
+                    if not batch_mask[b, t]:
                         continue
                     tid = topic_ids[b, t].item()
                     pred_val = predictions[b, t, tid].item()

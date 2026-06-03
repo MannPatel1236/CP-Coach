@@ -102,6 +102,7 @@ def collate_fn(batch: list[list[dict]], topic_graph=None) -> dict:
     solved = torch.zeros(B, T, 1)
     difficulty = torch.zeros(B, T, 1)
     ts_delta = torch.zeros(B, T, 1)
+    weight = torch.ones(B, T, 1)
     mask = torch.zeros(B, T, dtype=torch.bool)
 
     for b, seq in enumerate(batch):
@@ -115,6 +116,7 @@ def collate_fn(batch: list[list[dict]], topic_graph=None) -> dict:
             solved[b, t, 0] = float(step.get("solved", 0))
             difficulty[b, t, 0] = float(step.get("difficulty", 0.375))
             ts_delta[b, t, 0] = float(step.get("timestamp_delta", 0.0))
+            weight[b, t, 0] = float(step.get("weight", 1.0))
             mask[b, t] = True
 
     return {
@@ -122,6 +124,7 @@ def collate_fn(batch: list[list[dict]], topic_graph=None) -> dict:
         "solved": solved,
         "difficulty": difficulty,
         "ts_delta": ts_delta,
+        "weight": weight,
         "mask": mask,
     }
 

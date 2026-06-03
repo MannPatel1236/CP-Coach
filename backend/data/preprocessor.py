@@ -78,9 +78,14 @@ class Preprocessor:
 
             for topic in sub.get("topics", []):
                 td = topic_data[topic]
-                td["attempted"].add(pid)
-                if verdict == "OK":
-                    td["solved"].add(pid)
+                # Track per-(pid, topic) so multi-tag problems count once per topic
+                attempt_key = (pid, topic)
+                attempted_keys = td.setdefault("_attempted_keys", set())
+                if attempt_key not in attempted_keys:
+                    td["attempted"].add(pid)
+                    if verdict == "OK":
+                        td["solved"].add(pid)
+                    attempted_keys.add(attempt_key)
                 td["difficulties"].append(diff)
                 td["weights"].append(weight)
                 td[platform] += 1

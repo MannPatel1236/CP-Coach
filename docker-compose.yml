@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: cpcoach
       POSTGRES_USER: cpuser
-      POSTGRES_PASSWORD: cppass
+      # POSTGRES_PASSWORD loaded from ./backend/.env.local (gitignored)
     ports: ["5432:5432"]
     deploy:
       resources:
