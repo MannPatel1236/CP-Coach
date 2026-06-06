@@ -1,6 +1,6 @@
 """FastAPI response schemas — Pydantic models for all route response_model annotations."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Topic profile ────────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ class Recommendation(BaseModel):
 
 
 class RecommendationsResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     handle: str
     platforms: list[str]
     focus_topics: list[str]
@@ -92,6 +93,7 @@ class GraphResponse(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     handle: str
     platform: str
     rating: int | None = None
@@ -109,7 +111,7 @@ class AnalyzeResponse(BaseModel):
     mastery_scores: dict[str, float] = Field(default_factory=dict)
     model_used: str = "rule_based"
     total_submissions: int = 0
-    # Stats-only fields (unused for CF, present for LC stats-only variant)
+    # Stats-only fields (unused for CF, present for LC stats_only variant)
     note: str | None = None
 
 

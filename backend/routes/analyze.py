@@ -124,6 +124,11 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
         if t not in mastery_scores:
             mastery_scores[t] = 0.0
 
+    # Keep only canonical 29 topics — non-canonical CF tags (e.g. "*special")
+    # can leak in from rule-based fallback and should not be exposed or persisted.
+    canonical = set(_topic_graph.TOPICS)
+    mastery_scores = {k: v for k, v in mastery_scores.items() if k in canonical}
+
     return mastery_scores, model_used
 
 

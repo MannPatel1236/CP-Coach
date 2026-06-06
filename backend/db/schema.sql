@@ -124,13 +124,18 @@ ON CONFLICT DO NOTHING;
 -- Permissive policies: the backend connects as the DB owner which bypasses RLS anyway,
 -- but these ensure non-superuser connections also work reliably.
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_users ON users;
 CREATE POLICY allow_all_users ON users FOR ALL USING (true);
 ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_submissions ON submissions;
 CREATE POLICY allow_all_submissions ON submissions FOR ALL USING (true);
 ALTER TABLE problems ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_problems ON problems;
 CREATE POLICY allow_all_problems ON problems FOR ALL USING (true);
 ALTER TABLE topic_graph ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_topic_graph ON topic_graph;
 CREATE POLICY allow_all_topic_graph ON topic_graph FOR ALL USING (true);
 ALTER TABLE kt_states ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_kt_states ON kt_states;
 CREATE POLICY allow_all_kt_states ON kt_states FOR ALL USING (true);
 

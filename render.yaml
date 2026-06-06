@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: cp-coach-backend
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: ""
+    startCommand: bash startup.sh
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: MODEL_WEIGHTS_PATH
+        value: ./weights/graph_dkt.pt
+      # DATABASE_URL is set in the Render dashboard (sync: false)
+      # FRONTEND_ORIGINS is set in the Render dashboard (sync: false)
