@@ -7,34 +7,83 @@ except ImportError:
 
 
 class CPTopicGraph:
-    """Directed prerequisite graph over 22 canonical CP topics."""
+    """Directed prerequisite graph over 29 canonical CP topics."""
 
     TOPICS = [
         "implementation", "math", "greedy", "constructive_algorithms", "binary_search",
         "two_pointers", "sortings", "strings", "number_theory", "combinatorics",
         "dfs_and_similar", "graphs", "trees", "dp", "dp_on_trees", "data_structures",
         "bitmasks", "divide_and_conquer", "hashing", "geometry", "flows", "brute_force",
+        # 7 new topics
+        "prefix_sum", "sliding_window", "dsu", "shortest_paths",
+        "backtracking", "string_algorithms", "matrices",
     ]
 
     EDGES = [
+        # Root: implementation → foundational topics
         ("implementation", "math"),
+        ("implementation", "sortings"),
+        ("implementation", "strings"),
+        ("implementation", "brute_force"),
+        ("implementation", "prefix_sum"),
+
+        # Math cluster
         ("math", "greedy"),
-        ("math", "constructive_algorithms"),
-        ("greedy", "binary_search"),
-        ("binary_search", "data_structures"),
-        ("data_structures", "trees"),
-        ("data_structures", "graphs"),
-        ("trees", "dfs_and_similar"),
-        ("graphs", "dfs_and_similar"),
-        ("dfs_and_similar", "dp"),
-        ("dp", "dp_on_trees"),
-        ("greedy", "dp"),
         ("math", "number_theory"),
-        ("number_theory", "combinatorics"),
-        ("binary_search", "sortings"),
+        ("math", "geometry"),
+        ("math", "constructive_algorithms"),
+        ("math", "bitmasks"),
+
+        # Sortings cluster
+        ("sortings", "binary_search"),
+        ("sortings", "two_pointers"),
         ("sortings", "data_structures"),
-        ("math", "two_pointers"),
-        ("two_pointers", "binary_search"),
+        ("sortings", "greedy"),
+
+        # Strings cluster
+        ("strings", "hashing"),
+
+        # Sequence techniques
+        ("two_pointers", "sliding_window"),
+        ("binary_search", "data_structures"),
+        ("binary_search", "divide_and_conquer"),
+
+        # Math → combinatorics
+        ("number_theory", "combinatorics"),
+
+        # Data structures → graph family
+        ("data_structures", "graphs"),
+        ("data_structures", "trees"),
+        ("data_structures", "dsu"),
+        ("data_structures", "shortest_paths"),
+
+        # Graph family
+        ("graphs", "dfs_and_similar"),
+        ("graphs", "shortest_paths"),
+        ("graphs", "flows"),
+        ("graphs", "dsu"),
+
+        # Trees
+        ("trees", "dfs_and_similar"),
+        ("trees", "dp_on_trees"),
+
+        # DFS/BFS → advanced
+        ("dfs_and_similar", "dp"),
+        ("dfs_and_similar", "backtracking"),
+        ("dfs_and_similar", "dp_on_trees"),
+        ("dfs_and_similar", "flows"),
+
+        # DP cluster
+        ("greedy", "dp"),
+        ("dp", "dp_on_trees"),
+        ("dp", "string_algorithms"),
+        ("dp", "matrices"),
+
+        # String algorithms
+        ("hashing", "string_algorithms"),
+
+        # Backtracking
+        ("brute_force", "backtracking"),
     ]
 
     def __init__(self):

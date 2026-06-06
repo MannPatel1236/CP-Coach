@@ -15,15 +15,13 @@ const ARROW_SIZE = 10;
 //  Difficulty rank for orphan nodes — place them at an appropriate
 //  level in the graph rather than dumping them all together.
 //  Lower rank = easier / more foundational, higher = harder.
+//
+//  After the 22→29 / 18→39 graph expansion, the only orphan is the
+//  single root: `implementation`. It must sit at the leftmost rank
+//  (rank 0) so the rest of the DAG flows rightward from it.
 // ------------------------------------------------------------------
 const ORPHAN_DIFFICULTY_RANK = {
-  brute_force: 0,       // very beginner
-  strings: 1,           // beginner
-  hashing: 1,           // beginner
-  bitmasks: 2,          // intermediate
-  divide_and_conquer: 2, // intermediate
-  geometry: 3,          // advanced
-  flows: 4,             // very advanced
+  implementation: 0,   // root — far left, everything else flows from here
 };
 
 // ------------------------------------------------------------------
@@ -192,26 +190,67 @@ const FALLBACK_GRAPH = {
     { id: "geometry", label: "geometry" },
     { id: "flows", label: "flows" },
     { id: "brute_force", label: "brute_force" },
-      ],
+    { id: "prefix_sum", label: "prefix_sum" },
+    { id: "sliding_window", label: "sliding_window" },
+    { id: "dsu", label: "dsu" },
+    { id: "shortest_paths", label: "shortest_paths" },
+    { id: "backtracking", label: "backtracking" },
+    { id: "string_algorithms", label: "string_algorithms" },
+    { id: "matrices", label: "matrices" },
+  ],
   edges: [
+    // Root: implementation → foundational topics
     { source: "implementation", target: "math" },
+    { source: "implementation", target: "sortings" },
+    { source: "implementation", target: "strings" },
+    { source: "implementation", target: "brute_force" },
+    { source: "implementation", target: "prefix_sum" },
+    // Math cluster
     { source: "math", target: "greedy" },
-    { source: "math", target: "constructive_algorithms" },
-    { source: "greedy", target: "binary_search" },
-    { source: "binary_search", target: "data_structures" },
-    { source: "data_structures", target: "trees" },
-    { source: "data_structures", target: "graphs" },
-    { source: "trees", target: "dfs_and_similar" },
-    { source: "graphs", target: "dfs_and_similar" },
-    { source: "dfs_and_similar", target: "dp" },
-    { source: "dp", target: "dp_on_trees" },
-    { source: "greedy", target: "dp" },
     { source: "math", target: "number_theory" },
-    { source: "number_theory", target: "combinatorics" },
-    { source: "binary_search", target: "sortings" },
+    { source: "math", target: "geometry" },
+    { source: "math", target: "constructive_algorithms" },
+    { source: "math", target: "bitmasks" },
+    // Sortings cluster
+    { source: "sortings", target: "binary_search" },
+    { source: "sortings", target: "two_pointers" },
     { source: "sortings", target: "data_structures" },
-    { source: "math", target: "two_pointers" },
-    { source: "two_pointers", target: "binary_search" },
+    { source: "sortings", target: "greedy" },
+    // Strings cluster
+    { source: "strings", target: "hashing" },
+    // Sequence techniques
+    { source: "two_pointers", target: "sliding_window" },
+    { source: "binary_search", target: "data_structures" },
+    { source: "binary_search", target: "divide_and_conquer" },
+    // Math → combinatorics
+    { source: "number_theory", target: "combinatorics" },
+    // Data structures → graph family
+    { source: "data_structures", target: "graphs" },
+    { source: "data_structures", target: "trees" },
+    { source: "data_structures", target: "dsu" },
+    { source: "data_structures", target: "shortest_paths" },
+    // Graph family
+    { source: "graphs", target: "dfs_and_similar" },
+    { source: "graphs", target: "shortest_paths" },
+    { source: "graphs", target: "flows" },
+    { source: "graphs", target: "dsu" },
+    // Trees
+    { source: "trees", target: "dfs_and_similar" },
+    { source: "trees", target: "dp_on_trees" },
+    // DFS/BFS → advanced
+    { source: "dfs_and_similar", target: "dp" },
+    { source: "dfs_and_similar", target: "backtracking" },
+    { source: "dfs_and_similar", target: "dp_on_trees" },
+    { source: "dfs_and_similar", target: "flows" },
+    // DP cluster
+    { source: "greedy", target: "dp" },
+    { source: "dp", target: "dp_on_trees" },
+    { source: "dp", target: "string_algorithms" },
+    { source: "dp", target: "matrices" },
+    // String algorithms
+    { source: "hashing", target: "string_algorithms" },
+    // Backtracking
+    { source: "brute_force", target: "backtracking" },
   ],
 };
 

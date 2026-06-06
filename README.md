@@ -22,7 +22,7 @@
 
 ## Overview
 
-CP Coach is a full-stack web application that connects to your **Codeforces** and/or **LeetCode** account to analyze your submission history, identify skill gaps, and recommend personalized practice problems. It features a novel **Graph-DKT** architecture that layers a Graph Convolutional Network on top of a Deep Knowledge Tracing backbone, guided by a directed prerequisite graph over 22 canonical competitive programming topics.
+CP Coach is a full-stack web application that connects to your **Codeforces** and/or **LeetCode** account to analyze your submission history, identify skill gaps, and recommend personalized practice problems. It features a novel **Graph-DKT** architecture that layers a Graph Convolutional Network on top of a Deep Knowledge Tracing backbone, guided by a directed prerequisite graph over 29 canonical competitive programming topics.
 
 ### Key Features
 
@@ -165,7 +165,7 @@ Deep Knowledge Tracing with a Graph Convolutional Network for structured topic r
 
 | Feature | Description |
 |---------|-------------|
-| `topic_id` | Canonical topic index (0-21) via `Embedding(22, 64)` |
+| `topic_id` | Canonical topic index (0-28) via `Embedding(29, 64)` |
 | `solved` | Binary: 1 if solved, 0 if failed |
 | `difficulty` | Problem rating normalized to [0, 1] |
 | `timestamp_delta` | Days since previous submission (normalized) |
@@ -189,7 +189,7 @@ LSTM(128 -> 128, dropout=0.2)*
     |-----> concat[h_t, h_graph] (192D)
                    |
                    v
-            Linear(192 -> 22)
+            Linear(192 -> 29)
                    |
                    v
             Sigmoid -> p_mastery per topic
@@ -209,37 +209,26 @@ LSTM(128 -> 128, dropout=0.2)*
 
 ## CP Prerequisite Graph
 
-22 canonical topics with 18 directed prerequisite edges:
+29 canonical topics with 39 directed prerequisite edges:
 
-```
-implementation
-    |
-    v
-   math
- /   |   \
-v    v    v
-greedy   number_theory   two_pointers
-  |          |                |
-  v          v                v
-binary_search combinatorics   binary_search
-  |                            |
-  v                            v
-data_structures            sortings ----┐
-  |                                     |
-  |---> trees                           v
-  |         \                        data_structures
-  |          \                          |
-  |           v                         v
-  |--->  dfs_and_similar  <--- graphs    (closed loop)
-              |
-              v
-             dp --> dp_on_trees
-              |
-              ^--- greedy
-```
+**Structure** — single root `implementation`, 0 orphan nodes; every other
+topic has at least one incoming edge and receives GCN message-passing signal.
 
-Full topic list:
-`implementation`, `math`, `greedy`, `constructive_algorithms`, `binary_search`, `two_pointers`, `sortings`, `strings`, `number_theory`, `combinatorics`, `dfs_and_similar`, `graphs`, `trees`, `dp`, `dp_on_trees`, `data_structures`, `bitmasks`, `divide_and_conquer`, `hashing`, `geometry`, `flows`, `brute_force`
+| Cluster | Edges |
+|---------|-------|
+| Root | `implementation → {math, sortings, strings, brute_force, prefix_sum}` (5) |
+| Math | `math → {greedy, number_theory, geometry, constructive_algorithms, bitmasks}` (5) |
+| Sortings | `sortings → {binary_search, two_pointers, data_structures, greedy}` (4) |
+| Strings | `strings → hashing`; `hashing → string_algorithms` (2) |
+| Sequence | `two_pointers → sliding_window`; `binary_search → {data_structures, divide_and_conquer}` (3) |
+| Combinatorics | `number_theory → combinatorics` (1) |
+| Graph family | `data_structures → {graphs, trees, dsu, shortest_paths}`; `graphs → {dfs_and_similar, shortest_paths, flows, dsu}`; `trees → {dfs_and_similar, dp_on_trees}` (10) |
+| DFS/BFS | `dfs_and_similar → {dp, backtracking, dp_on_trees, flows}` (4) |
+| DP | `greedy → dp`; `dp → {dp_on_trees, string_algorithms, matrices}` (4) |
+| Backtracking | `brute_force → backtracking` (1) |
+
+Full topic list (29):
+`implementation`, `math`, `greedy`, `constructive_algorithms`, `binary_search`, `two_pointers`, `sortings`, `strings`, `number_theory`, `combinatorics`, `dfs_and_similar`, `graphs`, `trees`, `dp`, `dp_on_trees`, `data_structures`, `bitmasks`, `divide_and_conquer`, `hashing`, `geometry`, `flows`, `brute_force`, `prefix_sum`, `sliding_window`, `dsu`, `shortest_paths`, `backtracking`, `string_algorithms`, `matrices`
 
 ### Recency Decay
 
@@ -292,7 +281,7 @@ CP-Coach/
 │   │   └── recommender.py      # Prerequisite-aware engine
 │   ├── data/
 │   │   ├── preprocessor.py     # Feature engineering + recency decay
-│   │   └── topic_graph.py      # Prerequisite graph (22 topics, 18 edges)
+│   │   └── topic_graph.py      # Prerequisite graph (29 topics, 39 edges)
 │   ├── db/
 │   │   ├── schema.sql          # PostgreSQL schema + seed data
 │   │   └── connection.py       # SQLAlchemy async engine + ORM

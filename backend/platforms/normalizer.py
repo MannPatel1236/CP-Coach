@@ -14,6 +14,20 @@ class Normalizer:
         "divide and conquer": "divide_and_conquer",
         "brute force": "brute_force",
         "dynamic programming": "dp",
+        # ── Additions ──────────────────────────────────────────────────
+        "dsu": "dsu",
+        "shortest paths": "shortest_paths",
+        "string suffix structures": "string_algorithms",
+        "matrices": "matrices",
+        "graph matchings": "flows",
+        "probabilities": "math",
+        "games": "dp",
+        "fft": "math",
+        "ternary search": "binary_search",
+        "meet in the middle": "divide_and_conquer",
+        "expression parsing": "string_algorithms",
+        "2-sat": "graphs",
+        "chinese remainder theorem": "number_theory",
     }
 
     LC_TAG_MAP = {
@@ -35,7 +49,7 @@ class Normalizer:
         "combinatorics": "combinatorics",
         "number-theory": "number_theory",
         "geometry": "geometry",
-        "union-find": "data_structures",
+        "union-find": "dsu",
         "heap-priority-queue": "data_structures",
         "stack": "data_structures",
         "queue": "data_structures",
@@ -43,7 +57,22 @@ class Normalizer:
         "trie": "data_structures",
         "segment-tree": "data_structures",
         "binary-indexed-tree": "data_structures",
-        "shortest-path": "graphs",
+        "shortest-path": "shortest_paths",
+        # ── Additions ──────────────────────────────────────────────────
+        "prefix-sum": "prefix_sum",
+        "sliding-window": "sliding_window",
+        "backtracking": "backtracking",
+        "matrix": "matrices",
+        "string-matching": "string_algorithms",
+        "rolling-hash": "string_algorithms",
+        "topological-sort": "dfs_and_similar",
+        "monotonic-stack": "data_structures",
+        "memoization": "dp",
+        "simulation": "implementation",
+        "minimum-spanning-tree": "graphs",
+        "counting": "combinatorics",
+        "enumeration": "brute_force",
+        "recursion": "dfs_and_similar",
     }
 
     LC_DIFFICULTY_MAP = {
