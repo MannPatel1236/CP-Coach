@@ -2,8 +2,11 @@
 
 import os
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac
 from rate_limiter import limiter
@@ -12,6 +15,8 @@ from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
 from data.preprocessor import Preprocessor
 from data.topic_graph import CPTopicGraph
+from db.connection import AsyncSessionLocal, User, KTState
+from routes.schemas import AnalyzeResponse, TopicProfileEntry
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +127,38 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     return mastery_scores, model_used
 
 
-@router.get("/analyze/{handle}")
+async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[str, float]):
+    """Upsert mastery scores for a user into kt_states table."""
+    async with AsyncSessionLocal() as session:
+        # Map platform to the correct handle column
+        handle_col = User.cf_handle if platform == "cf" else User.lc_handle
+
+        # Find or create user
+        stmt = select(User).where(handle_col.ilike(handle))
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            user = User(cf_handle=handle if platform == "cf" else None,
+                        lc_handle=handle if platform == "lc" else None,
+                        primary_platform=platform)
+            session.add(user)
+            await session.flush()  # get the ID
+
+        now = datetime.now(timezone.utc)
+        stmt = pg_insert(KTState).values([
+            {"user_id": user.id, "topic": t, "p_mastery": s, "updated_at": now}
+            for t, s in mastery_scores.items()
+        ])
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["user_id", "topic"],
+            set_={"p_mastery": stmt.excluded.p_mastery, "updated_at": stmt.excluded.updated_at},
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+
+@router.get("/analyze/{handle}", response_model=AnalyzeResponse)
 @limiter.limit("30/minute")
 async def analyze(request: Request, handle: str, platform: str = Query("cf"), mode: str = Query("quick"), _auth: None = Depends(verify_hmac)):
     try:
@@ -130,8 +166,7 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         if platform == "lc":
             result = await _analyze_lc(handle, mode, None)
             if result[0] is None or (isinstance(result[0], dict) and result[0].get("model_used") == "stats_only"):
-                # Stats-only early return (LC with private submissions)
-                return result[0]
+                return AnalyzeResponse(**result[0])
             profile, normalized_subs, easy_solved = result
         else:
             profile, normalized_subs, easy_solved = await _analyze_cf(handle, mode, None)
@@ -139,8 +174,9 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         # 2. Build sequence + topic profile
         subs = normalized_subs or []
         sequence = _preprocessor.build_submission_sequence(subs)
-        topic_profile = _preprocessor.build_topic_profile(subs)
-        weak_areas = _preprocessor.detect_weak_areas(topic_profile)
+        raw_profile = _preprocessor.build_topic_profile(subs)
+        topic_profile = [TopicProfileEntry.model_validate(t) for t in raw_profile]
+        weak_areas = _preprocessor.detect_weak_areas(raw_profile)
 
         # 3. Mastery scores (use pre-loaded model from startup)
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
@@ -148,25 +184,31 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
 
         user_rating = profile.get("rating") if isinstance(profile, dict) else None
 
-        return {
-            "handle": handle,
-            "platform": platform,
-            "rating": user_rating,
-            "rank": profile.get("rank") if platform == "cf" else None,
-            "maxRating": profile.get("maxRating") if platform == "cf" else None,
-            "maxRank": profile.get("maxRank") if platform == "cf" else None,
-            "avatar": profile.get("avatar") if platform == "cf" else None,
-            "country": profile.get("country") if platform == "cf" else None,
-            "organization": profile.get("organization") if platform == "cf" else None,
-            "easy_solved": easy_solved,
-            "medium_solved": profile.get("medium_solved") if platform == "lc" else None,
-            "hard_solved": profile.get("hard_solved") if platform == "lc" else None,
-            "topic_profile": topic_profile,
-            "weak_areas": weak_areas,
-            "mastery_scores": mastery_scores,
-            "model_used": model_used,
-            "total_submissions": len(subs),
-        }
+        # 4. Persist mastery scores to kt_states (non-blocking — log failures only)
+        try:
+            await _persist_kt_states(handle, platform, mastery_scores)
+        except Exception as e:
+            logger.warning("Failed to persist kt_states for %s: %s", handle, e)
+
+        return AnalyzeResponse(
+            handle=handle,
+            platform=platform,
+            rating=user_rating,
+            rank=profile.get("rank") if platform == "cf" else None,
+            maxRating=profile.get("maxRating") if platform == "cf" else None,
+            maxRank=profile.get("maxRank") if platform == "cf" else None,
+            avatar=profile.get("avatar") if platform == "cf" else None,
+            country=profile.get("country") if platform == "cf" else None,
+            organization=profile.get("organization") if platform == "cf" else None,
+            easy_solved=easy_solved,
+            medium_solved=profile.get("medium_solved") if platform == "lc" else None,
+            hard_solved=profile.get("hard_solved") if platform == "lc" else None,
+            topic_profile=topic_profile,
+            weak_areas=weak_areas,
+            mastery_scores=mastery_scores,
+            model_used=model_used,
+            total_submissions=len(subs),
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:

@@ -16,6 +16,7 @@ load_dotenv()
 from rate_limiter import limiter  # noqa: E402
 from models.errors import handle_http_exception, handle_catchall  # noqa: E402
 from routes import analyze, recommend, progress, graph, user  # noqa: E402
+from routes.schemas import HealthResponse, HealthDeepResponse  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -102,12 +103,12 @@ app.include_router(graph.router)
 app.include_router(user.router)
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 async def health():
     return {"status": "ok", "version": "2.0", "platforms": ["cf", "lc"]}
 
 
-@app.get("/health/deep")
+@app.get("/health/deep", response_model=HealthDeepResponse)
 async def health_deep():
     """Check downstream API availability (CF + LeetCode)."""
     import httpx

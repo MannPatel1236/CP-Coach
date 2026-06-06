@@ -1,5 +1,6 @@
 """SQLAlchemy async engine + ORM models."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -9,13 +10,26 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 
+logger = logging.getLogger(__name__)
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-def _ensure_db_url():
+def _ensure_db_url() -> str:
+    """Return the DATABASE_URL with the asyncpg driver prefix.
+
+    Render, Supabase, and most managed Postgres providers hand out
+    ``postgresql://user:pass@host/db`` URLs. ``create_async_engine``
+    requires the explicit ``postgresql+asyncpg://`` scheme. We auto-fix
+    the scheme on read so the user only needs to paste the provider's
+    URL into the Render env panel.
+    """
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is required")
-    return DATABASE_URL
+    url = DATABASE_URL
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
 
 
 class _LazyEngine:
@@ -25,8 +39,12 @@ class _LazyEngine:
 
     def _get(self):
         if self._engine is None:
+            url = _ensure_db_url()
+            scheme = url.split("://", 1)[0]
+            host_part = url.rsplit("@", 1)[-1]
+            logger.info("DB engine: scheme=%s host=%s", scheme, host_part)
             self._engine = create_async_engine(
-                _ensure_db_url(), echo=False, future=True,
+                url, echo=False, future=True,
                 pool_recycle=1800,   # 30 min — match PgBouncer/Neon idle timeouts
                 pool_pre_ping=True,  # liveness check on checkout
             )

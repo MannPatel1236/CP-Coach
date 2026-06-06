@@ -11,6 +11,7 @@ from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
+from routes.schemas import ProgressResponse, WeeklyEntry
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
         return [_normalizer.normalize_cf_submission(s) for s in raw_subs]
 
 
-@router.get("/progress/{handle}")
+@router.get("/progress/{handle}", response_model=ProgressResponse)
 @limiter.limit("30/minute")
 async def progress(request: Request, handle: str, platform: str = Query("cf"), _auth: None = Depends(verify_hmac)):
     try:
@@ -61,11 +62,11 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
         weekly = []
         for week, counts in sorted(weeks.items()):
             rate = counts["solved"] / counts["total"] if counts["total"] > 0 else 0.0
-            weekly.append({"week": week, "solve_rate": round(rate, 3)})
+            weekly.append(WeeklyEntry(week=week, solve_rate=round(rate, 3)))
         topic_progress[topic] = weekly
 
-    return {
-        "handle": handle,
-        "platform": platform,
-        "topic_progress": topic_progress,
-    }
+    return ProgressResponse(
+        handle=handle,
+        platform=platform,
+        topic_progress=topic_progress,
+    )

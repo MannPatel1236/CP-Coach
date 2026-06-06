@@ -15,6 +15,7 @@ from platforms.normalizer import Normalizer
 from data.topic_graph import CPTopicGraph
 from data.preprocessor import Preprocessor
 from models.recommender import Recommender
+from routes.schemas import RecommendationsResponse
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +207,7 @@ def _run_recommender(
 
 _VALID_PLATFORMS = {"cf", "lc"}
 
-@router.get("/recommend/{handle}")
+@router.get("/recommend/{handle}", response_model=RecommendationsResponse)
 @limiter.limit("30/minute")
 async def recommend(
     request: Request,
@@ -245,7 +246,7 @@ async def recommend(
     )
 
 
-@router.post("/recommend/{handle}")
+@router.post("/recommend/{handle}", response_model=RecommendationsResponse)
 @limiter.limit("30/minute")
 async def recommend_post(
     request: Request,

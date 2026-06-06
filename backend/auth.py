@@ -1,4 +1,27 @@
-"""Lightweight HMAC request authentication for anti-abuse protection."""
+"""Lightweight HMAC request authentication for anti-abuse protection.
+
+DEPLOYMENT MODEL
+----------------
+This module is opt-in. The auth dependency is a no-op (pass-through) unless
+the ``CP_API_SECRET`` environment variable is set.
+
+Public deployments (e.g. https://cp-coach.vercel.app):
+    Leave ``CP_API_SECRET`` UNSET. The rate limiter (``slowapi`` in
+    ``rate_limiter.py``) is the only abuse mitigation. This is the honest
+    security posture for a public research demo: HMAC between a static SPA
+    and the API would require the secret in the browser bundle, which is
+    not a real secret.
+
+Non-public deployments:
+    Set ``CP_API_SECRET`` to a strong random value, and arrange for all
+    calling clients to sign requests with ``Authorization: HMAC <sig>`` and
+    ``X-Timestamp: <unix-ts>`` headers. Recommended pattern: a server-side
+    proxy (e.g. a Vercel serverless function) holds the secret and signs
+    requests on behalf of the browser. The browser never sees the secret.
+
+    Without a signing client, setting the secret will lock out all
+    callers and the API will return 401 on every request.
+"""
 
 import hashlib
 import hmac
@@ -7,6 +30,8 @@ import time
 
 from fastapi import Header, HTTPException
 
+# Read CP_API_SECRET at module import time. If unset (the public deployment
+# case), all auth dependencies below early-return without checking headers.
 _API_SECRET = os.getenv("CP_API_SECRET", "")
 _STALE_SECONDS = int(os.getenv("CP_AUTH_STALE_SECONDS", "300"))  # 5 minutes
 
