@@ -233,6 +233,8 @@ export default function useAnalysis() {
     });
 
     setLoadingStep(2);
+    setTimeout(() => setLoadingStep(3), 0);
+    setTimeout(() => setLoadingStep(4), 0);
     const weakTopicList = weak.map(w => w.tag).join(",");
     masteryScoresRef.current = data.mastery_scores || {};
 
@@ -321,7 +323,8 @@ export default function useAnalysis() {
       const submissions = await fetchSubmissions(handle.trim(), analysisMode, controller?.signal);
       if (controller?.signal.aborted) return;
 
-      setLoadingStep(3);
+      setTimeout(() => setLoadingStep(3), 0);
+      setTimeout(() => setLoadingStep(4), 0);
       const tagResult = buildTagProfile(submissions);
       profile = tagResult.profile;
       solved = tagResult.solvedSet;

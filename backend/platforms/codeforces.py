@@ -12,6 +12,9 @@ from platforms.normalizer import Normalizer
 logger = logging.getLogger(__name__)
 
 CF_BASE = os.getenv("CF_API_BASE", "https://codeforces.com/api")
+_ALLOWED_CF_BASES = ("https://codeforces.com/api",)
+if CF_BASE not in _ALLOWED_CF_BASES:
+    raise RuntimeError(f"Invalid CF_API_BASE: {CF_BASE!r}; must be one of {_ALLOWED_CF_BASES}")
 TIMEOUT = 15.0
 PAGE_SIZE = 1000
 PAGE_DELAY = 0.3
