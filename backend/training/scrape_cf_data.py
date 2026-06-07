@@ -178,7 +178,16 @@ def _process(
     if len(solved_pids) < min_solved:
         return None
 
-    normalized = [_NORMALIZER.normalize_cf_submission(s) for s in raw_submissions]
+    # Normalize each raw submission. Malformed submissions (CF API sometimes
+    # returns gym/retired-contest entries missing `problem.contestId` or
+    # `problem.index`) raise KeyError in the normalizer — skip those rather
+    # than crash the whole scrape.
+    normalized = []
+    for s in raw_submissions:
+        try:
+            normalized.append(_NORMALIZER.normalize_cf_submission(s))
+        except KeyError:
+            continue
     # Drop None entries (unparseable submissions) and entries with no topics
     normalized = [n for n in normalized if n and n.get("topics")]
     if not normalized:
