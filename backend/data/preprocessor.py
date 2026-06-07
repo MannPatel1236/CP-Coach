@@ -2,10 +2,24 @@
 
 from collections import defaultdict
 
+from data.topic_graph import CPTopicGraph
+
 
 def _recency_weight(idx: int, total: int) -> float:
     """Recency decay: weight=1.0 at idx=0 (most recent), weight=0.2 at oldest."""
     return 1.0 - (0.8 * idx) / max(total - 1, 1)
+
+
+# Lazy: import-on-first-use to keep the module importable without torch.
+_CANONICAL_TOPICS: frozenset[str] | None = None
+
+
+def _get_canonical_topics() -> frozenset[str]:
+    """Return the set of canonical topic names (29 entries from CPTopicGraph)."""
+    global _CANONICAL_TOPICS
+    if _CANONICAL_TOPICS is None:
+        _CANONICAL_TOPICS = frozenset(CPTopicGraph.TOPICS)
+    return _CANONICAL_TOPICS
 
 
 class Preprocessor:
@@ -13,14 +27,24 @@ class Preprocessor:
 
     # ── Submission sequence ──────────────────────────────────────────
 
-    def build_submission_sequence(self, submissions: list[dict]) -> list[dict]:
-        """Build time-ordered sequence with recency weights matching frontend exactly."""
+    def build_submission_sequence(
+        self, submissions: list[dict], canonical_only: bool = False
+    ) -> list[dict]:
+        """Build time-ordered sequence with recency weights matching frontend exactly.
+
+        Args:
+            submissions: normalized submissions in the shared format.
+            canonical_only: if True, drop rows where topic is not in
+                CPTopicGraph.TOPICS. Default False (kept for backward compat
+                with /api/analyze topic profiles).
+        """
         # Sort oldest first
         subs = sorted(submissions, key=lambda s: s.get("timestamp", 0))
         total = len(subs)
         if total == 0:
             return []
 
+        canonical = _get_canonical_topics() if canonical_only else None
         sequence = []
         prev_ts = subs[0].get("timestamp", 0) / 1000  # convert ms → seconds
 
@@ -38,6 +62,8 @@ class Preprocessor:
 
             # Emit one sequence entry per topic so all tags contribute signal
             for topic in sub["topics"]:
+                if canonical is not None and topic not in canonical:
+                    continue
                 sequence.append({
                     "topic": topic,
                     "all_topics": sub["topics"],
