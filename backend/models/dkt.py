@@ -93,8 +93,15 @@ class DKTModel(nn.Module):
         return model
 
 
-def collate_fn(batch: list[list[dict]], topic_graph=None) -> dict:
-    """Pad variable-length sequences to max length in batch."""
+def collate_fn(batch: list[list[dict]], topic_graph=None, canonical_only: bool = False) -> dict:
+    """Pad variable-length sequences to max length in batch.
+
+    Args:
+        batch: list of per-user sequences (list of {topic, solved, ...} dicts).
+        topic_graph: optional CPTopicGraph for topic-name → idx lookup.
+        canonical_only: if True, drop rows where the topic name is not in
+            topic_graph.topic_to_idx. Default False (silent fallback to idx 0).
+    """
     B = len(batch)
     T = max(len(seq) for seq in batch) if batch else 1
 
@@ -105,6 +112,10 @@ def collate_fn(batch: list[list[dict]], topic_graph=None) -> dict:
     weight = torch.ones(B, T, 1)
     mask = torch.zeros(B, T, dtype=torch.bool)
 
+    valid_topic_ids: set[int] = set()
+    if topic_graph is not None:
+        valid_topic_ids = set(topic_graph.topic_to_idx.values())
+
     for b, seq in enumerate(batch):
         for t, step in enumerate(seq):
             topic_name = step.get("topic", "implementation")
@@ -112,6 +123,16 @@ def collate_fn(batch: list[list[dict]], topic_graph=None) -> dict:
                 tid = topic_graph.topic_to_idx.get(topic_name, 0)
             else:
                 tid = 0
+
+            # Check the topic NAME, not the id. Unknown topics get tid=0
+            # (silent fallback to "implementation") but their NAME is not in
+            # topic_graph.topic_to_idx, which is what canonical_only should
+            # filter on.
+            if canonical_only and (
+                topic_graph is None or topic_name not in topic_graph.topic_to_idx
+            ):
+                continue
+
             topic_ids[b, t] = tid
             solved[b, t, 0] = float(step.get("solved", 0))
             difficulty[b, t, 0] = float(step.get("difficulty", 0.375))
