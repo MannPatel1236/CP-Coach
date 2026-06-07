@@ -66,6 +66,7 @@ STRATA = [
 # to drop non-29-topic rows, and writes one CSV row per (user, submission, topic)
 # — matching `train_dkt.py`'s expected schema.
 from data.preprocessor import Preprocessor
+from data.topic_graph import CPTopicGraph
 from platforms.normalizer import Normalizer
 
 _NORMALIZER = Normalizer()
@@ -274,10 +275,10 @@ def _analyze(out: Path) -> None:
     print(f"  Solved rate   : {100 * solved_counts[1] / max(total_rows, 1):.1f}%")
     print(f"\n  Topic distribution (top 15):")
     for topic, cnt in sorted(topics.items(), key=lambda x: -x[1])[:15]:
-        bar = "█" * int(30 * cnt / max(topics.values(), 1))
+        bar = "█" * int(30 * cnt / (max(topics.values()) if topics else 1))
         print(f"    {topic:<25}  {cnt:>6,}  {bar}")
 
-    missing = _CANONICAL - set(topics.keys())
+    missing = set(CPTopicGraph.TOPICS) - set(topics.keys())
     if missing:
         print(f"\n  Topics with ZERO rows (may need more users): {sorted(missing)}")
     print()
