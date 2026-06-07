@@ -42,6 +42,10 @@ from typing import Optional
 
 import httpx
 
+from data.preprocessor import Preprocessor
+from data.topic_graph import CPTopicGraph
+from platforms.normalizer import Normalizer
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
@@ -65,9 +69,6 @@ STRATA = [
 # out of sync with /api/analyze's pipeline. The scraper adds `canonical_only=True`
 # to drop non-29-topic rows, and writes one CSV row per (user, submission, topic)
 # — matching `train_dkt.py`'s expected schema.
-from data.preprocessor import Preprocessor
-from data.topic_graph import CPTopicGraph
-from platforms.normalizer import Normalizer
 
 _NORMALIZER = Normalizer()
 _PREPROCESSOR = Preprocessor()
@@ -273,7 +274,7 @@ def _analyze(out: Path) -> None:
     print(f"  Min seq length: {seq_lengths[0] if seq_lengths else 0}")
     print(f"  Max seq length: {seq_lengths[-1] if seq_lengths else 0}")
     print(f"  Solved rate   : {100 * solved_counts[1] / max(total_rows, 1):.1f}%")
-    print(f"\n  Topic distribution (top 15):")
+    print("\n  Topic distribution (top 15):")
     for topic, cnt in sorted(topics.items(), key=lambda x: -x[1])[:15]:
         bar = "█" * int(30 * cnt / (max(topics.values()) if topics else 1))
         print(f"    {topic:<25}  {cnt:>6,}  {bar}")
@@ -383,12 +384,12 @@ async def _scrape(args: argparse.Namespace) -> None:
     print(f"  Rows     : {total_rows:,}")
     print(f"  Output   : {out}")
     print(f"{'─'*60}")
-    print(f"\nNext steps:")
-    print(f"  1. Check the data:")
+    print("\nNext steps:")
+    print("  1. Check the data:")
     print(f"       python training/scrape_cf_data.py --analyze --out {out}")
-    print(f"  2. Train the model (from backend/):")
+    print("  2. Train the model (from backend/):")
     print(f"       python training/train_dkt.py --data {out} --model graph_dkt --epochs 50 --out weights/graph_dkt.pt")
-    print(f"  3. Run compare_models() to get paper numbers:")
+    print("  3. Run compare_models() to get paper numbers:")
     print(f"       python training/evaluate.py --data {out} --weights weights/graph_dkt.pt")
 
 

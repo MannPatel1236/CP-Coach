@@ -112,10 +112,6 @@ def collate_fn(batch: list[list[dict]], topic_graph=None, canonical_only: bool =
     weight = torch.ones(B, T, 1)
     mask = torch.zeros(B, T, dtype=torch.bool)
 
-    valid_topic_ids: set[int] = set()
-    if topic_graph is not None:
-        valid_topic_ids = set(topic_graph.topic_to_idx.values())
-
     for b, seq in enumerate(batch):
         for t, step in enumerate(seq):
             topic_name = step.get("topic", "implementation")
