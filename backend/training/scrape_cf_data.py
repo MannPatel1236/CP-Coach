@@ -32,8 +32,10 @@ import asyncio
 import collections
 import csv
 import json
+import os
 import random
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Optional
@@ -215,9 +217,24 @@ def _load_checkpoint(out: Path) -> tuple[set[str], int]:
 
 
 def _save_checkpoint(out: Path, done: set[str], next_uid: int) -> None:
-    _meta_path(out).write_text(
-        json.dumps({"done": sorted(done), "next_uid": next_uid}, indent=2)
-    )
+    """Atomically write the checkpoint sidecar.
+
+    Writes to a temp file in the same directory, then renames via os.replace
+    (which is atomic on POSIX). If the write fails, the temp file is removed
+    and the existing .meta.json is left untouched.
+    """
+    meta = _meta_path(out)
+    fd, tmp = tempfile.mkstemp(dir=meta.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump({"done": sorted(done), "next_uid": next_uid}, f, indent=2)
+        os.replace(tmp, meta)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 # ─────────────────────────────────────────────────────────────────────────────
