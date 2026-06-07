@@ -48,7 +48,6 @@ CF_API          = "https://codeforces.com/api"
 REQ_DELAY       = 0.45          # seconds between each request (≈ 2.2 req/s, safe under CF's 5/s)
 MAX_CONCURRENT  = 3             # parallel user.status fetches
 MAX_SUBS        = 8000          # match the app's deep-mode page limit
-MIN_SOLVED      = 30            # drop users with fewer accepted problems
 TIMEOUT_SECS    = 30            # per-request timeout
 
 # Stratified sample buckets: (min_rating, max_rating, target_fraction)
@@ -154,7 +153,7 @@ async def _fetch_one(
 def _process(
     user_id: int,
     raw_submissions: list,
-    min_solved: int = MIN_SOLVED,
+    min_solved: int = 30,
 ) -> Optional[list[dict]]:
     """
     Convert raw CF submissions for one user into training rows.
@@ -362,7 +361,7 @@ async def _scrape(args: argparse.Namespace) -> None:
     print(f"\n{'─'*60}")
     print(f"  Done in {elapsed_total:.0f}s")
     print(f"  Included : {included} users")
-    print(f"  Excluded : {excluded} users  (< {MIN_SOLVED} solved or API error)")
+    print(f"  Excluded : {excluded} users  (< {args.min_solved} solved or API error)")
     print(f"  Rows     : {total_rows:,}")
     print(f"  Output   : {out}")
     print(f"{'─'*60}")
@@ -413,8 +412,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _build_parser().parse_args()
-    global MIN_SOLVED
-    MIN_SOLVED = args.min_solved
 
     out = Path(args.out)
 
