@@ -155,7 +155,11 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
 
         print(f"{epoch:>5d} {train_loss:>12.4f} {val_metrics['loss']:>10.4f} {val_metrics['auc']:>10.4f}")
 
-        if val_metrics["auc"] > best_auc:
+        # Tolerance: ignore AUC improvements smaller than 1e-4 (display precision).
+        # Without this, patience never increments once val AUC plateaus near 1.0,
+        # because the LSTM keeps producing microscopic improvements
+        # (1.00000001 > 1.00000000) and the model trains all 50 epochs.
+        if val_metrics["auc"] - best_auc > 1e-4:
             best_auc = val_metrics["auc"]
             patience_counter = 0
             # Save best
@@ -216,11 +220,20 @@ def main():
     parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--folds", type=int, default=1, help="K-fold CV (default 1 = single split, no shuffle)")
+    parser.add_argument("--start-fold", type=int, default=0, help="First fold to train (0-indexed, inclusive). Use to resume a partial CV.")
+    parser.add_argument("--end-fold", type=int, default=None, help="Last fold to train (0-indexed, inclusive). Default: --folds-1.")
     parser.add_argument("--out", default="weights/graph_dkt.pt")
     args = parser.parse_args()
 
     if args.folds < 1:
         logger.error("--folds must be >= 1 (got %d).", args.folds)
+        sys.exit(1)
+    if args.start_fold < 0 or args.start_fold >= args.folds:
+        logger.error("--start-fold must be in [0, %d) (got %d).", args.folds, args.start_fold)
+        sys.exit(1)
+    end_fold = args.end_fold if args.end_fold is not None else args.folds - 1
+    if end_fold < args.start_fold or end_fold >= args.folds:
+        logger.error("--end-fold must be in [%d, %d) (got %d).", args.start_fold, args.folds, end_fold)
         sys.exit(1)
 
     # Set random seeds for reproducibility
@@ -258,10 +271,13 @@ def main():
         print(f"Model saved to: {args.out}")
     else:
         # K-fold CV
-        logger.info("Running %d-fold CV (seed=%d)", args.folds, seed)
+        logger.info("Running %d-fold CV (seed=%d), folds [%d, %d]", args.folds, seed, args.start_fold, end_fold)
         fold_pairs = kfold_split(sequences, k=args.folds, seed=seed)
         fold_aucs = []
         for i, (train_seqs, val_seqs) in enumerate(fold_pairs):
+            if i < args.start_fold or i > end_fold:
+                logger.info("Fold %d/%d: skipped (outside [%d, %d])", i + 1, args.folds, args.start_fold, end_fold)
+                continue
             auc = train_one_fold(
                 args, train_seqs, val_seqs, topic_graph, device,
                 fold_idx=i, total_folds=args.folds,
@@ -270,7 +286,7 @@ def main():
             logger.info("Fold %d/%d best AUC: %.4f", i + 1, args.folds, auc)
         if fold_aucs:
             arr = np.array(fold_aucs)
-            print(f"\nCV summary ({args.folds} folds): {arr.mean():.4f} ± {arr.std(ddof=0):.4f} (mean ± std)")
+            print(f"\nCV summary ({len(fold_aucs)} folds): {arr.mean():.4f} ± {arr.std(ddof=0):.4f} (mean ± std)")
 
 
 if __name__ == "__main__":
