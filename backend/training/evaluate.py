@@ -30,17 +30,18 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
 
             predictions, _ = model(batch)  # (B, T, num_topics)
 
-            # Build target: for each timestep, target is solved (0/1) at the topic_id
+            # Build target: predictions[t-1] should predict solved[t] (standard DKT).
+            # Skip t=0 (no prior interaction to predict from).
             topic_ids = batch["topic_ids"]  # (B, T)
             solved = batch["solved"].squeeze(-1)  # (B, T)
             batch_mask = batch["mask"]  # (B, T)
             B, T = topic_ids.shape
             for b in range(B):
-                for t in range(T):
+                for t in range(1, T):
                     if not batch_mask[b, t]:
                         continue
                     tid = topic_ids[b, t].item()
-                    pred_val = predictions[b, t, tid].item()
+                    pred_val = predictions[b, t - 1, tid].item()
                     label_val = solved[b, t].item()
 
                     all_preds.append(pred_val)

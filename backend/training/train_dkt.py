@@ -38,10 +38,10 @@ def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph) -> list[list[di
             continue
         user_seqs[row["user_id"]].append({
             "topic": topic,
-            "solved": int(row["solved"]),
-            "difficulty": float(row["difficulty"]),
-            "timestamp_delta": float(row["timestamp_delta"]),
-            "weight": float(row["weight"]) if "weight" in row.index else 1.0,
+            "solved": int(row["solved"]),  # type: ignore[arg-type]
+            "difficulty": float(row["difficulty"]),  # type: ignore[arg-type]
+            "timestamp_delta": float(row["timestamp_delta"]),  # type: ignore[arg-type]
+            "weight": float(row["weight"]) if "weight" in row.index else 1.0,  # type: ignore[arg-type]
         })
 
     # Filter out very short sequences
@@ -187,26 +187,34 @@ def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device):
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         predictions, _ = model(batch)  # (B, T, num_topics)
-        mask = batch["mask"]
-        topic_ids = batch["topic_ids"]
-        solved = batch["solved"].squeeze(-1)
-        weights = batch["weight"].squeeze(-1)
+        mask = batch["mask"]  # (B, T)
+        topic_ids = batch["topic_ids"]  # (B, T)
+        solved = batch["solved"].squeeze(-1)  # (B, T)
+        weights = batch["weight"].squeeze(-1)  # (B, T)
 
-        # Gather predictions at the correct topic index
+        # Standard DKT: input at timestep t includes solved[t] and the model
+        # predicts the outcome for the NEXT timestep. So predictions[t] should
+        # predict solved[t+1]. Shift target by 1 — skip first target (no prior
+        # interaction) and last prediction (nothing to predict after).
+        #   pred_at_topic[t-1] predicts solved[t] for t=1..T-1
         topic_ids_expanded = topic_ids.unsqueeze(-1)
-        pred_at_topic = predictions.gather(2, topic_ids_expanded).squeeze(-1)
+        pred_at_topic = predictions.gather(2, topic_ids_expanded).squeeze(-1)  # (B, T)
 
-        # Recency-weighted masked loss
-        loss_raw = criterion(pred_at_topic, solved)
-        loss_masked = (loss_raw * weights * mask.float()).sum() / (weights * mask.float()).sum().clamp(min=1)
+        pred_for_target = pred_at_topic[:, :-1]  # (B, T-1)
+        target = solved[:, 1:]  # (B, T-1)
+        target_weights = weights[:, 1:]  # (B, T-1)
+        target_mask = mask[:, 1:]  # (B, T-1)
+
+        loss_raw = criterion(pred_for_target, target)
+        loss_masked = (loss_raw * target_weights * target_mask.float()).sum() / (target_weights * target_mask.float()).sum().clamp(min=1)
 
         optimizer.zero_grad()
         loss_masked.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
-        total_loss += loss_masked.item() * mask.float().sum().item()
-        total_steps += mask.float().sum().item()
+        total_loss += loss_masked.item() * target_mask.float().sum().item()
+        total_steps += target_mask.float().sum().item()
 
     return total_loss / max(total_steps, 1)
 
