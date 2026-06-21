@@ -36,7 +36,7 @@ from models.dkt import DKTModel, collate_fn  # noqa: F401 — re-export collate_
 logger = logging.getLogger(__name__)
 
 try:
-    from torch_geometric.nn import GCNConv
+    import torch_geometric  # noqa: F401
     TORCH_GEOMETRIC_AVAILABLE = True
 except ImportError:
     TORCH_GEOMETRIC_AVAILABLE = False

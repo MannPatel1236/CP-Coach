@@ -76,8 +76,6 @@ def _compute_ranking_metrics(predictions, topic_ids, mask, K_list=None):
             "ndcg_at_k": {k: 0.0 for k in K_list},
         }
 
-    num_topics = predictions.size(-1)
-
     # Single argsort over the full tensor: (B, T, num_topics)
     # sorted_indices[b, t, 0] = topic with highest predicted prob at timestep t
     sorted_indices = predictions.argsort(dim=-1, descending=True)
