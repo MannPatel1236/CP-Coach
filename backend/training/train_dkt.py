@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import math
 import os
 import sys
 from collections import defaultdict
@@ -12,15 +13,47 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
 
 from data.topic_graph import CPTopicGraph
 from models.dkt import DKTModel, DKTDataset, collate_fn
 from models.graph_dkt import GraphDKTModel
-from training.evaluate import evaluate_model
+from training.evaluate import evaluate_model, get_target_prediction
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
+
+
+class LengthBatchSampler(Sampler):
+    """Groups sequences of similar length into batches to minimize padding.
+
+    Sequences are sorted by length and grouped into contiguous batches,
+    then the batch order is shuffled for training randomness (validation
+    uses shuffle=False for deterministic ordering).
+    """
+
+    def __init__(self, lengths: list[int], batch_size: int, shuffle: bool = True, seed: int = 42):
+        self.lengths = lengths
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.rng = random.Random(seed)
+
+    def __iter__(self):
+        n = len(self.lengths)
+        # Sort indices by sequence length (group similar-length sequences)
+        sorted_indices = sorted(range(n), key=lambda i: self.lengths[i])
+
+        # Group into batches of batch_size
+        batches = [sorted_indices[i:i + self.batch_size] for i in range(0, n, self.batch_size)]
+
+        # Shuffle batch order for training randomness
+        if self.shuffle:
+            self.rng.shuffle(batches)
+
+        return iter(batches)
+
+    def __len__(self) -> int:
+        return math.ceil(len(self.lengths) / self.batch_size)
 
 
 def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph) -> list[list[dict]]:
@@ -112,7 +145,7 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
         train_seqs: per-user sequences for the train split.
         val_seqs: per-user sequences for the val split.
         topic_graph: CPTopicGraph instance.
-        device: 'cpu' or 'cuda'.
+        device: 'cpu', 'cuda', or 'mps'.
         fold_idx: 0-indexed fold number (None for single-split mode).
         total_folds: total number of folds (1 for single-split mode).
 
@@ -126,9 +159,15 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
     train_dataset = DKTDataset(train_seqs, topic_graph)
     val_dataset = DKTDataset(val_seqs, topic_graph)
 
-    # Custom collate that returns raw sequences (collate_fn called inside train loop)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch, shuffle=True, collate_fn=lambda x: x)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch, shuffle=False, collate_fn=lambda x: x)
+    # Use LengthBatchSampler so sequences of similar length are batched
+    # together, minimizing wasted padding tokens in the LSTM.
+    train_lengths = [len(s) for s in train_seqs]
+    val_lengths = [len(s) for s in val_seqs]
+    train_sampler = LengthBatchSampler(train_lengths, batch_size=args.batch, shuffle=True, seed=args.seed)
+    val_sampler = LengthBatchSampler(val_lengths, batch_size=args.batch, shuffle=False, seed=args.seed)
+
+    train_loader = DataLoader(train_dataset, batch_sampler=train_sampler, collate_fn=lambda x: x)
+    val_loader = DataLoader(val_dataset, batch_sampler=val_sampler, collate_fn=lambda x: x)
 
     # Model
     if args.model == "graph_dkt":
@@ -145,15 +184,18 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
     best_auc = 0.0
     patience_counter = 0
     patience = 5
+    import time as _time
 
-    print(f"\n{'Epoch':>5} {'Train Loss':>12} {'Val Loss':>10} {'Val AUC':>10}")
-    print("-" * 40)
+    print(f"\n{'Epoch':>5} {'Train Loss':>12} {'Val Loss':>10} {'Val AUC':>10} {'Time':>8}", flush=True)
+    print("-" * 48, flush=True)
 
     for epoch in range(1, args.epochs + 1):
+        t0 = _time.time()
         train_loss = train_epoch(model, train_loader, optimizer, criterion, topic_graph, device)
         val_metrics = evaluate_model(model, val_loader, topic_graph, device)
+        elapsed = _time.time() - t0
 
-        print(f"{epoch:>5d} {train_loss:>12.4f} {val_metrics['loss']:>10.4f} {val_metrics['auc']:>10.4f}")
+        print(f"{epoch:>5d} {train_loss:>12.4f} {val_metrics['loss']:>10.4f} {val_metrics['auc']:>10.4f} {elapsed:>7.0f}s", flush=True)
 
         # Tolerance: ignore AUC improvements smaller than 1e-4 (display precision).
         # Without this, patience never increments once val AUC plateaus near 1.0,
@@ -192,15 +234,12 @@ def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device):
         solved = batch["solved"].squeeze(-1)  # (B, T)
         weights = batch["weight"].squeeze(-1)  # (B, T)
 
-        # Standard DKT: input at timestep t includes solved[t] and the model
-        # predicts the outcome for the NEXT timestep. So predictions[t] should
-        # predict solved[t+1]. Shift target by 1 — skip first target (no prior
-        # interaction) and last prediction (nothing to predict after).
-        #   pred_at_topic[t-1] predicts solved[t] for t=1..T-1
-        topic_ids_expanded = topic_ids.unsqueeze(-1)
-        pred_at_topic = predictions.gather(2, topic_ids_expanded).squeeze(-1)  # (B, T)
-
-        pred_for_target = pred_at_topic[:, :-1]  # (B, T-1)
+        # Standard DKT alignment (Piech et al. 2015): after input at t, the
+        # model predicts the outcome at t+1.  The target topic is c_{t+1}
+        # (the one that actually appears next), NOT c_t (the one just
+        # observed).  The shared helper enforces the exact same pairing as
+        # evaluate.py so training and evaluation can never drift apart.
+        pred_for_target = get_target_prediction(predictions, topic_ids)  # (B, T-1)
         target = solved[:, 1:]  # (B, T-1)
         target_weights = weights[:, 1:]  # (B, T-1)
         target_mask = mask[:, 1:]  # (B, T-1)
@@ -231,6 +270,7 @@ def main():
     parser.add_argument("--start-fold", type=int, default=0, help="First fold to train (0-indexed, inclusive). Use to resume a partial CV.")
     parser.add_argument("--end-fold", type=int, default=None, help="Last fold to train (0-indexed, inclusive). Default: --folds-1.")
     parser.add_argument("--out", default="weights/graph_dkt.pt")
+    parser.add_argument("--device", default=None, help='Override device detection: "cpu", "mps", or "cuda"')
     args = parser.parse_args()
 
     if args.folds < 1:
@@ -256,7 +296,15 @@ def main():
     torch.backends.cudnn.benchmark = False
     logger.info("Random seed set to: %d", seed)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if args.device is not None:
+        device = args.device
+        logger.info("Device: %s (from --device flag)", device)
+    elif torch.cuda.is_available():
+        device = "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     logger.info("Device: %s", device)
 
     topic_graph = CPTopicGraph()
