@@ -66,7 +66,7 @@ else:
         """
 
         def __init__(self, num_topics, embedding_dim=64, hidden_dim=128, gcn_hidden=64,
-                     dropout=0.2, topic_graph=None):
+                     dropout=0.2, topic_graph=None, gcn_chunk_size=100):
             super().__init__()
             self.num_topics = num_topics
             self.config = {
@@ -75,7 +75,9 @@ else:
                 "hidden_dim": hidden_dim,
                 "gcn_hidden": gcn_hidden,
                 "dropout": dropout,
+                "gcn_chunk_size": gcn_chunk_size,
             }
+            self.gcn_chunk_size = gcn_chunk_size
 
             # Step 1 — DKT backbone
             self.topic_embedding = nn.Embedding(num_topics, embedding_dim)
@@ -139,7 +141,7 @@ else:
             # ── 4. Chunked dense GCN + checkpointing (avoid OOM) ─────
             # Each chunk's autograd graph is discarded during forward
             # and recomputed during backward — saves ~80% peak memory.
-            K = 100
+            K = self.gcn_chunk_size
             if self.training:
                 h_topic_list = [
                     torch.utils.checkpoint.checkpoint(
