@@ -348,7 +348,7 @@ def main():
 
         # Compute depth: longest path from root
         depth = 0
-        stack = [(topic, 0)]
+        stack: list[tuple[str, int]] = [(topic, 0)]
         while stack:
             t, d = stack.pop()
             if d > depth:
@@ -365,7 +365,7 @@ def main():
     shallow_topics = []
     for topic in all_topics:
         depth = 0
-        stack = [(topic, 0)]
+        stack: list[tuple[str, int]] = [(topic, 0)]
         while stack:
             t, d = stack.pop()
             if d > depth:
