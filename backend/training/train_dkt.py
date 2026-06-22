@@ -56,7 +56,7 @@ class LengthBatchSampler(Sampler):
         return math.ceil(len(self.lengths) / self.batch_size)
 
 
-def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph) -> list[list[dict]]:
+def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph, max_seq_len: int = 0) -> list[list[dict]]:
     """Load CSV and group rows by user_id into sequences."""
     df = pd.read_csv(csv_path)
     required = {"user_id", "topic", "solved", "difficulty", "timestamp_delta"}
@@ -77,8 +77,14 @@ def load_csv_sequences(csv_path: str, topic_graph: CPTopicGraph) -> list[list[di
             "weight": float(row["weight"]) if "weight" in row.index else 1.0,  # type: ignore[arg-type]
         })
 
-    # Filter out very short sequences
-    sequences = [seq for seq in user_seqs.values() if len(seq) >= 3]
+    # Filter out very short sequences and truncate if requested
+    sequences = []
+    for seq in user_seqs.values():
+        if len(seq) < 3:
+            continue
+        if max_seq_len > 0 and len(seq) > max_seq_len:
+            seq = seq[-max_seq_len:]
+        sequences.append(seq)
     return sequences
 
 
@@ -265,6 +271,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--max-seq-len", type=int, default=0, help="Truncate sequences to this length (0=no truncation)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--folds", type=int, default=1, help="K-fold CV (default 1 = single split, no shuffle)")
     parser.add_argument("--start-fold", type=int, default=0, help="First fold to train (0-indexed, inclusive). Use to resume a partial CV.")
@@ -311,7 +318,7 @@ def main():
 
     # Load data
     logger.info("Loading data from %s", args.data)
-    sequences = load_csv_sequences(args.data, topic_graph)
+    sequences = load_csv_sequences(args.data, topic_graph, max_seq_len=args.max_seq_len)
     logger.info("Loaded %d user sequences", len(sequences))
 
     if len(sequences) < 5:
