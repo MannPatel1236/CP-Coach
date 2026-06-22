@@ -153,7 +153,7 @@ def main():
         dkt_path = os.path.join(WEIGHTS_DIR, f"dkt_fold{fi}.pt")
         gdkt_path = os.path.join(WEIGHTS_DIR, f"graph_dkt_fold{fi}.pt")
 
-        results = {"fold": fi, "val_users": len(val_seqs)}
+        results: dict[str, object] = {"fold": fi, "val_users": len(val_seqs)}
         dkt_loaded = False
 
         # --- DKT evaluation ---
