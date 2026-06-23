@@ -1,6 +1,10 @@
 weights/*.pt
 weights/*.pth
+weights/archived-buggy/
 __pycache__/
 .env
 *.pyc
 venv/
+data/*.csv
+data/*.csv.zip
+data/*.meta.json
