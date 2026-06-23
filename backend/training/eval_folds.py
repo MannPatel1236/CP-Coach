@@ -32,7 +32,7 @@ DATA = os.path.join(ROOT, "data", "training.csv")
 WEIGHTS_DIR = os.path.join(ROOT, "weights")
 
 
-def load_csv_sequences(csv_path, topic_graph):
+def load_csv_sequences(csv_path, topic_graph, max_seq_len=0):
     df = pd.read_csv(csv_path)
     required = {"user_id", "topic", "solved", "difficulty", "timestamp_delta"}
     if not required.issubset(set(df.columns)):
@@ -60,7 +60,14 @@ def load_csv_sequences(csv_path, topic_graph):
             "weight": float(_to_scalar(row["weight"])) if "weight" in row.index else 1.0,
         })
 
-    return [seq for seq in user_seqs.values() if len(seq) >= 3]
+    sequences = []
+    for seq in user_seqs.values():
+        if len(seq) < 3:
+            continue
+        if max_seq_len > 0 and len(seq) > max_seq_len:
+            seq = seq[-max_seq_len:]
+        sequences.append(seq)
+    return sequences
 
 
 def kfold_split(sequences, k=5, seed=42):
@@ -100,27 +107,33 @@ def segment_by_length(sequences, low_boundary, mid_boundary):
 
 
 def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Parse CLI args
+    cli_args = argparse.Namespace(segment_by_length=False, no_rule_baseline=False, device=None, max_seq_len=0)
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--segment-by-length", action="store_true",
+                     help="Report per-activity-group AUC (low/mid/high, defined by tertile boundaries of sequence length)")
+    _ap.add_argument("--no-rule-baseline", action="store_true",
+                     help="Skip rule-based P@K baseline comparison")
+    _ap.add_argument("--device", default=None, help='Override device detection: "cpu", "mps", or "cuda"')
+    _ap.add_argument("--max-seq-len", type=int, default=0,
+                     help="Truncate sequences to this length (0=no truncation, default 0)")
+    try:
+        cli_args = _ap.parse_args()
+    except SystemExit:
+        pass  # Allow import without args (used as import)
+
+    if cli_args.device is not None:
+        device = cli_args.device
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Device: %s", device)
 
     topic_graph = CPTopicGraph()
 
     # Load data
     logger.info("Loading data from %s", DATA)
-    sequences = load_csv_sequences(DATA, topic_graph)
+    sequences = load_csv_sequences(DATA, topic_graph, max_seq_len=cli_args.max_seq_len)
     logger.info("Loaded %d user sequences", len(sequences))
-
-    # Parse CLI args
-    cli_args = argparse.Namespace(segment_by_length=False, no_rule_baseline=False)
-    _ap = argparse.ArgumentParser()
-    _ap.add_argument("--segment-by-length", action="store_true",
-                     help="Report per-activity-group AUC (low/mid/high, defined by tertile boundaries of sequence length)")
-    _ap.add_argument("--no-rule-baseline", action="store_true",
-                     help="Skip rule-based P@K baseline comparison")
-    try:
-        cli_args = _ap.parse_args()
-    except SystemExit:
-        pass  # Allow import without args (used as import)
 
     # Compute tertile boundaries for activity-level segmentation
     low_boundary = int(np.percentile([len(s) for s in sequences], 33))
@@ -214,6 +227,14 @@ def main():
             logger.warning("  Graph-DKT weights not found: %s", gdkt_path)
 
         all_results.append(results)
+
+        # Free GPU memory before next fold to prevent VRAM accumulation OOM
+        if 'dkt_model' in locals():
+            del dkt_model
+        if 'gdkt_model' in locals():
+            del gdkt_model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     # ---- Print aggregate comparison ----
     print("\n" + "=" * 70)
