@@ -177,7 +177,16 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
 
     # Model
     if args.model == "graph_dkt":
-        model = GraphDKTModel(num_topics=topic_graph.num_topics, topic_graph=topic_graph)
+        if args.adjacency_mode != "directed":
+            from models.graph_dkt import AblationGraphDKTModel
+            model = AblationGraphDKTModel(
+                num_topics=topic_graph.num_topics,
+                topic_graph=topic_graph,
+                adjacency_mode=args.adjacency_mode,
+            )
+            logger.info("Adjacency mode: %s (ablation)", args.adjacency_mode)
+        else:
+            model = GraphDKTModel(num_topics=topic_graph.num_topics, topic_graph=topic_graph)
     else:
         model = DKTModel(num_topics=topic_graph.num_topics)
     model.to(device)
@@ -268,6 +277,12 @@ def main():
     parser = argparse.ArgumentParser(description="Train DKT / Graph-DKT model")
     parser.add_argument("--data", required=True, help="Path to training CSV")
     parser.add_argument("--model", choices=["dkt", "graph_dkt"], default="graph_dkt")
+    parser.add_argument(
+        "--adjacency-mode",
+        choices=["directed", "undirected", "no_graph", "dense"],
+        default="directed",
+        help="Adjacency type for Graph-DKT ablation (default: directed)"
+    )
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--batch", type=int, default=32)

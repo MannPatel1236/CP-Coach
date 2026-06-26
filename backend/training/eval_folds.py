@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from data.topic_graph import CPTopicGraph
 from models.dkt import DKTModel, DKTDataset
-from models.graph_dkt import GraphDKTModel
+from models.graph_dkt import AblationGraphDKTModel, GraphDKTModel
 from training.evaluate import compute_rule_baseline_pk, evaluate_model
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -117,6 +117,8 @@ def main():
     _ap.add_argument("--device", default=None, help='Override device detection: "cpu", "mps", or "cuda"')
     _ap.add_argument("--max-seq-len", type=int, default=0,
                      help="Truncate sequences to this length (0=no truncation, default 0)")
+    _ap.add_argument("--folds", type=int, default=5,
+                     help="Number of folds to evaluate (must match training fold count, default 5)")
     try:
         cli_args = _ap.parse_args()
     except SystemExit:
@@ -135,11 +137,16 @@ def main():
     sequences = load_csv_sequences(DATA, topic_graph, max_seq_len=cli_args.max_seq_len)
     logger.info("Loaded %d user sequences", len(sequences))
 
-    # Compute tertile boundaries for activity-level segmentation
-    low_boundary = int(np.percentile([len(s) for s in sequences], 33))
-    mid_boundary = int(np.percentile([len(s) for s in sequences], 67))
-    logger.info("Activity tertiles: low ≤ %d | mid %d-%d | high > %d",
+    # Compute tertile boundaries from ORIGINAL (pre-truncation) sequence lengths.
+    # Without this fix, --max-seq-len 2000 truncates all sequences and the high-activity
+    # tertile becomes empty (truncation artifact, not real measurement).
+    raw_sequences = load_csv_sequences(DATA, topic_graph, max_seq_len=0)
+    raw_lengths = [len(s) for s in raw_sequences]
+    low_boundary = int(np.percentile(raw_lengths, 33))
+    mid_boundary = int(np.percentile(raw_lengths, 67))
+    logger.info("Activity tertiles (pre-truncation lengths): low ≤ %d | mid %d-%d | high > %d",
                 low_boundary, low_boundary + 1, mid_boundary, mid_boundary)
+    # Note: groups defined by ORIGINAL activity level; training used --max-seq-len.
 
     # Per-activity-group result tracking (tertile-based)
     segment_results = {
@@ -148,17 +155,18 @@ def main():
         "high": {"dkt_aucs": [], "gdkt_aucs": [], "n": 0},
     }
 
-    # Reproduce 5-fold splits (seed=42, matching train_dkt.py defaults)
-    folds = kfold_split(sequences, k=5, seed=42)
+    # Reproduce k-fold splits (seed=42, matching train_dkt.py defaults).
+    # --folds controls both the split count and which weights to look for.
+    folds = kfold_split(sequences, k=cli_args.folds, seed=42)
 
-    # Fold indices to evaluate (default: all 5)
-    fold_indices = [0, 1, 2, 3, 4]
+    # Fold indices to evaluate
+    fold_indices = list(range(cli_args.folds))
 
     all_results = []
 
     for fi in fold_indices:
         _, val_seqs = folds[fi]
-        logger.info("=== Fold %d/%d (val: %d users) ===", fi + 1, 5, len(val_seqs))
+        logger.info("=== Fold %d/%d (val: %d users) ===", fi + 1, cli_args.folds, len(val_seqs))
 
         val_dataset = DKTDataset(val_seqs, topic_graph)
         val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=lambda x: x)
@@ -189,7 +197,13 @@ def main():
 
         # --- Graph-DKT evaluation ---
         if os.path.exists(gdkt_path):
-            gdkt_model = GraphDKTModel.load(gdkt_path, topic_graph=topic_graph)
+            # Detect ablation checkpoints (adjacency_mode in config) and use
+            # AblationGraphDKTModel.load to avoid TypeError from the extra kwarg.
+            ckpt_keys = torch.load(gdkt_path, map_location="cpu", weights_only=True).get("config", {})
+            if "adjacency_mode" in ckpt_keys:
+                gdkt_model = AblationGraphDKTModel.load(gdkt_path, topic_graph=topic_graph)
+            else:
+                gdkt_model = GraphDKTModel.load(gdkt_path, topic_graph=topic_graph)
             if gdkt_model is None:
                 logger.warning("  Graph-DKT load returned None for %s", gdkt_path)
                 continue

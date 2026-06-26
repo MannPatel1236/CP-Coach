@@ -1,5 +1,7 @@
 """Recommendation engine."""
 
+import math
+
 from data.topic_graph import CPTopicGraph
 
 
@@ -7,7 +9,6 @@ class Recommender:
     """Graph-aware problem recommender with prerequisite gating."""
 
     TOPIC_MATCH_WEIGHT = 100_000
-    SOLVE_COUNT_CAP = 10_000
     DEFAULT_MASTERY_THRESHOLD = 0.6
     STRETCH_MULTIPLIER = 2
 
@@ -82,7 +83,7 @@ class Recommender:
             p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
             p_copy["is_stretch"] = False
             matched = len(p_copy["matched_topics"])
-            p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + min(p.get("solve_count", 0), self.SOLVE_COUNT_CAP)
+            p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + math.log1p(p.get("solve_count", 0))
             normal_pool.append(p_copy)
 
         # ── 4. RANKING ───────────────────────────────────────────────
@@ -108,14 +109,14 @@ class Recommender:
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
                 matched = len(p_copy["matched_topics"])
-                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + min(p.get("solve_count", 0), self.SOLVE_COUNT_CAP)
+                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + math.log1p(p.get("solve_count", 0))
                 normal_pool.append(p_copy)
 
         # ── 6. ABSOLUTE FALLBACK ─────────────────────────────────────
         if len(normal_pool) < 5:
             sorted_problems = sorted(all_problems, key=lambda x: (
                 len([t for t in x.get("topics", []) if t in final_topics]) * self.TOPIC_MATCH_WEIGHT +
-                min(x.get("solve_count", 0), self.SOLVE_COUNT_CAP)
+                math.log1p(x.get("solve_count", 0))
             ), reverse=True)
             normal_ids = {p["problem_id"] for p in normal_pool}
             for p in sorted_problems:
@@ -129,7 +130,7 @@ class Recommender:
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
                 matched = len(p_copy["matched_topics"])
-                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + min(p.get("solve_count", 0), self.SOLVE_COUNT_CAP)
+                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + math.log1p(p.get("solve_count", 0))
                 normal_pool.append(p_copy)
                 normal_ids.add(p["problem_id"])
                 if len(normal_pool) >= top_k:

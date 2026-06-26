@@ -53,17 +53,19 @@ python -m training.train_dkt \
   --out weights/graph_dkt.pt
 ```
 
-CSV format: `user_id, topic, solved, difficulty, timestamp_delta`
+CSV format: `user_id, topic, solved, difficulty, timestamp_delta, weight`
 
 ### 4. API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
+| GET | `/health/deep` | Probes CF and LC API reachability |
 | GET | `/api/analyze/{handle}?platform=cf&mode=quick` | Analyze user |
-| GET | `/api/recommend/{handle}?platforms=cf&top_k=20` | Recommendations |
+| GET/POST | `/api/recommend/{handle}?platforms=cf&top_k=20` | Recommendations |
 | GET | `/api/progress/{handle}` | Weekly progress |
 | GET | `/api/graph` | Topic prerequisite graph |
+| DELETE | `/api/user/{handle}` | GDPR erasure (requires HMAC auth) |
 
 ### Environment Variables
 

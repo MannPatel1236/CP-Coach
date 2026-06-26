@@ -144,11 +144,13 @@ Services:
 
 | Endpoint | Method | Description |
 |----------|:------:|-------------|
-| `/api/analyze/{handle}` | GET | Analyze profile (`platform=cf|lc`, `mode=quick|deep`) |
+| `/api/analyze/{handle}` | GET | Analyze profile (`platform=cf\|lc`, `mode=quick\|deep`) |
 | `/api/recommend/{handle}` | GET/POST | Get recommendations (`platforms=cf,lc`, `focus_topics=...`) |
 | `/api/progress/{handle}` | GET | Weekly per-topic solve rates |
 | `/api/graph` | GET | Prerequisite graph topology (JSON) |
+| `/api/user/{handle}` | DELETE | GDPR erasure (requires HMAC auth if `CP_API_SECRET` set) |
 | `/health` | GET | Health check |
+| `/health/deep` | GET | Probes CF and LeetCode API reachability |
 
 **Example:**
 ```bash
@@ -179,14 +181,23 @@ Input (67D) = Embedding(64) + solved(1) + difficulty(1) + ts_delta(1)
 Linear(67 -> 128) + ReLU
     |
     v
-LSTM(128 -> 128, dropout=0.2)*
+LSTM(128 -> 128)
+    |
+    v
+nn.Dropout(0.2)
     |
     | h_t
-    |-----> GCNConv(128, 64) + GCNConv(64, 64)
-    |              |
-    |          h_graph (64D per topic)
-    |              |
-    |-----> concat[h_t, h_graph] (192D)
+    |
+    +---> mastery_head: Linear(128, 29) -> sigmoid -> mastery_t[b,t,j]
+    |         |
+    |     node_feats = mastery_t * topic_embedding.weight  (B,T,29,64)
+    |         |
+    |     Dense GCN (einsum): adj_norm @ node_feats -> Linear(64,64) -> ReLU
+    |         |              -> einsum -> Linear(64,64)
+    |         |
+    |     gather at topic_ids[b,t] -> h_topic (64D)
+    |
+    +---> concat[h_t, h_topic] (192D)
                    |
                    v
             Linear(192 -> 29)
@@ -194,9 +205,6 @@ LSTM(128 -> 128, dropout=0.2)*
                    v
             Sigmoid -> p_mastery per topic
 ```
-
-*Explicit `nn.Dropout` applied after LSTM output, since `num_layers=1` means
-`dropout` in the LSTM constructor is a no-op.
 
 ### Training
 
@@ -249,9 +257,12 @@ weight = 1.0 - (0.8 * idx) / max(total - 1, 1)
 CP-Coach/
 ├── src/                        # React frontend (Vite)
 │   ├── api.js                  # CF API calls + data processing
-│   ├── api/backendClient.js      # FastAPI backend wrapper
-│   ├── hooks/useAnalysis.js    # Analysis state machine
-│   ├── hooks/useRecommendations.js
+│   ├── api/backendClient.js    # FastAPI backend wrapper with retry
+│   ├── hooks/
+│   │   ├── AnalysisContext.jsx  # React context + useAnalysisContext()
+│   │   ├── useAnalysis.js      # Analysis state machine
+│   │   ├── useRecommendations.js
+│   │   └── useKeyboardShortcuts.js
 │   ├── components/             # UI components
 │   ├── App.jsx                 # Root component
 │   ├── main.jsx                # Entry point
@@ -259,18 +270,21 @@ CP-Coach/
 ├── api/                        # Vercel serverless functions
 │   └── cf.js                   # CORS proxy for Codeforces
 ├── backend/
-│   ├── main.py                 # FastAPI entry point
+│   ├── main.py                 # FastAPI entry point, CORS, lifespan
+│   ├── auth.py                 # HMAC-signed request auth
+│   ├── rate_limiter.py         # slowapi with trusted-proxy-aware IP
 │   ├── Dockerfile
 │   ├── startup.sh              # Startup script (local/cloud split)
 │   ├── .env.local              # Local dev (no DATABASE_URL)
 │   ├── .env.example            # Production template
 │   ├── .dockerignore           # Prevents secrets in Docker context
 │   ├── routes/
+│   │   ├── schemas.py          # Pydantic response models
 │   │   ├── analyze.py          # GET /api/analyze
 │   │   ├── recommend.py        # GET/POST /api/recommend
 │   │   ├── progress.py         # GET /api/progress
 │   │   ├── graph.py            # GET /api/graph
-│   │   └── user.py
+│   │   └── user.py             # DELETE /api/user (GDPR erasure)
 │   ├── platforms/
 │   │   ├── codeforces.py       # CF REST client (httpx)
 │   │   ├── leetcode.py         # LC GraphQL client (httpx)
@@ -278,7 +292,8 @@ CP-Coach/
 │   ├── models/
 │   │   ├── dkt.py              # LSTM backbone
 │   │   ├── graph_dkt.py        # GCN-augmented DKT
-│   │   └── recommender.py      # Prerequisite-aware engine
+│   │   ├── recommender.py      # Prerequisite-aware engine
+│   │   └── errors.py           # FastAPI exception handlers
 │   ├── data/
 │   │   ├── preprocessor.py     # Feature engineering + recency decay
 │   │   └── topic_graph.py      # Prerequisite graph (29 topics, 39 edges)
@@ -287,11 +302,14 @@ CP-Coach/
 │   │   └── connection.py       # SQLAlchemy async engine + ORM
 │   ├── training/
 │   │   ├── train_dkt.py        # CLI training script
-│   │   └── evaluate.py         # AUC, accuracy, per-topic metrics
+│   │   ├── evaluate.py         # AUC, accuracy, per-topic metrics
+│   │   ├── eval_folds.py       # 5-fold CV evaluation
+│   │   └── scrape_cf_data.py   # CF API scraper → training CSV
+│   ├── tests/                  # pytest smoke tests
 │   └── weights/                # Model checkpoints (gitignored)
 ├── docker-compose.yml          # PG + backend stack
 ├── vercel.json                 # Vercel routing
-├── vite.config.js              # Dev proxy
+├── vite.config.js              # Dev proxy + chunk splitting
 └── package.json                # Frontend deps
 ```
 
@@ -344,7 +362,7 @@ CREATE TABLE IF NOT EXISTS topic_graph (
 CREATE TABLE IF NOT EXISTS kt_states (
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   topic VARCHAR(50),
-  p_mastery FLOAT,
+  p_mastery FLOAT NOT NULL DEFAULT 0.0,
   updated_at TIMESTAMP,
   PRIMARY KEY (user_id, topic)
 );

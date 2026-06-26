@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api", tags=["recommend"])
 class RecommendRequest(BaseModel):
     platforms: str = "cf"
     top_k: int = Field(default=20, ge=1, le=100)
-    focus_topics: str | None = ""
+    focus_topics: str = ""
     mastery_scores: dict | None = None
     solved_ids: list[str] = []
     user_rating: int | None = None

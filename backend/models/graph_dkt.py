@@ -232,3 +232,47 @@ else:
             model = cls(topic_graph=topic_graph, **config)
             model.load_state_dict(checkpoint["state_dict"])
             return model
+
+
+    class AblationGraphDKTModel(GraphDKTModel):
+        """GraphDKTModel with a swappable adjacency matrix for ablation studies.
+
+        Only overrides _build_normalized_adj. All forward pass logic is inherited.
+        Controlled via adjacency_mode:
+          "directed"   — original 39-edge prerequisite DAG (baseline, same as GraphDKTModel)
+          "undirected" — same edges but bidirectional (removes prerequisite ordering)
+          "no_graph"   — identity only (self-loops, no cross-topic signal)
+          "dense"      — fully connected (all-to-all mixing, no structural information)
+        """
+        VALID_MODES = frozenset({"directed", "undirected", "no_graph", "dense"})
+
+        def __init__(self, num_topics, embedding_dim=64, hidden_dim=128, gcn_hidden=64,
+                     dropout=0.2, topic_graph=None, adjacency_mode="directed"):
+            self._adjacency_mode = adjacency_mode
+            super().__init__(num_topics=num_topics, embedding_dim=embedding_dim,
+                             hidden_dim=hidden_dim, gcn_hidden=gcn_hidden,
+                             dropout=dropout, topic_graph=topic_graph)
+            self.config["adjacency_mode"] = adjacency_mode
+
+        def _build_normalized_adj(self, topic_graph) -> torch.Tensor:
+            num_topics = topic_graph.num_topics
+            edge_index = topic_graph.get_edge_index()
+            mode = getattr(self, "_adjacency_mode", "directed")
+
+            if mode not in self.VALID_MODES:
+                raise ValueError(f"Unknown adjacency_mode '{mode}'. Valid: {self.VALID_MODES}")
+
+            A = torch.zeros(num_topics, num_topics)
+            if mode == "directed":
+                A[edge_index[1], edge_index[0]] = 1.0
+            elif mode == "undirected":
+                A[edge_index[1], edge_index[0]] = 1.0
+                A[edge_index[0], edge_index[1]] = 1.0
+            elif mode == "no_graph":
+                pass  # A stays zero; only self-loops added below
+            elif mode == "dense":
+                A = torch.ones(num_topics, num_topics) - torch.eye(num_topics)
+
+            A = A + torch.eye(num_topics)
+            D = A.sum(dim=1).pow(-0.5)
+            return D.unsqueeze(1) * A * D.unsqueeze(0)
