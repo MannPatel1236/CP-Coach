@@ -247,11 +247,13 @@ else:
         VALID_MODES = frozenset({"directed", "undirected", "no_graph", "dense"})
 
         def __init__(self, num_topics, embedding_dim=64, hidden_dim=128, gcn_hidden=64,
-                     dropout=0.2, topic_graph=None, adjacency_mode="directed"):
+                     dropout=0.2, topic_graph=None, adjacency_mode="directed",
+                     gcn_chunk_size=100):
             self._adjacency_mode = adjacency_mode
             super().__init__(num_topics=num_topics, embedding_dim=embedding_dim,
                              hidden_dim=hidden_dim, gcn_hidden=gcn_hidden,
-                             dropout=dropout, topic_graph=topic_graph)
+                             dropout=dropout, topic_graph=topic_graph,
+                             gcn_chunk_size=gcn_chunk_size)
             self.config["adjacency_mode"] = adjacency_mode
 
         def _build_normalized_adj(self, topic_graph) -> torch.Tensor:
