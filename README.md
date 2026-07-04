@@ -14,7 +14,7 @@
 
 <br>
 
-*Analyze your competitive programming profile, uncover weak topics, and get AI-powered problem recommendations across Codeforces and LeetCode.*
+*Analyze your competitive programming profile, uncover weak topics and get AI-powered problem recommendations across Codeforces and LeetCode.*
 
 </div>
 
