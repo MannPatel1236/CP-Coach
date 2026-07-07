@@ -62,7 +62,13 @@ function WeakAreas({ weakTags, selectedTag, onSelectTag }) {
                 borderRadius: "var(--radius-full)",
                 transition: "width 1.2s cubic-bezier(0.4, 0, 0.2, 1)",
                 boxShadow: `0 0 8px ${acColor(t.acRate)}44`,
-              }} />
+              }}
+                role="progressbar"
+                aria-valuenow={t.acRate}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${t.acRate}% solve rate`}
+              />
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
