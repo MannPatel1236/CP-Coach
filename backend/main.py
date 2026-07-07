@@ -84,6 +84,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# Reject POST /api/recommend bodies > 1MB
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    """Reject request bodies larger than MAX_SIZE bytes for POST /recommend."""
+    MAX_SIZE = 1_000_000  # 1 MB
+
+    async def dispatch(self, request, call_next):
+        if request.method == "POST" and request.url.path.startswith("/api/recommend"):
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > self.MAX_SIZE:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"Request body too large. Max {self.MAX_SIZE} bytes."},
+                )
+        return await call_next(request)
+
+app.add_middleware(MaxBodySizeMiddleware)
+
 # CORS
 origins = [
     o.strip().lower()
