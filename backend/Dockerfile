@@ -13,5 +13,7 @@ COPY . .
 # Run as non-root for security
 RUN useradd -m appuser
 USER appuser
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()" || exit 1
 EXPOSE 8000
 CMD ["/bin/bash", "/app/startup.sh"]
