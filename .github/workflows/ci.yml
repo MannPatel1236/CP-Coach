@@ -34,9 +34,8 @@ jobs:
           python -m py_compile main.py routes/analyze.py routes/recommend.py routes/progress.py routes/graph.py
 
       - name: Test
-        run: |
-          cd ${{ github.workspace }}/backend
-          python -m pytest tests/ -v
+        working-directory: ./backend
+        run: python -m pytest tests/ -v
 
   frontend:
     runs-on: ubuntu-latest
