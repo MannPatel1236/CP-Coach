@@ -129,6 +129,7 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     platforms: list[str]
+    model_loaded: bool = False
 
 
 class DeepHealthDownstream(BaseModel):

@@ -104,8 +104,14 @@ app.include_router(user.router)
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health():
-    return {"status": "ok", "version": "2.0", "platforms": ["cf", "lc"]}
+async def health(request: Request):
+    model = getattr(request.app.state, "graph_dkt_model", None)
+    return {
+        "status": "ok",
+        "version": "2.0",
+        "platforms": ["cf", "lc"],
+        "model_loaded": model is not None,
+    }
 
 
 @app.get("/health/deep", response_model=HealthDeepResponse)
