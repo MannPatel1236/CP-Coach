@@ -50,7 +50,7 @@ USE_DENSE_GCN = True
 
 
 if not TORCH_GEOMETRIC_AVAILABLE and not USE_DENSE_GCN:
-    GraphDKTModel = DKTModel
+    GraphDKTModel = DKTModel  # type: ignore[reportAssignmentType]
 else:
 
     class GraphDKTModel(nn.Module):
@@ -144,7 +144,7 @@ else:
             K = self.gcn_chunk_size
             if self.training:
                 h_topic_list = [
-                    torch.utils.checkpoint.checkpoint(
+                    torch.utils.checkpoint.checkpoint(  # type: ignore[reportAttributeAccessIssue]
                         self._gcn_chunk,
                         node_feats[:, t_start : t_start + K],
                         batch["topic_ids"][:, t_start : t_start + K],

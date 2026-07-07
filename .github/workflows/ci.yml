@@ -36,11 +36,7 @@ jobs:
           python -m py_compile main.py routes/analyze.py routes/recommend.py routes/progress.py routes/graph.py
 
       - name: Test
-        run: python -m pytest tests/ -v 2>&1 | tee /tmp/pytest_output.txt
-
-      - name: Show pytest output
-        if: always()
-        run: cat /tmp/pytest_output.txt
+        run: python -m pytest tests/ -v
 
   frontend:
     runs-on: ubuntu-latest
