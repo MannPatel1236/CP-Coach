@@ -4,7 +4,8 @@ slowapi==0.1.9
 asyncpg==0.31.0
 sqlalchemy[asyncio]==2.0.50
 httpx==0.28.1
-numpy==2.4.4
+numpy==1.26.4; python_version < '3.12'
+numpy==2.4.4; python_version >= '3.12'
 pandas==3.0.3
 scikit-learn==1.9.0
 python-dotenv==1.2.2
