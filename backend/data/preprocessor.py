@@ -137,7 +137,13 @@ class Preprocessor:
     # ── Weak area detection ──────────────────────────────────────────
 
     def detect_weak_areas(self, topic_profile: list[dict], threshold: float = 0.65) -> list[str]:
-        """Return weakest topics (max 3)."""
+        """Return weakest topics (max 3).
+
+        Threshold 0.65 flags topics for UI display as "weak areas."
+        This is intentionally stricter than the recommender's practice threshold (0.6)
+        and prerequisite gate (0.5) — a topic at 0.6-0.65 solve rate may need practice
+        but isn't alarming enough to highlight as a vulnerability.
+        """
         weak = [t for t in topic_profile if t["solve_rate"] < threshold]
         weak.sort(key=lambda t: t["solve_rate"])
 

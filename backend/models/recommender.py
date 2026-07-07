@@ -46,8 +46,14 @@ class Recommender:
         final_topics = []
         for topic in weak_topics:
             if self.topic_graph.are_prerequisites_met(topic, mastery_scores, threshold=0.5):
-                # threshold 0.5 — 10% gap from weak-area detection (0.6 in preprocessor.py).
-                # Topics with 0.5-0.6 mastery may pass gating but aren't flagged as weak.
+                # ── Threshold rationale ──
+                # Three distinct thresholds serve different purposes:
+                #   0.65 = UI "weak area" flag (preprocessor.py) — alarming enough to highlight
+                #   0.60 = practice recommendation trigger (this file) — needs improvement
+                #   0.50 = prerequisite gate (are_prerequisites_met) — "good enough" to move on
+                # The gaps are intentional. A topic with 0.55 mastery isn't alarming (skip weak flag),
+                # but still worth practicing (hit by 0.6 practice threshold).
+                # A prerequisite at 0.55 is solid enough to build on (passes 0.5 gate).
                 final_topics.append(topic)
             else:
                 unmet = [
