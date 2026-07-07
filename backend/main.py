@@ -2,6 +2,7 @@
 
 import os
 import logging
+import uuid
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -70,6 +71,17 @@ app.add_exception_handler(RateLimitExceeded, _slowapi_handler)  # pyright: ignor
 # Structured error responses for all other exceptions
 app.add_exception_handler(HTTPException, handle_http_exception)  # pyright: ignore[reportArgumentType]
 app.add_exception_handler(Exception, handle_catchall)
+
+# Request ID — must be first so downstream handlers can reference it
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Add X-Request-ID to every response for request tracing."""
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+app.add_middleware(RequestIDMiddleware)
 
 # Security headers middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
