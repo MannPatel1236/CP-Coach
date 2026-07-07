@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS problems (
 CREATE INDEX IF NOT EXISTS idx_problems_platform ON problems(platform);
 CREATE INDEX IF NOT EXISTS idx_problems_difficulty ON problems(difficulty);
 CREATE INDEX IF NOT EXISTS idx_problems_name_trgm ON problems USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_problems_topics ON problems USING GIN (topics);
 
 CREATE TABLE IF NOT EXISTS topic_graph (
   from_topic VARCHAR(50),
