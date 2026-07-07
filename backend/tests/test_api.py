@@ -153,3 +153,21 @@ class TestRecommend:
         )
         assert r.status_code == 200, r.json()
         assert r.json()["model_used"] == "rule_based"
+
+    def test_recommend_post_body_too_large_returns_413(self):
+        """Body > 1MB should be rejected by MaxBodySizeMiddleware."""
+        big_body = "x" * (1_000_001)  # 1 MB + 1 byte
+        r = client.post(
+            "/api/recommend/tourist",
+            content='{"data": "' + big_body + '"}',
+            headers={"Content-Type": "application/json"},
+        )
+        assert r.status_code == 413, f"Expected 413, got {r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert "detail" in data
+        assert "too large" in data["detail"].lower()
+
+    # NOTE: TestClient (httpx) auto-sets Content-Length, so a malformed header
+    # test (e.g. content-length: not_a_number) cannot be written via TestClient.
+    # The fix is verified by code review: MaxBodySizeMiddleware.dispatch() wraps
+    # int(content_length) in try/except (ValueError, TypeError), defaulting to 0.
