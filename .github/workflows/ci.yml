@@ -34,7 +34,7 @@ jobs:
           python -m py_compile main.py routes/analyze.py routes/recommend.py routes/progress.py routes/graph.py
 
       - name: Test
-        run: pytest tests/ -v
+        run: python -m pytest tests/ -v
 
   frontend:
     runs-on: ubuntu-latest
