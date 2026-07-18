@@ -37,7 +37,7 @@ def test_scraper_rows_match_preprocessor_sequence(sample_raw_submissions):
     normalizer = Normalizer()
     preprocessor = Preprocessor()
 
-    normalized = [normalizer.normalize_cf_submission(s) for s in sample_raw_submissions]
+    normalized = [n for n in (normalizer.normalize_cf_submission(s) for s in sample_raw_submissions) if n]
     expected_seq = preprocessor.build_submission_sequence(normalized, canonical_only=True)
 
     rows = _process(user_id=42, raw_submissions=sample_raw_submissions, min_solved=0)

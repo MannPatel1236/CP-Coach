@@ -93,10 +93,16 @@ class Normalizer:
 
     # ── Submission normalization ─────────────────────────────────────
 
-    def normalize_cf_submission(self, raw: dict) -> dict:
-        prob = raw["problem"]
+    def normalize_cf_submission(self, raw: dict) -> dict | None:
+        prob = raw.get("problem")
+        if not isinstance(prob, dict):
+            return None
+        contest_id = prob.get("contestId")
+        index = prob.get("index")
+        if contest_id is None or index is None:
+            return None
         return {
-            "problem_id": f"cf-{prob['contestId']}{prob['index']}",
+            "problem_id": f"cf-{contest_id}{index}",
             "platform": "cf",
             "verdict": "OK" if raw.get("verdict") == "OK" else "WRONG_ANSWER",
             "topics": [self.normalize_cf_tag(t) for t in prob.get("tags", [])],
@@ -125,15 +131,19 @@ class Normalizer:
 
     # ── Problem normalization ────────────────────────────────────────
 
-    def normalize_cf_problem(self, raw_problem: dict, raw_stat: dict) -> dict:
+    def normalize_cf_problem(self, raw_problem: dict, raw_stat: dict) -> dict | None:
+        contest_id = raw_problem.get("contestId")
+        index = raw_problem.get("index")
+        if contest_id is None or index is None:
+            return None
         return {
-            "problem_id": f"cf-{raw_problem['contestId']}{raw_problem['index']}",
+            "problem_id": f"cf-{contest_id}{index}",
             "platform": "cf",
-            "name": raw_problem["name"],
+            "name": raw_problem.get("name", ""),
             "difficulty": raw_problem.get("rating"),
             "topics": [self.normalize_cf_tag(t) for t in raw_problem.get("tags", [])],
             "solve_count": raw_stat.get("solvedCount", 0),
-            "url": f"https://codeforces.com/problemset/problem/{raw_problem['contestId']}/{raw_problem['index']}",
+            "url": f"https://codeforces.com/problemset/problem/{contest_id}/{index}",
         }
 
     def normalize_lc_problem(self, raw: dict) -> dict:
@@ -186,8 +196,9 @@ if __name__ == "__main__":
             {"slug": "hash-table", "name": "Hash Table"},
         ],
     }
-    print(n.normalize_cf_submission(cf_raw))
+    cf_norm = n.normalize_cf_submission(cf_raw)
+    print(cf_norm)
     print(n.normalize_lc_submission(lc_raw))
-    assert n.normalize_cf_submission(cf_raw)["topics"] == ["dfs_and_similar", "greedy"]
+    assert cf_norm is not None and cf_norm["topics"] == ["dfs_and_similar", "greedy"]
     assert n.normalize_lc_submission(lc_raw)["topics"] == ["implementation", "hashing"]
     print("All assertions passed")

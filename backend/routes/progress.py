@@ -28,7 +28,7 @@ async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
     else:
         client = CFClient()
         raw_subs = await client.get_all_submissions(handle, max_count=8000)
-        return [_normalizer.normalize_cf_submission(s) for s in raw_subs]
+        return [n for n in (_normalizer.normalize_cf_submission(s) for s in raw_subs) if n]
 
 
 @router.get("/progress/{handle}", response_model=ProgressResponse)

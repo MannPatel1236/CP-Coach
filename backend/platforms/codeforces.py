@@ -97,9 +97,9 @@ class CFClient:
 
         normalized = []
         for p in problems:
-            key = (p.get("contestId"), p.get("index"))
-            stat = stat_map.get(key, {})
-            normalized.append(self._normalizer.normalize_cf_problem(p, stat))
+            n = self._normalizer.normalize_cf_problem(p, stat_map.get((p.get("contestId"), p.get("index")), {}))
+            if n:
+                normalized.append(n)
         return normalized
 
     # ── Internal HTTP ────────────────────────────────────────────────
