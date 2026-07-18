@@ -9,6 +9,10 @@ class Recommender:
     """Graph-aware problem recommender with prerequisite gating."""
 
     TOPIC_MATCH_WEIGHT = 100_000
+    # Prerequisite matches rank below requested-topic matches but above the
+    # popularity tie-breaker, so supplemented-prereq problems never crowd out
+    # the topic the user actually asked to practise.
+    PREREQ_MATCH_WEIGHT = 1_000
     DEFAULT_MASTERY_THRESHOLD = 0.6
     STRETCH_MULTIPLIER = 2
 
@@ -16,6 +20,18 @@ class Recommender:
         self.topic_graph = topic_graph
         self.mastery_threshold = mastery_threshold
         self.difficulty_band = difficulty_band
+
+    def _rank_score(self, matched_topics: list[str], solve_count: int, primary_set: set[str]) -> float:
+        # Problems matching a REQUESTED (primary) weak topic rank above those
+        # matching only a supplemented prerequisite, both above the popularity
+        # tie-breaker. primary_set = topics the user actually asked to practise.
+        primary = sum(1 for t in matched_topics if t in primary_set)
+        prereq = len(matched_topics) - primary
+        return (
+            primary * self.TOPIC_MATCH_WEIGHT
+            + prereq * self.PREREQ_MATCH_WEIGHT
+            + math.log1p(solve_count)
+        )
 
     def recommend(
         self,
@@ -43,8 +59,13 @@ class Recommender:
                 weak_topics = sorted(mastery_scores, key=lambda t: mastery_scores[t])[:3]
 
         # ── 2. PREREQUISITE GATING ───────────────────────────────────
+        # Keep the requested weak topic — the user asked to practise it. If its
+        # prerequisites are unmet, SUPPLEMENT (do not replace) with them; those
+        # prerequisite-matching problems then rank lower via PREREQ_MATCH_WEIGHT.
+        primary_set = set(weak_topics)
         final_topics = []
         for topic in weak_topics:
+            final_topics.append(topic)
             if self.topic_graph.are_prerequisites_met(topic, mastery_scores, threshold=0.5):
                 # ── Threshold rationale ──
                 # Three distinct thresholds serve different purposes:
@@ -54,13 +75,12 @@ class Recommender:
                 # The gaps are intentional. A topic with 0.55 mastery isn't alarming (skip weak flag),
                 # but still worth practicing (hit by 0.6 practice threshold).
                 # A prerequisite at 0.55 is solid enough to build on (passes 0.5 gate).
-                final_topics.append(topic)
-            else:
-                unmet = [
-                    p for p in self.topic_graph.get_prerequisites(topic)
-                    if mastery_scores.get(p, 0) < 0.5
-                ]
-                final_topics.extend(unmet)
+                continue
+            unmet = [
+                p for p in self.topic_graph.get_prerequisites(topic)
+                if mastery_scores.get(p, 0) < 0.5
+            ]
+            final_topics.extend(unmet)
         # Deduplicate preserving order
         final_topics = list(dict.fromkeys(final_topics))
 
@@ -88,8 +108,9 @@ class Recommender:
             p_copy = dict(p)
             p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
             p_copy["is_stretch"] = False
-            matched = len(p_copy["matched_topics"])
-            p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + math.log1p(p.get("solve_count", 0))
+            p_copy["rank_score"] = self._rank_score(
+                p_copy["matched_topics"], p.get("solve_count", 0), primary_set
+            )
             normal_pool.append(p_copy)
 
         # ── 4. RANKING ───────────────────────────────────────────────
@@ -114,16 +135,22 @@ class Recommender:
                 p_copy = dict(p)
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
-                matched = len(p_copy["matched_topics"])
-                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + math.log1p(p.get("solve_count", 0))
+                p_copy["rank_score"] = self._rank_score(
+                    p_copy["matched_topics"], p.get("solve_count", 0), primary_set
+                )
                 normal_pool.append(p_copy)
 
         # ── 6. ABSOLUTE FALLBACK ─────────────────────────────────────
         if len(normal_pool) < 5:
-            sorted_problems = sorted(all_problems, key=lambda x: (
-                len([t for t in x.get("topics", []) if t in final_topics]) * self.TOPIC_MATCH_WEIGHT +
-                math.log1p(x.get("solve_count", 0))
-            ), reverse=True)
+            sorted_problems = sorted(
+                all_problems,
+                key=lambda x: self._rank_score(
+                    [t for t in x.get("topics", []) if t in final_topics],
+                    x.get("solve_count", 0),
+                    primary_set,
+                ),
+                reverse=True,
+            )
             normal_ids = {p["problem_id"] for p in normal_pool}
             for p in sorted_problems:
                 if p["problem_id"] in solved_problem_ids:
@@ -135,8 +162,9 @@ class Recommender:
                 p_copy = dict(p)
                 p_copy["matched_topics"] = [t for t in p.get("topics", []) if t in final_topics]
                 p_copy["is_stretch"] = True
-                matched = len(p_copy["matched_topics"])
-                p_copy["rank_score"] = (matched * self.TOPIC_MATCH_WEIGHT) + math.log1p(p.get("solve_count", 0))
+                p_copy["rank_score"] = self._rank_score(
+                    p_copy["matched_topics"], p.get("solve_count", 0), primary_set
+                )
                 normal_pool.append(p_copy)
                 normal_ids.add(p["problem_id"])
                 if len(normal_pool) >= top_k:
