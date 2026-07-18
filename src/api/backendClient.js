@@ -40,7 +40,7 @@ export const analyzeHandle = (handle, platform, mode, signal) =>
 export const getRecommendations = (handle, platforms, topK, signal, focusTopics = "") =>
   apiFetch(`/api/recommend/${encodeURIComponent(handle)}?platforms=${platforms}&top_k=${topK}&focus_topics=${encodeURIComponent(focusTopics)}`, signal);
 
-export const getRecommendationsWithMastery = (handle, platforms, topK, signal, focusTopics = "", masteryScores = {}, solvedIds = [], userRating = null) =>
+export const getRecommendationsWithMastery = (handle, platforms, topK, signal, focusTopics = "", masteryScores = {}, solvedIds = [], userRating = null, cfHandle = null, lcHandle = null) =>
   apiFetch(`/api/recommend/${encodeURIComponent(handle)}`, signal, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -51,6 +51,8 @@ export const getRecommendationsWithMastery = (handle, platforms, topK, signal, f
       mastery_scores: masteryScores,
       solved_ids: solvedIds,
       ...(userRating != null && { user_rating: userRating }),
+      ...(cfHandle && { cf_handle: cfHandle }),
+      ...(lcHandle && { lc_handle: lcHandle }),
     }),
   });
 

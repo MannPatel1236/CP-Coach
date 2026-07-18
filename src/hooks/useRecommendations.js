@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchProblemsForTags, buildRecommendations } from "../api.js";
 import { getRecommendations, getRecommendationsWithMastery } from "../api/backendClient.js";
 
-export default function useRecommendations({ solvedSet, user, abortRef, resetAbort, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, analysisMasteryScoresRef, platform, combinedPlatform }) {
+export default function useRecommendations({ solvedSet, user, abortRef, resetAbort, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, analysisMasteryScoresRef, platform, combinedPlatform, cfHandle, lcHandle }) {
   const useBackend = !!import.meta.env.VITE_API_URL;
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [fetchingRecs, setFetchingRecs] = useState(false);
@@ -14,14 +14,16 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
   const prevHandleRef = useRef(null);
 
   // Reset on new user search so recommendations from analyze() are picked up
-  if (user?.handle !== prevHandleRef.current) {
-    prevHandleRef.current = user?.handle;
-    setInitialized(false);
-    setRecs([]);
-    setSelectedTopics([]);
-    setActiveWeakTag(null);
-    setError(null);
-  }
+  useEffect(() => {
+    if (user?.handle !== prevHandleRef.current) {
+      prevHandleRef.current = user?.handle;
+      setInitialized(false);
+      setRecs([]);
+      setSelectedTopics([]);
+      setActiveWeakTag(null);
+      setError(null);
+    }
+  }, [user?.handle]);
 
   // Abort in-flight requests on unmount — read abortRef.current at unmount time
   // (not at mount time) so we catch any request started after the effect mounted.
@@ -80,7 +82,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
 
         let data;
         if (hasMasteryScores) {
-          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, focusTopics, analysisMasteryScoresRef.current, solvedIds, userRating);
+          data = await getRecommendationsWithMastery(handle, platformsStr, 12, controller?.signal, focusTopics, analysisMasteryScoresRef.current, solvedIds, userRating, cfHandle, lcHandle);
         } else {
           data = await getRecommendations(handle, platformsStr, 12, controller?.signal, focusTopics);
         }
@@ -136,7 +138,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     } finally {
       setFetchingRecs(false);
     }
-  }, [solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort, analysisMasteryScoresRef, getHandle, getPlatformsStr]);
+  }, [solvedSet, user, platform, combinedPlatform, useBackend, abortRef, resetAbort, analysisMasteryScoresRef, getHandle, getPlatformsStr, cfHandle, lcHandle]);
 
   const selectWeakTag = useCallback(async (tag) => {
     setActiveWeakTag(tag);

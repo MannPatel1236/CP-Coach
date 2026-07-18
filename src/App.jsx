@@ -35,6 +35,8 @@ export default function App() {
     analysisMasteryScoresRef: analysis.masteryScoresRef,
     platform: analysis.platform,
     combinedPlatform: analysis.combinedPlatform,
+    cfHandle: analysis.cfHandle,
+    lcHandle: analysis.lcHandle,
   });
 
   const {
@@ -81,7 +83,7 @@ export default function App() {
     combinedPlatform, setCombinedPlatform, analyze, clearAll,
     selectedTopics, fetchingRecs, recommendations,
     activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
-  }), [handle, cfHandle, lcHandle, loading, loadingStep, error, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, platform, combinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError]);
+  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, toggleTopic, fetchForSelectedTopics]);
 
   return (
     <AnalysisContext.Provider value={contextValue}>

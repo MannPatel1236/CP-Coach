@@ -187,7 +187,7 @@ export default function useAnalysis() {
     const recsHandle = cfHandle?.trim() || lcHandle?.trim() || "";
     const weakTopicList = weak.map(w => w.tag).join(",");
     const recsData = Object.keys(mergedMastery).length > 0
-      ? await getRecommendationsWithMastery(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList, mergedMastery)
+      ? await getRecommendationsWithMastery(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList, mergedMastery, [], null, cfHandle?.trim() || null, lcHandle?.trim() || null)
           .catch((e) => { console.warn("Combined POST recs failed:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; })
       : await getRecommendations(recsHandle, "cf,lc", 12, controller?.signal, weakTopicList)
           .catch((e) => { console.warn("Combined GET recs failed:", e); setError(`Recommendations failed: ${e.message || String(e)}`); return { recommendations: [], model_used: "rule_based" }; });
