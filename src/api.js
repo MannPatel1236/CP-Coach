@@ -23,6 +23,82 @@ function validateHandle(handle) {
   }
 }
 
+// ─── Tag normalization (mirrors backend/platforms/normalizer.py) ──────────────
+// Canonical-namespace tags are the lingua franca the backend + topic graph use.
+// Normalizing CF tags here keeps the client-only fallback path (Path B) in sync
+// with the backend path (Path A), so topic-graph highlighting and next-topic
+// dedup work the same regardless of whether the backend answered.
+
+export const CF_TAG_MAP = {
+  "dfs and similar": "dfs_and_similar",
+  "constructive algorithms": "constructive_algorithms",
+  "binary search": "binary_search",
+  "two pointers": "two_pointers",
+  "number theory": "number_theory",
+  "data structures": "data_structures",
+  "divide and conquer": "divide_and_conquer",
+  "brute force": "brute_force",
+  "dynamic programming": "dp",
+  // ── Additions (match backend normalizer.py) ────────────────────────────
+  "dsu": "dsu",
+  "shortest paths": "shortest_paths",
+  "string suffix structures": "string_algorithms",
+  "matrices": "matrices",
+  "graph matchings": "flows",
+  "probabilities": "math",
+  "games": "dp",
+  "fft": "math",
+  "ternary search": "binary_search",
+  "meet in the middle": "divide_and_conquer",
+  "expression parsing": "string_algorithms",
+  "2-sat": "graphs",
+  "chinese remainder theorem": "number_theory",
+};
+
+// Inverse: canonical → the single CF API tag to query. Hand-authored because
+// CF_TAG_MAP is many-to-one (e.g. "dynamic programming" AND "games" both → "dp")
+// — auto-inverting would sometimes map "dp" → "games", which the CF problemset
+// API does not index. We always pick the mainstream CF tag. Tags not listed
+// fall back to `_`→` ` which is correct for identity cases (canonical name is
+// just the underscored CF tag, e.g. "math"→"math").
+// LC-only topics (backtracking, dp_on_trees, prefix_sum, sliding_window) are
+// intentionally absent — they have no CF API tag to query.
+export const CANONICAL_TO_CF_TAG = {
+  implementation: "implementation",
+  math: "math",
+  greedy: "greedy",
+  constructive_algorithms: "constructive algorithms",
+  binary_search: "binary search",
+  two_pointers: "two pointers",
+  sortings: "sortings",
+  strings: "strings",
+  number_theory: "number theory",
+  combinatorics: "combinatorics",
+  dfs_and_similar: "dfs and similar",
+  graphs: "graphs",
+  trees: "trees",
+  dp: "dynamic programming",
+  data_structures: "data structures",
+  bitmasks: "bitmasks",
+  divide_and_conquer: "divide and conquer",
+  hashing: "hashing",
+  geometry: "geometry",
+  flows: "graph matchings",
+  brute_force: "brute force",
+  dsu: "dsu",
+  shortest_paths: "shortest paths",
+  string_algorithms: "string suffix structures",
+  matrices: "matrices",
+};
+
+export function normalizeCfTag(tag) {
+  return CF_TAG_MAP[tag] || tag.toLowerCase().replace(/ /g, "_");
+}
+
+export function canonicalToCfTag(tag) {
+  return CANONICAL_TO_CF_TAG[tag] || tag.replace(/_/g, " ");
+}
+
 export async function fetchUserInfo(handle, signal) {
   validateHandle(handle);
   const res = await fetch(`${BASE}/user.info?handles=${encodeURIComponent(handle)}`, { signal });
@@ -70,9 +146,11 @@ export async function fetchSubmissions(handle, mode = "quick", signal) {
   return all;
 }
 
-// Fetch problems for a single tag
+// Fetch problems for a single tag. `tag` may be a canonical name (e.g. "dp")
+// or a raw CF tag (e.g. "dynamic programming"); canonicalToCfTag resolves both
+// to the CF problemset API's expected tag string.
 export async function fetchProblemsByTag(tag, signal) {
-  const cfTag = tag.replace(/_/g, " ");
+  const cfTag = canonicalToCfTag(tag);
   const res = await fetch(
     `${BASE}/problemset.problems?tags=${encodeURIComponent(cfTag)}`,
     { signal }
@@ -154,7 +232,8 @@ export function buildTagProfile(submissions) {
 
     if (sub.verdict === "OK") solvedSet.add(key);
 
-    sub.problem.tags.forEach((tag) => {
+    sub.problem.tags.forEach((rawTag) => {
+      const tag = normalizeCfTag(rawTag);
       if (!tagMap[tag]) {
         tagMap[tag] = {
           attempted: new Set(),
@@ -282,24 +361,26 @@ export function buildRecommendations(problems, solvedSet, userRating) {
 }
 
 // ─── Next Topic Suggestions ───────────────────────────────────────────────────
+// All `tag` values are CANONICAL names so dedup against buildTagProfile output
+// (also canonical) works, and so suggestions line up with topic-graph node IDs.
 const TOPIC_LADDER = [
   { tag: "implementation",          minRating: 0,    maxRating: 1600 },
-  { tag: "brute force",             minRating: 0,    maxRating: 1500 },
+  { tag: "brute_force",             minRating: 0,    maxRating: 1500 },
   { tag: "math",                    minRating: 0,    maxRating: 2000 },
   { tag: "greedy",                  minRating: 800,  maxRating: 2200 },
   { tag: "sortings",                minRating: 800,  maxRating: 1800 },
-  { tag: "binary search",           minRating: 1000, maxRating: 2200 },
-  { tag: "two pointers",            minRating: 1000, maxRating: 2000 },
+  { tag: "binary_search",           minRating: 1000, maxRating: 2200 },
+  { tag: "two_pointers",            minRating: 1000, maxRating: 2000 },
   { tag: "strings",                 minRating: 1000, maxRating: 2200 },
-  { tag: "constructive algorithms", minRating: 1100, maxRating: 2400 },
-  { tag: "number theory",           minRating: 1200, maxRating: 2400 },
-  { tag: "dfs and similar",         minRating: 1200, maxRating: 2400 },
+  { tag: "constructive_algorithms", minRating: 1100, maxRating: 2400 },
+  { tag: "number_theory",           minRating: 1200, maxRating: 2400 },
+  { tag: "dfs_and_similar",         minRating: 1200, maxRating: 2400 },
   { tag: "graphs",                  minRating: 1300, maxRating: 2600 },
   { tag: "trees",                   minRating: 1300, maxRating: 2600 },
   { tag: "dp",                       minRating: 1400, maxRating: 3500 },
-  { tag: "data structures",         minRating: 1400, maxRating: 3500 },
+  { tag: "data_structures",         minRating: 1400, maxRating: 3500 },
   { tag: "bitmasks",                minRating: 1500, maxRating: 2600 },
-  { tag: "divide and conquer",      minRating: 1600, maxRating: 3000 },
+  { tag: "divide_and_conquer",      minRating: 1600, maxRating: 3000 },
   { tag: "combinatorics",           minRating: 1600, maxRating: 3000 },
   { tag: "hashing",                 minRating: 1600, maxRating: 2800 },
   { tag: "geometry",                minRating: 1800, maxRating: 3500 },
