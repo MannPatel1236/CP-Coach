@@ -1,6 +1,7 @@
 """CP Coach API — FastAPI entry point."""
 
 import os
+import glob
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -25,6 +26,22 @@ logger = logging.getLogger(__name__)
 
 from db.connection import create_tables  # noqa: E402
 
+
+class _GraphDKTEnsemble:
+    """Thin wrapper averaging N Graph-DKT folds' predict_mastery output."""
+
+    def __init__(self, folds: list) -> None:
+        self.folds = folds
+
+    def predict_mastery(self, sequence, topic_graph, device="cpu") -> dict[str, float]:
+        acc = {t: 0.0 for t in topic_graph.TOPICS}
+        for f in self.folds:
+            m = f.predict_mastery(sequence, topic_graph, device=device)
+            for k, v in m.items():
+                acc[k] = acc.get(k, 0.0) + v
+        return {k: v / len(self.folds) for k, v in acc.items()}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
@@ -34,20 +51,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
 
-    # Pre-load Graph-DKT model once at startup
+    # Pre-load Graph-DKT model once at startup (prefer 5-fold 10k ensemble)
     try:
         from models.graph_dkt import GraphDKTModel
         from data.topic_graph import CPTopicGraph
-        import os
-        weights_path = os.getenv("MODEL_WEIGHTS_PATH", "./weights/graph_dkt.pt")
-        if os.path.exists(weights_path):
+        weights_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "weights")
+        ensemble_paths = sorted(glob.glob(os.path.join(weights_dir, "graph_dkt_10k_fold*.pt")))
+        if ensemble_paths:
             topic_graph = CPTopicGraph()
-            model = GraphDKTModel.load(weights_path, topic_graph=topic_graph)
-            app.state.graph_dkt_model = model
-            logger.info("Graph-DKT model loaded successfully")
+            folds = []
+            for p in ensemble_paths:
+                try:
+                    folds.append(GraphDKTModel.load(p, topic_graph=topic_graph))
+                except Exception as e:
+                    logger.warning("Skipping fold %s: %s", p, e)
+            if len(folds) >= 1:
+                app.state.graph_dkt_model = _GraphDKTEnsemble(folds)
+                logger.info("Loaded %d-fold Graph-DKT 10k ensemble", len(folds))
+            else:
+                app.state.graph_dkt_model = None
+                logger.warning("Ensemble glob matched %d paths but 0 folds loaded", len(ensemble_paths))
         else:
-            app.state.graph_dkt_model = None
-            logger.info("No model weights found at %s — using rule-based fallback", weights_path)
+            weights_path = os.getenv("MODEL_WEIGHTS_PATH", "./weights/graph_dkt.pt")
+            if os.path.exists(weights_path):
+                topic_graph = CPTopicGraph()
+                model = GraphDKTModel.load(weights_path, topic_graph=topic_graph)
+                app.state.graph_dkt_model = model
+                logger.info("Graph-DKT model loaded successfully (single file)")
+            else:
+                app.state.graph_dkt_model = None
+                logger.info("No model weights found at %s — using rule-based fallback", weights_path)
     except Exception as e:
         app.state.graph_dkt_model = None
         logger.error("Failed to load Graph-DKT model: %s", e)

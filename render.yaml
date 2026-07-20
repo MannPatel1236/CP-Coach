@@ -4,7 +4,10 @@ services:
     runtime: python
     plan: starter
     rootDir: backend
-    buildCommand: ""
+    buildCommand: |
+      pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+      pip install torch-geometric==2.5.3
+      pip install -r requirements.txt
     startCommand: bash startup.sh
     healthCheckPath: /health
     autoDeploy: true
@@ -12,6 +15,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: MODEL_WEIGHTS_PATH
-        value: ./weights/graph_dkt.pt
+        value: ./weights/graph_dkt_10k_fold0.pt
       # DATABASE_URL is set in the Render dashboard (sync: false)
       # FRONTEND_ORIGINS is set in the Render dashboard (sync: false)
