@@ -3,9 +3,17 @@
 venv/
 __pycache__/
 *.pyc
-weights/
+weights/*
 .DS_Store
 *.pt
 *.pth
 node_modules/
 .git/
+# Re-include the 5 deployed Graph-DKT 10k ensemble folds (force-added to git).
+# weights/* (not weights/) so specific files can be re-included; ! lines last so they win.
+!weights/.gitkeep
+!weights/graph_dkt_10k_fold0.pt
+!weights/graph_dkt_10k_fold1.pt
+!weights/graph_dkt_10k_fold2.pt
+!weights/graph_dkt_10k_fold3.pt
+!weights/graph_dkt_10k_fold4.pt
