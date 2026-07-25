@@ -1,6 +1,7 @@
 weights/*.pt
 weights/*.pth
 weights/archived-buggy/
+weights/backup_2k/
 __pycache__/
 .env
 *.pyc
