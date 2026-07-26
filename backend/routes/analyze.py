@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from auth import verify_hmac
+from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
@@ -166,6 +166,13 @@ async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[st
 @router.get("/analyze/{handle}", response_model=AnalyzeResponse)
 @limiter.limit("30/minute")
 async def analyze(request: Request, handle: str, platform: str = Query("cf"), mode: str = Query("quick"), _auth: None = Depends(verify_hmac)):
+    # Bind the HMAC signature to this specific handle (verify_hmac only checks
+    # header presence + freshness; the crypto compare lives in this helper).
+    verify_handle_signature(
+        handle=handle,
+        authorization=request.headers.get("Authorization"),
+        x_timestamp=request.headers.get("X-Timestamp"),
+    )
     try:
         # 1. Fetch profile + submissions via platform-specific helper
         if platform == "lc":

@@ -152,14 +152,19 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
                         status_code=413,
                         content={"detail": f"Request body too large. Max {self.MAX_SIZE} bytes."},
                     )
-                    # Ensure security headers and request ID on the early-return path
+                    # Ensure security headers and request ID on the early-return path.
+                    # RequestIDMiddleware is inner (registered first → innermost), so
+                    # on this outermost early-return it has not yet set request.state.request_id;
+                    # generate inline, matching what it would have produced.
                     response.headers["X-Frame-Options"] = "DENY"
                     response.headers["X-Content-Type-Options"] = "nosniff"
                     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
                     response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
-                    rid = getattr(request.state, "request_id", None)
-                    if rid:
-                        response.headers["X-Request-ID"] = rid
+                    rid = request.state.request_id if hasattr(request.state, "request_id") else None
+                    if rid is None:
+                        rid = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+                        request.state.request_id = rid
+                    response.headers["X-Request-ID"] = rid
                     return response
         return await call_next(request)
 

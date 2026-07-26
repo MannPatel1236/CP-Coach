@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from auth import verify_hmac
+from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
@@ -34,6 +34,11 @@ async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
 @router.get("/progress/{handle}", response_model=ProgressResponse)
 @limiter.limit("30/minute")
 async def progress(request: Request, handle: str, platform: str = Query("cf"), _auth: None = Depends(verify_hmac)):
+    verify_handle_signature(
+        handle=handle,
+        authorization=request.headers.get("Authorization"),
+        x_timestamp=request.headers.get("X-Timestamp"),
+    )
     try:
         normalized = await _fetch_normalized_subs(handle, platform)
     except ValueError as e:

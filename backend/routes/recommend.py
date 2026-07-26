@@ -7,7 +7,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
 from pydantic import BaseModel, Field
 
-from auth import verify_hmac
+from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
@@ -229,6 +229,11 @@ async def recommend(
     lc_handle: str | None = Query(None),
     _auth: None = Depends(verify_hmac),
 ):
+    verify_handle_signature(
+        handle=handle,
+        authorization=request.headers.get("Authorization"),
+        x_timestamp=request.headers.get("X-Timestamp"),
+    )
     platform_list = [p.strip() for p in platforms.split(",") if p.strip() in _VALID_PLATFORMS]
     if not platform_list:
         raise HTTPException(status_code=400, detail="Invalid platforms; use 'cf' and/or 'lc'")
@@ -270,6 +275,11 @@ async def recommend_post(
     body: RecommendRequest = Body(...),
     _auth: None = Depends(verify_hmac),
 ):
+    verify_handle_signature(
+        handle=handle,
+        authorization=request.headers.get("Authorization"),
+        x_timestamp=request.headers.get("X-Timestamp"),
+    )
     platform_list = [p.strip() for p in body.platforms.split(",") if p.strip() in _VALID_PLATFORMS]
     if not platform_list:
         raise HTTPException(status_code=400, detail="Invalid platforms; use 'cf' and/or 'lc'")

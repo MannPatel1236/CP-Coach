@@ -14,6 +14,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_cf_handle ON users(cf_handle);
 CREATE INDEX IF NOT EXISTS idx_users_lc_handle ON users(lc_handle);
+-- Enforce handle uniqueness so concurrent SELECT-then-INSERT in _persist_kt_states
+-- can't create duplicate user rows. Partial (NULL handles are excluded) — a user
+-- with only a cf_handle has NULL lc_handle and must not collide with others like it.
+-- The race loser throws IntegrityError, already caught + logged by analyze.py.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_cf_handle_unique ON users(cf_handle) WHERE cf_handle IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_lc_handle_unique ON users(lc_handle) WHERE lc_handle IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS submissions (
   id BIGSERIAL PRIMARY KEY,

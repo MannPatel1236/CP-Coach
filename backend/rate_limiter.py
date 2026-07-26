@@ -22,7 +22,16 @@ def _get_client_ip(request: Request) -> str:
     if _is_trusted(remote):
         xff = request.headers.get("x-forwarded-for")
         if xff:
-            return xff.split(",")[0].strip()
+            hops = [h.strip() for h in xff.split(",") if h.strip()]
+            # XFF is append-ordered: rightmost = what the last trusted proxy saw
+            # as its TCP peer; leftmost = first-hop claim, fully client-spoofable.
+            # Walk right→left skipping trusted proxies; first non-trusted hop is
+            # the real client. (ponytail: trusts the one proxy we run behind; a
+            # multi-hop chain would need an explicit proxy-count depth limit.)
+            for hop in reversed(hops):
+                if not _is_trusted(hop):
+                    return hop
+            return hops[-1] if hops else remote
         xr = request.headers.get("x-real-ip")
         if xr:
             return xr.strip()
