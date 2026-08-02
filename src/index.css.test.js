@@ -64,3 +64,41 @@ describe("Greenhouse Phase 1 — fonts + kept-name contract", () => {
     expect(html).not.toContain("fonts.gstatic.com");
   });
 });
+
+describe("Greenhouse Phase 1 — accent + motion + elevation token canon", () => {
+  it("expresses the accent as OKLCH indigo (~hue 268), not hex", () => {
+    expect(css).toMatch(/--primary-container:\s*oklch\([^)]*268\)/);
+  });
+
+  it("adds --color-accent as a shared-indigo alias of --primary-container", () => {
+    expect(css).toContain("--color-accent: var(--primary-container)");
+  });
+
+  it("declares the motion timing scale (§6 Motion canon, exact values)", () => {
+    expect(css).toContain("--dur-fast: 180ms");
+    expect(css).toContain("--dur-med: 360ms");
+    expect(css).toContain("--dur-slow: 700ms");
+    expect(css).toContain("--ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1)");
+  });
+
+  it("declares the --shadow elevation scale (§6 Border/elevation canon)", () => {
+    for (const t of ["--shadow-1", "--shadow-2", "--shadow-3"]) {
+      expect(css).toContain(`${t}:`);
+    }
+  });
+
+  it("restyles .card to consume the new motion + shadow tokens", () => {
+    // The transition tokens live in the base `.card` rule; the shadow token
+    // lives in `.card:hover`. They are separated by `.card::before` and
+    // `.card:hover::before`, so slice to `.card:hover {` (NOT `.card::before`)
+    // and inspect each rule in its own slice. Slicing to `::before` would cut
+    // the block before `.card:hover`, dropping `var(--shadow-2)` from view.
+    const cardStart = css.indexOf(".card {");
+    const cardHoverStart = css.indexOf(".card:hover {", cardStart);
+    const cardBlock = css.slice(cardStart, cardHoverStart);
+    const cardHoverBlock = css.slice(cardHoverStart, css.indexOf("}", cardHoverStart));
+    expect(cardBlock).toContain("var(--dur-med)");
+    expect(cardBlock).toContain("var(--ease-out-expo)");
+    expect(cardHoverBlock).toContain("var(--shadow-2)");
+  });
+});
