@@ -38,10 +38,11 @@
   --warning: #fbbf24;
   --warning-container: rgba(251, 191, 36, 0.06);
 
-  /* ── Typography Stacks ────────────────────────────────────────────────────── */
-  --font-heading: 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Space Grotesk', system-ui, monospace;
-  --font-body: 'Fira Sans', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+  /* ── Typography Stacks (Greenhouse: Fraunces / Inter / JetBrains Mono) ─────── */
+  --font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --font-heading: var(--font-display);   /* §6: old --font-heading aliases --font-display */
+  --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', monospace;
 
   /* ── Spacing (8px grid) ───────────────────────────────────────────────────── */
   --space-xs: 4px;
