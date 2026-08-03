@@ -102,3 +102,22 @@ describe("Greenhouse Phase 1 — accent + motion + elevation token canon", () =>
     expect(cardHoverBlock).toContain("var(--shadow-2)");
   });
 });
+
+describe("Greenhouse Phase 2 — deferred accent-text + dashboard-max tokens", () => {
+  it("declares --color-accent-text as OKLCH light indigo (~82% 0.09 268)", () => {
+    // §6: small mono labels over OLED surfaces; WCAG AA ≥4.5:1 enforced by choice
+    // of lightness ≈ 0.82 over the dark surface tokens.
+    expect(css).toMatch(/--color-accent-text:\s*oklch\([^)]*268\)/);
+  });
+
+  it("declares --dash-max as the dashboard max-width", () => {
+    expect(css).toMatch(/--dash-max:\s*\d+px/);
+  });
+
+  it("applies --dash-max to .dashboard-layout", () => {
+    const layoutStart = css.indexOf(".dashboard-layout {");
+    expect(layoutStart).toBeGreaterThan(-1);
+    const layoutBlock = css.slice(layoutStart, css.indexOf("}", layoutStart));
+    expect(layoutBlock).toContain("var(--dash-max)");
+  });
+});
