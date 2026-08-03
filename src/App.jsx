@@ -13,7 +13,8 @@ import TagOverview from "./components/TagOverview.jsx";
 import SkillChart from "./components/SkillChart.jsx";
 import TopicPicker from "./components/TopicPicker.jsx";
 import Recommendations from "./components/Recommendations.jsx";
-import TopicGraphViz from "./components/TopicGraphViz.jsx";
+import SkillFrontier from "./components/SkillFrontier.jsx";
+import WhyThisRec from "./components/WhyThisRec.jsx";
 import ModelInsight from "./components/ModelInsight.jsx";
 import LandingPage from "./components/LandingPage.jsx";
 import LoadingState from "./components/LoadingState.jsx";
@@ -149,7 +150,7 @@ export default function App() {
 
           <div className="column-panel" style={{ minWidth: 0 }}>
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
-            {user && <TopicGraphViz weakTags={weakTags} />}
+            {user && <SkillFrontier />}
 
             {tagProfile.length > 0 && weakTags.length === 0 && <SuccessBanner />}
 
@@ -172,6 +173,10 @@ export default function App() {
                 />
               )}
             </AnimatePresence>
+
+            {recommendations.length > 0 && (
+              <WhyThisRec />
+            )}
 
             {tagProfile.length > 0 && (
               <ModelInsight topicProfile={tagProfile} selectedTopics={selectedTopics} />

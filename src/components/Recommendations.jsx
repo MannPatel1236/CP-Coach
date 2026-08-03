@@ -2,10 +2,7 @@ import { memo } from "react";
 import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
 import { ExternalLinkIcon, BookIcon } from "./Icons";
-
-const BASE_RECOMMEND_RATING = 800;
-const RATING_STEP = 100;
-const NORMAL_RANGE = 350;
+import { bandFor } from "../lib/recBand.js";
 
 function lcDiffLabel(rating) {
   if (rating <= 1100) return { label: "Easy", bg: "rgba(0, 175, 155, 0.12)", color: "#00af9b", border: "rgba(0, 175, 155, 0.2)" };
@@ -53,8 +50,7 @@ function normalizeRec(p) {
 function Recommendations({ recs, userRating, selectedTopics }) {
   if (!recs.length) return null;
 
-  const lo = Math.max(BASE_RECOMMEND_RATING, Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP);
-  const hi = Math.ceil((userRating + NORMAL_RANGE) / RATING_STEP) * RATING_STEP;
+  const { lo, hi } = bandFor(userRating);
   const isStretchMode = recs.every((r) => r.isStretch);
   const firstTag = recs[0]?.matchedTags?.[0];
 
@@ -62,7 +58,7 @@ function Recommendations({ recs, userRating, selectedTopics }) {
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       style={{ margin: 0 }}
     >
       <div className="card" style={{ padding: 24 }}>
@@ -167,7 +163,7 @@ function Recommendations({ recs, userRating, selectedTopics }) {
                 border: "1px solid var(--outline)",
                 borderRadius: "var(--radius-sm)",
                 textDecoration: "none",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "transform var(--dur-fast) var(--ease-out-expo), box-shadow var(--dur-med) var(--ease-out-expo), border-color var(--dur-med) var(--ease-out-expo)",
                 fontFamily: "var(--font-body)"
               }}
               className="problem-item"
@@ -221,7 +217,7 @@ function Recommendations({ recs, userRating, selectedTopics }) {
                 <div style={{ minWidth: 0 }}>
                   <div style={{
                     fontSize: 10,
-                    color: "var(--text-muted)",
+                    color: "var(--color-accent-text)",
                     fontWeight: 600,
                     fontFamily: "var(--font-mono)",
                     marginBottom: 2,
