@@ -55,6 +55,7 @@ export default function App() {
     platform, setPlatform,
     combinedPlatform, setCombinedPlatform,
     analyze, clearAll,
+    modelUsed, masteryScoresRef,
   } = analysis;
 
   const focusSearch = () => {
@@ -78,12 +79,13 @@ export default function App() {
   const contextValue = useMemo(() => ({
     handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle,
     loading, loadingStep, error,
+    modelUsed, masteryScoresRef,
     user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics,
     analysisMode, setAnalysisMode, platform, setPlatform,
     combinedPlatform, setCombinedPlatform, analyze, clearAll,
     selectedTopics, fetchingRecs, recommendations,
     activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
-  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, toggleTopic, fetchForSelectedTopics]);
+  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, modelUsed, masteryScoresRef, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, toggleTopic, fetchForSelectedTopics]);
 
   return (
     <AnalysisContext.Provider value={contextValue}>

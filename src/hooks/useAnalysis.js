@@ -17,6 +17,7 @@ export default function useAnalysis() {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState("");
+  const [modelUsed, setModelUsed] = useState(null);  // §8: mastery provenance ("graph_dkt" | "rule_based" | "stats_only" | null)
 
   const [user, setUser] = useState(null);
   const [cfUser, setCfUser] = useState(null);
@@ -71,6 +72,7 @@ export default function useAnalysis() {
     analysisSelectedTopicsRef.current = [];
     analysisActiveWeakTagRef.current = null;
     masteryScoresRef.current = {};
+    setModelUsed(null);
   }, [resetAbort]);
 
   // ── Combined CF + LC analysis ────────────────────────────────────────
@@ -182,6 +184,8 @@ export default function useAnalysis() {
 
     const mergedMastery = { ...cfData?.mastery_scores, ...lcData?.mastery_scores };
     masteryScoresRef.current = mergedMastery;
+    const presentModels = [cfData?.model_used, lcData?.model_used].filter(Boolean);
+    setModelUsed(presentModels.length > 0 && presentModels.every(m => m === "graph_dkt") ? "graph_dkt" : "rule_based");
 
     setLoadingStep(3);
     const recsHandle = cfHandle?.trim() || lcHandle?.trim() || "";
@@ -237,6 +241,7 @@ export default function useAnalysis() {
     setTimeout(() => setLoadingStep(4), 0);
     const weakTopicList = weak.map(w => w.tag).join(",");
     masteryScoresRef.current = data.mastery_scores || {};
+    setModelUsed(data.model_used || "rule_based");
 
     let recsData;
     if (Object.keys(masteryScoresRef.current).length > 0) {
@@ -301,6 +306,7 @@ export default function useAnalysis() {
           return { tag, acRate: tp ? tp.acRate : 0, solved: tp ? tp.solved : 0, attempts: tp ? tp.attempts : 0 };
         });
         masteryScoresRef.current = data.mastery_scores || {};
+        setModelUsed(data.model_used || "rule_based");
         solved = new Set();
         for (const t of data.topic_profile || []) {
           if (t.solved_problems) {
@@ -337,6 +343,7 @@ export default function useAnalysis() {
         scores[t.tag] = t.acRate / 100;
       }
       masteryScoresRef.current = scores;
+      setModelUsed("rule_based");  // §8: client fallback mastery (acRate/100) is a linear heuristic → badge as estimate
     }
 
     if (weak.length > 0) {
@@ -437,6 +444,7 @@ export default function useAnalysis() {
     lcHandle, setLcHandle,
     loading, loadingStep,
     error,
+    modelUsed,
     user, cfUser, lcUser,
     tagProfile, weakTags,
     solvedSet, suggestedTopics,
