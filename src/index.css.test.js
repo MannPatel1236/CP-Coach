@@ -121,3 +121,9 @@ describe("Greenhouse Phase 2 — deferred accent-text + dashboard-max tokens", (
     expect(layoutBlock).toContain("var(--dash-max)");
   });
 });
+
+describe("Greenhouse Phase 3 — landing-max token", () => {
+  it("declares --landing-max as the landing content max-width", () => {
+    expect(css).toMatch(/--landing-max:\s*\d+px/);
+  });
+});
