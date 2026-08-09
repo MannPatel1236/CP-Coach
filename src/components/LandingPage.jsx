@@ -1,394 +1,197 @@
 import { motion } from "framer-motion";
-import { ZapIcon, BarChartIcon, TargetIcon, TrendUpIcon, CheckIcon } from "./Icons";
 import SearchBar from "./SearchBar";
-import { fadeUp, staggerContainer } from "../lib/motion";
+import LandingDAG from "./LandingDAG";
+import { staggerContainer } from "../lib/motion";
 
-const FEATURES = [
-  {
-    icon: BarChartIcon,
-    title: "Deep Analytics",
-    desc: "Analyze your submission history to identify weak tags, track AC rates, and understand your problem-solving patterns."
-  },
-  {
-    icon: TargetIcon,
-    title: "Smart Recommendations",
-    desc: "Get tailored problem sets based on your current rating and weakest areas. Never waste time on the wrong problems."
-  },
-  {
-    icon: TrendUpIcon,
-    title: "Progress Tracking",
-    desc: "Monitor your rating trajectory and see how your skills evolve across different algorithmic topics over time."
-  },
-  {
-    icon: CheckIcon,
-    title: "Solve Streak Tracking",
-    desc: "Build consistent solving habits with streak tracking and daily challenge suggestions to keep you motivated."
-  },
-];
+// §3 lock 4 motion A — cinematic landing. Section/hero reveals stay UNDER the 560ms cap
+// with a landing-local variant, so the shared `fadeUp` (600ms, from ../lib/motion, used
+// across the dashboard) stays untouched (surgical — Rule 1). ponytail: 5-line local variant
+// vs forking motion.js; if a 4th landing reveal wants the same easing, lift this into motion.js.
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.54, ease: [0.2, 0, 0.2, 1] } }),
+};
 
+// §5.1 "How it works (3 steps)" — read handle → map onto graph → practice the frontier.
 const HOW_IT_WORKS = [
   {
     step: "01",
-    title: "Enter Your Handle",
-    desc: "Provide your Codeforces or LeetCode username. Our system fetches your full submission history and rating data."
+    title: "Read your handle",
+    desc: "CP Coach fetches your full Codeforces or LeetCode submission history — every verdict, every tag, every rating band.",
   },
   {
     step: "02",
-    title: "Get Your Analysis",
-    desc: "We analyze every submission to find your weak tags, compare against your rating, and build a complete skill profile."
+    title: "Map it onto the graph",
+    desc: "Your submissions land on the 29-topic prerequisite graph. Weak tags, AC-rate drift, and prerequisite gaps become visible — the honest evidence behind your rating.",
   },
   {
     step: "03",
-    title: "Practice Smarter",
-    desc: "Receive targeted problem recommendations at your exact level. Focus on what matters and track your progress."
+    title: "Practice the frontier",
+    desc: "Get problems calibrated to your rating band, gated by the prerequisites you've already cleared. Spend each session where the graph says you're thin.",
   },
 ];
 
-const STATS = [
-  { value: "1.6M+", label: "Competitive Programmers on Codeforces" },
-  { value: "100+", label: "Rated Contests Per Year" },
-  { value: "2–4", label: "Hours/Day Top Coders Practice" },
+// §5.1 "Credibility stats" — the three deployed-model numbers from CLAUDE.md.
+const CREDIBILITY = [
+  { value: "0.969", label: "AUC · 5-fold CV on the deployed Graph-DKT ensemble (10k sequences)" },
+  { value: "5.17M", label: "submissions read across 1,341 handles" },
+  { value: "29 → 25", label: "canonical topics; 25 evaluated, 4 held out for zero CF test data" },
 ];
+
+const section = { maxWidth: "var(--landing-max)", margin: "0 auto", padding: "80px 24px" };
 
 export default function LandingPage() {
   return (
-    <div className="hero-landing" style={{ paddingBottom: 80 }}>
-      {/* Hero */}
-      <motion.div
-        className="hero-section"
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        style={{
-          position: "relative",
-          padding: "80px 48px 60px",
-          maxWidth: 900,
-          margin: "0 auto",
-        }}
-      >
-        {/* Decorative orbital rings */}
-        <div className="orbital-ring" style={{
-          position: "absolute",
-          top: "20%",
-          right: "-10%",
-          width: 400,
-          height: 400,
-          borderRadius: "50%",
-          border: "1px solid rgba(99, 102, 241, 0.08)",
-          pointerEvents: "none",
-        }} />
-        <div className="orbital-ring" style={{
-          position: "absolute",
-          top: "30%",
-          right: "-5%",
-          width: 300,
-          height: 300,
-          borderRadius: "50%",
-          border: "1px solid rgba(99, 102, 241, 0.05)",
-          pointerEvents: "none",
-        }} />
-
-        <motion.div
-          className="glow-pulse"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 16px",
-            background: "rgba(99, 102, 241, 0.08)",
-            border: "1px solid rgba(99, 102, 241, 0.15)",
-            borderRadius: "var(--radius-full)",
-            marginBottom: 24,
-          }}
-        >
-          <ZapIcon size={14} style={{ color: "var(--primary-bright)" }} />
-          <span style={{ fontSize: 12, color: "var(--primary-bright)", fontWeight: 600 }}>
-            Smart Analytics
-          </span>
-        </motion.div>
-
-        <motion.h1
-          className="font-heading hero-title"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2, ease: [0.2, 0, 0.2, 1] }}
-          style={{
-            fontSize: 52,
-            fontWeight: 700,
-            lineHeight: 1.1,
-            letterSpacing: "-0.03em",
-            maxWidth: 640,
-            marginBottom: 20,
-            background: "linear-gradient(135deg, #ffffff 0%, var(--primary-bright) 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          Master Competitive Programming
-        </motion.h1>
-
-        <motion.p
-          className="hero-subtitle"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.35, ease: [0.2, 0, 0.2, 1] }}
-          style={{
-            fontSize: 18,
-            color: "var(--on-surface-variant)",
-            lineHeight: 1.7,
-            maxWidth: 540,
-            marginBottom: 40,
-          }}
-        >
-          Identify your weaknesses, track your progress, and get personalized
-          problem recommendations to climb the ranks.
+    <div className="landing-page" style={{ paddingBottom: 64 }}>
+      {/* Hero — §5.1: headline + handle input + CTA + credibility micro-strip */}
+      <section style={{ ...section, paddingTop: 120, maxWidth: 900 }}>
+        <motion.p className="label-caps" initial="hidden" animate="visible" variants={fadeIn}
+          style={{ color: "var(--color-accent-text)", marginBottom: 16 }}>
+          A training journal for competitive programmers
         </motion.p>
-
-        {/* Search bar in hero */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.45 }}
-        >
+        <motion.h1 className="font-heading" initial="hidden" animate="visible" variants={fadeIn} custom={1}
+          style={{
+            fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem, 5vw, 3.4rem)",
+            fontWeight: 600, lineHeight: 1.08, letterSpacing: "-0.02em",
+            maxWidth: "16ch", marginBottom: 20, color: "var(--on-surface)",
+          }}>
+          Where do you stand on the graph?
+        </motion.h1>
+        <motion.p initial="hidden" animate="visible" variants={fadeIn} custom={2}
+          style={{ fontSize: 18, color: "var(--on-surface-variant)", lineHeight: 1.7, maxWidth: "52ch", marginBottom: 32 }}>
+          CP Coach reads your submission history and maps it onto the competitive-programming
+          prerequisite graph — every topic you touch grows from the foundations outward.
+        </motion.p>
+        <motion.div initial="hidden" animate="visible" variants={fadeIn} custom={3} style={{ marginBottom: 28 }}>
           <SearchBar />
         </motion.div>
+        {/* §5.1 credibility micro-strip */}
+        <motion.div data-testid="credibility-strip" initial="hidden" animate="visible" variants={fadeIn} custom={4}
+          style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "baseline",
+            fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>
+          <span><strong style={{ color: "var(--color-accent-text)" }}>0.969</strong> AUC</span>
+          <span>·</span>
+          <span><strong style={{ color: "var(--color-accent-text)" }}>5.17M</strong> submissions</span>
+          <span>·</span>
+          <span>EDM 2027</span>
+        </motion.div>
+      </section>
 
-        {/* Stats row */}
-        <motion.div
-          className="stats-row"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.55 }}
-          style={{
-            display: "flex",
-            gap: 48,
-            flexWrap: "wrap",
-            marginTop: 60,
-          }}
-        >
-          {STATS.map((stat) => (
-            <div key={stat.label}>
-              <div className="font-heading" style={{ fontSize: 24, fontWeight: 700, color: "#ffffff", marginBottom: 4 }}>
-                {stat.value}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", letterSpacing: "0.05em" }}>
-                {stat.label}
-              </div>
-            </div>
+      {/* DAG centerpiece (below the fold) — §5.1, §9. The LandingDAG IO fires the draw here. */}
+      <section style={{ ...section, borderTop: "1px solid var(--outline)" }}>
+        <motion.p className="label-caps" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
+          variants={fadeIn} style={{ color: "var(--color-accent-text)", marginBottom: 12, textAlign: "center" }}>
+          The prerequisite graph
+        </motion.p>
+        <motion.h2 className="font-heading" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
+          variants={fadeIn} custom={1}
+          style={{ fontFamily: "var(--font-display)", fontWeight: 600,
+            fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em",
+            textAlign: "center", maxWidth: "20ch", margin: "0 auto 32px" }}>
+          Your knowledge, drawn from its roots.
+        </motion.h2>
+        <LandingDAG />
+      </section>
+
+      {/* Self-selection story — §5.1 "Why your rating is lying to you" (the 87.7% finding, 3 beats) */}
+      <section data-testid="self-selection-story" style={{ ...section, borderTop: "1px solid var(--outline)", maxWidth: 760 }}>
+        <motion.p className="label-caps" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
+          variants={fadeIn} style={{ color: "var(--color-accent-text)", marginBottom: 12 }}>
+          Why your rating is lying to you
+        </motion.p>
+        <motion.h2 className="font-heading" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
+          variants={fadeIn} custom={1}
+          style={{ fontFamily: "var(--font-display)", fontWeight: 600,
+            fontSize: "clamp(1.6rem, 3vw, 2.1rem)", letterSpacing: "-0.015em", marginBottom: 24 }}>
+          Self-selection sets a ceiling your rating can&apos;t see.
+        </motion.h2>
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={staggerContainer}
+          style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {[
+            { n: "01", p: "Competitive programmers practice what they're already good at. Across 5.17M submissions, the topic-switch rate is 87.7% — solvers stay in streaks." },
+            { n: "02", p: "That streaking is what a knowledge-tracing model learns. AUC climbs to 0.969 and keeps rising with activity — not because the model is clever, but because self-selection makes outcomes predictable." },
+            { n: "03", p: "Your rating reports the streak. CP Coach reports the gaps underneath it — the prerequisite frontier you keep skipping. That's where the next problem lives." },
+          ].map((beat) => (
+            <motion.div key={beat.n} variants={fadeIn} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-accent-text)", flexShrink: 0 }}>
+                {beat.n}
+              </span>
+              <p style={{ fontSize: 16, color: "var(--on-surface-variant)", lineHeight: 1.7 }}>{beat.p}</p>
+            </motion.div>
           ))}
         </motion.div>
-      </motion.div>
+      </section>
 
-      {/* Features Grid */}
-      <div className="features-section" style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <motion.span
-              className="label-caps"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "0px" }}
-              transition={{ duration: 0.5 }}
-              style={{ display: "block", marginBottom: 12 }}
-            >
-              Features
-            </motion.span>
-            <motion.h2
-              className="font-heading features-section-title"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "0px" }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}
-            >
-              Everything you need to improve
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "0px" }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              style={{ fontSize: 16, color: "var(--on-surface-variant)", maxWidth: 480, margin: "0 auto" }}
-            >
-              Deep analytics, smart recommendations, and progress tracking all in one place.
-            </motion.p>
-          </div>
+      {/* Credibility stats + paper reference strip */}
+      <section style={{ ...section, borderTop: "1px solid var(--outline)" }}>
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={staggerContainer}
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24 }}>
+          {CREDIBILITY.map((c) => (
+            <motion.div key={c.label} variants={fadeIn}
+              style={{ padding: 24, background: "var(--surface-1)", border: "1px solid var(--outline)", borderRadius: "var(--radius-lg)" }}>
+              <div className="font-heading" style={{ fontFamily: "var(--font-display)", fontSize: 28,
+                fontWeight: 600, color: "var(--color-accent-text)", marginBottom: 8 }}>{c.value}</div>
+              <div style={{ fontSize: 12, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-mono)" }}>{c.label}</div>
+            </motion.div>
+          ))}
+        </motion.div>
+        <motion.p initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={fadeIn}
+          style={{ marginTop: 32, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
+          Graph-Augmented Knowledge Tracing · KSAP base (Wang et al., KAIS 2025) · targeting EDM 2027
+        </motion.p>
+      </section>
 
-          <div
-            className="features-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: 20,
-            }}
-          >
-            {FEATURES.map((feature, i) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                whileHover={{
-                  y: -4,
-                  borderColor: "var(--primary-container)",
-                  boxShadow: "0 0 32px var(--primary-glow)",
-                  transition: { duration: 0.25 }
-                }}
-                viewport={{ once: true, margin: "0px" }}
-                transition={{ delay: i * 0.08, duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
-                style={{
-                  padding: 24,
-                  background: "var(--surface-1)",
-                  border: "1px solid var(--outline)",
-                  borderRadius: "var(--radius-lg)",
-                }}
-              >
-                <motion.div
-                  whileHover={{ scale: 1.08 }}
-                  transition={{ duration: 0.2 }}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
-                    borderRadius: "var(--radius-sm)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--on-primary)",
-                    marginBottom: 16,
-                  }}
-                >
-                  <feature.icon size={18} />
-                </motion.div>
-                <h3 className="font-heading" style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
-                  {feature.title}
-                </h3>
-                <p style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6 }}>
-                  {feature.desc}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* How it works (3 steps) */}
+      <section style={{ ...section, borderTop: "1px solid var(--outline)", maxWidth: 800 }}>
+        <motion.p className="label-caps" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
+          variants={fadeIn} style={{ color: "var(--color-accent-text)", marginBottom: 12, textAlign: "center" }}>
+          How it works
+        </motion.p>
+        <motion.h2 className="font-heading" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
+          variants={fadeIn} custom={1}
+          style={{ fontFamily: "var(--font-display)", fontWeight: 600,
+            fontSize: "clamp(1.5rem, 3vw, 2rem)", letterSpacing: "-0.015em", textAlign: "center", marginBottom: 40 }}>
+          Three steps onto the graph.
+        </motion.h2>
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={staggerContainer}
+          style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {HOW_IT_WORKS.map((item) => (
+            <motion.div key={item.step} variants={fadeIn}
+              style={{ display: "flex", gap: 24, alignItems: "flex-start", padding: 24,
+                background: "var(--surface-1)", border: "1px solid var(--outline)", borderRadius: "var(--radius-lg)" }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%",
+                background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "var(--on-primary)",
+                fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{item.step}</div>
+              <div>
+                <h3 className="font-heading" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600, marginBottom: 6 }}>{item.title}</h3>
+                <p style={{ fontSize: 14, color: "var(--on-surface-variant)", lineHeight: 1.6 }}>{item.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
 
-      {/* How It Works */}
-      <div className="how-it-works-section" style={{ padding: "60px 48px", borderTop: "1px solid var(--outline)" }}>
-        <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <motion.span
-              className="label-caps"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "0px" }}
-              transition={{ duration: 0.5 }}
-              style={{ display: "block", marginBottom: 12 }}
-            >
-              How It Works
-            </motion.span>
-            <motion.h2
-              className="font-heading"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "0px" }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              style={{ fontSize: 32, fontWeight: 700 }}
-            >
-              Three steps to better performance
-            </motion.h2>
-          </div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "0px" }}
-            variants={staggerContainer}
-            style={{ display: "flex", flexDirection: "column", gap: 24 }}
-          >
-            {HOW_IT_WORKS.map((item) => (
-              <motion.div
-                key={item.step}
-                className="how-it-works-item"
-                variants={fadeUp}
-                style={{
-                  display: "flex",
-                  gap: 24,
-                  alignItems: "flex-start",
-                  padding: "24px",
-                  background: "var(--surface-1)",
-                  border: "1px solid var(--outline)",
-                  borderRadius: "var(--radius-lg)",
-                }}
-              >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--on-primary)",
-                    fontFamily: "var(--font-heading)",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    flexShrink: 0,
-                  }}
-                >
-                  {item.step}
-                </div>
-                <div>
-                  <h3 className="font-heading" style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                    {item.title}
-                  </h3>
-                  <p style={{ fontSize: 14, color: "var(--on-surface-variant)", lineHeight: 1.6 }}>
-                    {item.desc}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </div>
-
-      {/* CTA Section */}
-      <motion.div
-        className="cta-section"
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "0px" }}
-        transition={{ duration: 0.6 }}
-        style={{
-          padding: "80px 48px",
-          textAlign: "center",
-          borderTop: "1px solid var(--outline)",
-        }}
-      >
-        <h2 className="font-heading cta-title" style={{ fontSize: 36, fontWeight: 700, marginBottom: 16 }}>
-          Ready to improve?
+      {/* Final CTA + minimal footer */}
+      <motion.section initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "0px" }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        style={{ ...section, borderTop: "1px solid var(--outline)", textAlign: "center", maxWidth: 640 }}>
+        <h2 className="font-heading" style={{ fontFamily: "var(--font-display)", fontWeight: 600,
+          fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em", marginBottom: 16 }}>
+          Find your frontier.
         </h2>
-        <p style={{ fontSize: 16, color: "var(--on-surface-variant)", marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
-          Enter your Codeforces or LeetCode handle above and get your personalized
-          analysis in seconds.
+        <p style={{ fontSize: 16, color: "var(--on-surface-variant)", marginBottom: 8, maxWidth: "40ch", margin: "0 auto" }}>
+          Enter your Codeforces or LeetCode handle above and watch the graph build from your foundations outward.
         </p>
-      </motion.div>
+      </motion.section>
 
-      {/* Footer */}
-      <div className="footer-section" style={{
-        padding: "24px 48px",
-        borderTop: "1px solid var(--outline)",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        fontSize: 12,
-        color: "var(--text-muted)",
-      }}>
+      <footer style={{ padding: "24px", borderTop: "1px solid var(--outline)",
+        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8,
+        fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)",
+        maxWidth: "var(--landing-max)", margin: "0 auto" }}>
         <span>CP Coach</span>
-        <span>Built for competitive programmers</span>
-      </div>
+        <span>analyze · activity · trajectory · mastery · recommend · progress · compare · streaks · workbook · explain</span>
+      </footer>
     </div>
   );
 }
