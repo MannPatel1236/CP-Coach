@@ -1,8 +1,7 @@
 // Pure DAG layout + prerequisite-graph math for the CP topic graph.
-// Three consumers: SkillFrontier (dashboard, Phase 2), TopicGraphViz (dashboard
-// editor-mode viz, Phase 3 untouched), and LandingDAG (landing presentation mode,
-// Phase 3 — §5.1 "real dagre layout"). Extracted so they share one engine, NOT
-// to abstract a viz framework (ponytail: this is move-to-lib, one DAG, three callers).
+// Two consumers: SkillFrontier (dashboard, Phase 2) and LandingDAG (landing
+// presentation mode, Phase 3 — §5.1 "real dagre layout"). Extracted so they
+// share one engine, NOT to abstract a viz framework (ponytail: move-to-lib).
 
 // Lazily loaded dagre (~200 KB). Only downloads when a graph is visible.
 const dagrePromise = import("dagre").then((mod) => mod.default || mod);
@@ -259,7 +258,7 @@ export function bezierPathD(x1, y1, x2, y2) {
 }
 
 // Live /api/graph with the 5s-timeout fallback to FALLBACK_GRAPH (spec §8).
-// De-dupes an in-flight promise so SkillFrontier + TopicGraphViz never double-fetch.
+// De-dupes an in-flight promise so SkillFrontier + LandingDAG never double-fetch.
 let inflight = null;
 export async function fetchTopicGraph(_signal, baseOverride) {
   const base = baseOverride ?? (import.meta.env.VITE_API_URL || "");

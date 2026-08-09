@@ -1,9 +1,8 @@
 // Greenhouse Phase 3 — landing DAG centerpiece (spec §5.1, §3 lock 4, §9).
 // Presentation mode: decorative-only (aria-hidden SVG + text caption), no mastery,
 // no weak annotation, no hover, no click. Reuses the shared topicGraphLayout engine
-// (real dagre layout, real pill-boundary bezier edges) — NOT TopicGraphViz, which
-// stays as the dashboard editor-mode viz. Draw fires from one IntersectionObserver
-// on the frame; CSS drives the depth-staggered reveal.
+// (real dagre layout, real pill-boundary bezier edges). Draw fires from one
+// IntersectionObserver on the frame; CSS drives the depth-staggered reveal.
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   fetchTopicGraph, getLayout, getEdgeEndpoints, bezierPathD, topicDepths,
@@ -121,10 +120,11 @@ export default function LandingDAG() {
             const w = pillWidth(label), h = PILL_H, x = n.x - w / 2, y = n.y - h / 2;
             return (
               <g key={id} className={`ld-node${isRoot ? " ld-root" : ""}`} style={{ "--d": depth }}>
-                {/* ponytail: graph node/edge body colors are raw rgba literals — matching TopicGraphViz's
-                    established pattern (§6 defines NO graph-viz tokens, only surface/accent/motion).
-                    The arrow marker uses --color-accent intentionally (decorative indigo accent).
-                    Ceiling: if a later Greenhouse phase adds graph-viz tokens, swap these rgba literals. */}
+                {/* ponytail: graph node/edge body colors are raw rgba literals — established
+                    pattern without graph-viz tokens (§6 defines no graph-viz tokens, only
+                    surface/accent/motion). The arrow marker uses --color-accent intentionally
+                    (decorative indigo accent). Ceiling: if a later Greenhouse phase adds
+                    graph-viz tokens, swap these rgba literals. */}
                 <rect x={x} y={y} width={w} height={h} rx={PILL_RX}
                   fill="rgba(148,163,184,0.08)" stroke="rgba(148,163,184,0.25)" strokeWidth={1} />
                 <text x={n.x} y={n.y + 0.5} fontSize={11} fill="rgba(220,225,240,0.85)"
