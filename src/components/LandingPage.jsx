@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import SearchBar from "./SearchBar";
 import LandingDAG from "./LandingDAG";
-import { staggerContainer } from "../lib/motion";
+import { staggerContainer, panelTransition } from "../lib/motion";
 
 // §3 lock 4 motion A — cinematic landing. Section/hero reveals stay UNDER the 560ms cap
 // with a landing-local variant, so the shared `fadeUp` (600ms, from ../lib/motion, used
@@ -174,7 +174,7 @@ export default function LandingPage() {
 
       {/* Final CTA + minimal footer */}
       <motion.section initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "0px" }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        transition={panelTransition}
         style={{ ...section, borderTop: "1px solid var(--outline)", textAlign: "center", maxWidth: 640 }}>
         <h2 className="font-heading" style={{ fontFamily: "var(--font-display)", fontWeight: 600,
           fontSize: "clamp(1.6rem, 3vw, 2.2rem)", letterSpacing: "-0.015em", marginBottom: 16 }}>

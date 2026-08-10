@@ -185,7 +185,8 @@ export default function useAnalysis() {
     const mergedMastery = { ...cfData?.mastery_scores, ...lcData?.mastery_scores };
     masteryScoresRef.current = mergedMastery;
     const presentModels = [cfData?.model_used, lcData?.model_used].filter(Boolean);
-    setModelUsed(presentModels.length > 0 && presentModels.every(m => m === "graph_dkt") ? "graph_dkt" : "rule_based");
+    const allAgree = presentModels.length > 0 && presentModels.every(m => m === presentModels[0]);
+    setModelUsed(allAgree ? presentModels[0] : "rule_based");
 
     setLoadingStep(3);
     const recsHandle = cfHandle?.trim() || lcHandle?.trim() || "";
@@ -401,6 +402,7 @@ export default function useAnalysis() {
 
     setLoading(true);
     setError("");
+    setModelUsed(null);
     setUser(null);
     setTagProfile([]);
     setWeakTags([]);

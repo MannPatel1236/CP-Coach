@@ -11,3 +11,8 @@ export const staggerContainer = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.1 } },
 };
+
+// Shared panel reveal transition: 0.5s on the [0.16, 1, 0.3, 1] ease-out curve.
+// Used by Recommendations, WhyThisRec, SkillFrontier, and LandingPage (the same
+// literal was duplicated before — one const so they stay in lockstep on timing).
+export const panelTransition = { duration: 0.5, ease: [0.16, 1, 0.3, 1] };

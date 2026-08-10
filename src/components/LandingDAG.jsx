@@ -4,12 +4,11 @@
 // (real dagre layout, real pill-boundary bezier edges). Draw fires from one
 // IntersectionObserver on the frame; CSS drives the depth-staggered reveal.
 import { useState, useEffect, useRef, useMemo } from "react";
+import useGraphLayout from "../hooks/useGraphLayout.js";
 import {
-  fetchTopicGraph, getLayout, getEdgeEndpoints, bezierPathD, topicDepths,
-  pillWidth, PILL_H, PILL_RX, ARROW_SIZE,
+  getEdgeEndpoints, bezierPathD, topicDepths,
+  pillWidth, labelOf, PILL_H, PILL_RX, ARROW_SIZE,
 } from "../lib/topicGraphLayout.js";
-
-const labelOf = (id) => id.replace(/_/g, " ");
 
 // §9: the caption carries the meaning in text (SVG is aria-hidden).
 const CAPTION =
@@ -24,8 +23,7 @@ export default function LandingDAG() {
   // start hidden (data-anim="out") until the observer fires. `react-hooks/
   // set-state-in-effect` bans the synchronous setVisible(this guard — keep it out of the effect.
   const [visible, setVisible] = useState(() => typeof IntersectionObserver === "undefined");
-  const [graphData, setGraphData] = useState(null);
-  const [layout, setLayout] = useState({ nodes: [], edges: [], svgWidth: 1000, svgHeight: 620 });
+  const { graphData, layout } = useGraphLayout();
 
   // One IO on the frame → flip visible, disconnect. [] deps = observe once at mount.
   // CRITICAL: the frame wrapper renders on first paint (below), so frameRef.current is
@@ -40,39 +38,6 @@ export default function LandingDAG() {
     io.observe(frame);
     return () => io.disconnect();
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const g = await fetchTopicGraph();
-      if (cancelled) return;
-      setGraphData(g);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!graphData) return;
-    (async () => {
-      const { positions, svgWidth, svgHeight } = await getLayout(graphData.edges, graphData.nodes);
-      if (cancelled) return;
-      const nodes = (graphData.nodes || []).map((n) => {
-        const id = n.id || n;
-        const pos = positions[id] || { x: 500, y: 310 };
-        return { ...n, id, x: pos.x, y: pos.y };
-      });
-      const edges = (graphData.edges || [])
-        .map((e) => {
-          const src = nodes.find((n) => n.id === e.source);
-          const tgt = nodes.find((n) => n.id === e.target);
-          return src && tgt ? { source: src, target: tgt } : null;
-        })
-        .filter(Boolean);
-      setLayout({ nodes, edges, svgWidth, svgHeight });
-    })();
-    return () => { cancelled = true; };
-  }, [graphData]);
 
   // ponytail: depths recomputed from graphData edges — topicDepths is O(V*E) memoized, trivial at 29 nodes.
   const depths = useMemo(

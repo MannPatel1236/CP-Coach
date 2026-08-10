@@ -10,6 +10,6 @@ export function bandFor(userRating) {
     BASE_RECOMMEND_RATING,
     Math.floor((userRating - 100) / RATING_STEP) * RATING_STEP
   );
-  const hi = Math.ceil((userRating + NORMAL_RANGE) / RATING_STEP) * RATING_STEP;
+  const hi = Math.max(BASE_RECOMMEND_RATING, Math.ceil((userRating + NORMAL_RANGE) / RATING_STEP) * RATING_STEP);
   return { lo, hi };
 }

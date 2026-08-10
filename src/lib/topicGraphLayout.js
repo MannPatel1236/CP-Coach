@@ -6,6 +6,12 @@
 // Lazily loaded dagre (~200 KB). Only downloads when a graph is visible.
 const dagrePromise = import("dagre").then((mod) => mod.default || mod);
 
+// Canonical snake_case id → display label. Shared by SkillFrontier, LandingDAG,
+// WhyThisRec, and the layout engine itself (getLayout / getEdgeEndpoints).
+export function labelOf(id) {
+  return String(id).replace(/_/g, " ");
+}
+
 export const PILL_H = 28;
 export const PILL_RX = 14;
 export const CHAR_W = 6.8;
@@ -129,8 +135,8 @@ export async function getLayout(eds, rawNodes) {
   const nodePillWidths = {};
   nodes.forEach((n) => {
     const id = n.id || n;
-    const label = id.replace(/_/g, " ");
-    nodePillWidths[id] = label.length * CHAR_W + PAD_X * 2;
+    const label = labelOf(id);
+    nodePillWidths[id] = pillWidth(label);
   });
 
   connectedNodes.forEach((id) => {
@@ -205,8 +211,8 @@ export async function getLayout(eds, rawNodes) {
 
 // Compute edge endpoints that stop at the pill boundary (lifted from TopicGraphViz).
 export function getEdgeEndpoints(src, tgt) {
-  const srcLabel = src.id.replace(/_/g, " ");
-  const tgtLabel = tgt.id.replace(/_/g, " ");
+  const srcLabel = labelOf(src.id);
+  const tgtLabel = labelOf(tgt.id);
   const srcW = pillWidth(srcLabel) / 2;
   const tgtW = pillWidth(tgtLabel) / 2;
   const srcH = PILL_H / 2;
@@ -260,8 +266,8 @@ export function bezierPathD(x1, y1, x2, y2) {
 // Live /api/graph with the 5s-timeout fallback to FALLBACK_GRAPH (spec §8).
 // De-dupes an in-flight promise so SkillFrontier + LandingDAG never double-fetch.
 let inflight = null;
-export async function fetchTopicGraph(_signal, baseOverride) {
-  const base = baseOverride ?? (import.meta.env.VITE_API_URL || "");
+export async function fetchTopicGraph() {
+  const base = import.meta.env.VITE_API_URL || "";
   try {
     inflight ||= fetch(`${base}/api/graph`, { signal: AbortSignal.timeout(5000) })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("graph http " + res.status))))

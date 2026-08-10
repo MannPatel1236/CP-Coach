@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
 import { ExternalLinkIcon, BookIcon } from "./Icons";
 import { bandFor } from "../lib/recBand.js";
+import { panelTransition } from "../lib/motion.js";
 
 function lcDiffLabel(rating) {
   if (rating <= 1100) return { label: "Easy", bg: "rgba(0, 175, 155, 0.12)", color: "#00af9b", border: "rgba(0, 175, 155, 0.2)" };
@@ -58,7 +59,7 @@ function Recommendations({ recs, userRating, selectedTopics }) {
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={panelTransition}
       style={{ margin: 0 }}
     >
       <div className="card" style={{ padding: 24 }}>

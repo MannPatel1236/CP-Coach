@@ -2,10 +2,9 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { TargetIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
-import { prereqPath, FALLBACK_GRAPH } from "../lib/topicGraphLayout.js";
+import { prereqPath, FALLBACK_GRAPH, labelOf } from "../lib/topicGraphLayout.js";
 import { bandFor } from "../lib/recBand.js";
-
-const labelOf = (id) => id.replace(/_/g, " ");
+import { panelTransition } from "../lib/motion.js";
 
 export default function WhyThisRec() {
   const { activeWeakTag, recommendations, cfUser, lcUser, user, modelUsed } = useAnalysisContext();
@@ -23,9 +22,13 @@ export default function WhyThisRec() {
     const path = prereqPath(FALLBACK_GRAPH.edges, trigger);
     const band = bandFor(userRating);
     const next = recs[1];
-    // Schema allows difficulty=None on a rec; fall back to the band floor so the
-    // margin never computes NaN when the top rec (or the next one) lacks a rating.
-    const margin = (top.difficulty ?? band.lo) - (next?.difficulty ?? band.lo);
+    // Client-path recs carry `rating`, backend recs carry `difficulty`; either may
+    // be missing (unrated problem, single rec). Only compute a margin when both are
+    // real; otherwise null → the UI renders an em-dash instead of a fabricated gap.
+    const diffOf = (r) => r?.rating ?? r?.difficulty;
+    const margin = Number.isFinite(diffOf(top)) && Number.isFinite(diffOf(next))
+      ? diffOf(top) - diffOf(next)
+      : null;
     return { trigger_weak_tag: trigger, prereq_path: path, band: [band.lo, band.hi], margin_vs_next: margin };
   }, [top, activeWeakTag, cfUser, lcUser, user, recs]);
 
@@ -34,7 +37,7 @@ export default function WhyThisRec() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} style={{ margin: 0 }}
+      transition={panelTransition} style={{ margin: 0 }}
     >
       <div className="card dash-whyrec" style={{ padding: 24 }}>
         {/* Header */}
@@ -87,7 +90,9 @@ export default function WhyThisRec() {
           </div>
           <div style={{ flex: "1 1 200px", padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", border: "1px solid var(--outline-variant)" }}>
             <div className="label-caps" style={{ marginBottom: 4 }}>Margin vs next rec</div>
-            <div data-testid="whyrec-margin" style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 600, color: provenance.margin_vs_next >= 0 ? "var(--warning)" : "var(--success)" }}>{provenance.margin_vs_next >= 0 ? "+" : ""}{provenance.margin_vs_next} rd</div>
+            <div data-testid="whyrec-margin" style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 600, color: provenance.margin_vs_next != null && provenance.margin_vs_next >= 0 ? "var(--warning)" : "var(--success)" }}>
+              {provenance.margin_vs_next != null ? (provenance.margin_vs_next >= 0 ? "+" : "") + provenance.margin_vs_next + " rd" : "—"}
+            </div>
           </div>
         </div>
       </div>

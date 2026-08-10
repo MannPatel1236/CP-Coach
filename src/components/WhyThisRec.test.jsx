@@ -60,3 +60,24 @@ describe("WhyThisRec — Phase-4d forward compatibility", () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe("WhyThisRec — client-path recs (rating, no difficulty)", () => {
+  it("em-dashes the margin when the top rec has no numeric rating (no fabricated gap)", () => {
+    const clientRec = [{
+      name: "Two Pointers Dive", rating: undefined, contestId: 1300, index: "B",
+      solvedCount: 500, matchedTags: ["two_pointers"], isStretch: false,
+      url: "https://codeforces.com/problemset/problem/1300/B",
+    }];
+    const { getByTestId } = renderInContext(<WhyThisRec />, { recommendations: clientRec });
+    expect(getByTestId("whyrec-margin").textContent).toContain("—");
+  });
+
+  it("computes the margin from `rating` when both recs are client-shape with ratings", () => {
+    const clientRecs = [
+      { ...baseContext.recommendations[0], rating: 1500, difficulty: undefined },
+      { ...baseContext.recommendations[1], rating: 1700, difficulty: undefined },
+    ];
+    const { getByTestId } = renderInContext(<WhyThisRec />, { recommendations: clientRecs });
+    expect(getByTestId("whyrec-margin").textContent).toContain("200");
+  });
+});

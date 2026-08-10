@@ -1,19 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { InfoIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
+import useGraphLayout from "../hooks/useGraphLayout.js";
+import { panelTransition } from "../lib/motion.js";
 import {
-  getLayout, fetchTopicGraph, prereqPath, topicDepths,
-  pillWidth, getEdgeEndpoints, bezierPathD,
+  prereqPath, topicDepths,
+  pillWidth, getEdgeEndpoints, bezierPathD, labelOf,
   PILL_H, PILL_RX, ARROW_SIZE,
 } from "../lib/topicGraphLayout.js";
 
-const labelOf = (id) => id.replace(/_/g, " ");
-
 export default function SkillFrontier() {
   const { masteryScoresRef, weakTags, activeWeakTag, modelUsed } = useAnalysisContext();
-  const [graphData, setGraphData] = useState(null);   // { nodes, edges, fromFallback }
-  const [layout, setLayout] = useState({ nodes: [], edges: [], svgWidth: 1000, svgHeight: 620 });
+  const { graphData, layout } = useGraphLayout();
   const [selected, setSelected] = useState(null);     // click → reveal prereq chain
   const [hovered, setHovered] = useState(null);
   const [focused, setFocused] = useState(null);
@@ -23,39 +22,6 @@ export default function SkillFrontier() {
   // immediately before setModelUsed() → the paired state flip re-renders with fresh mastery.
   // eslint-disable-next-line react-hooks/refs
   const mastery = (masteryScoresRef && masteryScoresRef.current) || {};
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const g = await fetchTopicGraph();
-      if (cancelled) return;
-      setGraphData(g);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!graphData) return;
-    (async () => {
-      const { positions, svgWidth, svgHeight } = await getLayout(graphData.edges, graphData.nodes);
-      if (cancelled) return;
-      const nodes = (graphData.nodes || []).map((n) => {
-        const id = n.id || n;
-        const pos = positions[id] || { x: 500, y: 310 };
-        return { ...n, id, x: pos.x, y: pos.y };
-      });
-      const edges = (graphData.edges || [])
-        .map((e) => {
-          const src = nodes.find((n) => n.id === e.source);
-          const tgt = nodes.find((n) => n.id === e.target);
-          return src && tgt ? { source: src, target: tgt } : null;
-        })
-        .filter(Boolean);
-      setLayout({ nodes, edges, svgWidth, svgHeight });
-    })();
-    return () => { cancelled = true; };
-  }, [graphData]);
 
   const weakSet = useMemo(() => new Set((weakTags || []).map((t) => t.tag)), [weakTags]);
   const depths = useMemo(() => topicDepths((graphData && graphData.edges) || [], "implementation"), [graphData]);
@@ -81,7 +47,7 @@ export default function SkillFrontier() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} style={{ margin: 0 }}
+      transition={panelTransition} style={{ margin: 0 }}
     >
       <div className="card dash-frontier" style={{ padding: 24 }}>
         {/* Header + §8 provenance badge + §8 cached chip */}

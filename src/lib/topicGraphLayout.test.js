@@ -95,10 +95,17 @@ describe("topicGraphLayout — prereq path (BFS) + topic depths (longest path)",
 
 describe("topicGraphLayout — fetchTopicGraph fallback", () => {
   it("resolves to FALLBACK_GRAPH + fromFallback=true when /api/graph is unreachable", async () => {
-    // No network in unit test → fetch rejects → fallback path. Use a definitely-bad URL.
-    const res = await fetchTopicGraph(undefined, "https://invalid.invalid.invalid/graph");
-    expect(res.fromFallback).toBe(true);
-    expect(res.nodes.length).toBe(29);
-    expect(res.edges.length).toBe(39);
+    // No network in unit test → fetch rejects → fallback path. Point VITE_API_URL at a
+    // definitely-bad host so the fetch is attempted (and fails) rather than skipped.
+    const prev = import.meta.env.VITE_API_URL;
+    import.meta.env.VITE_API_URL = "https://invalid.invalid.invalid";
+    try {
+      const res = await fetchTopicGraph();
+      expect(res.fromFallback).toBe(true);
+      expect(res.nodes.length).toBe(29);
+      expect(res.edges.length).toBe(39);
+    } finally {
+      import.meta.env.VITE_API_URL = prev;
+    }
   });
 });

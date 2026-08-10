@@ -13,6 +13,14 @@ describe("recBand — bandFor", () => {
     expect(bandFor(0).lo).toBe(800);
   });
 
+  it("clamps hi at 800 so a sub-floor rating never produces an inverted band", () => {
+    // bandFor(300): lo = max(800, floor(200/100)*100) = 800; an unclamped hi would be
+    // ceil(650/100)*100 = 700 < lo → { lo: 800, hi: 700 }. Clamped: { lo: 800, hi: 800 }.
+    expect(bandFor(300).lo).toBe(800);
+    expect(bandFor(300).hi).toBe(800);
+    expect(bandFor(450).hi).toBe(800);
+  });
+
   it("rounds a non-multiple-of-100 rating to the nearest band edges", () => {
     // r=1547: lo = max(800, floor(1447/100)*100)=1400; hi = ceil(1897/100)*100=1900
     expect(bandFor(1547)).toEqual({ lo: 1400, hi: 1900 });
