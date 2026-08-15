@@ -39,7 +39,6 @@ export default function LandingDAG() {
     return () => io.disconnect();
   }, []);
 
-  
   return (
     <div ref={frameRef} className="ldag-frame" data-testid="dag-frame" data-anim={visible ? "in" : "out"}>
       <p data-testid="dag-caption" className="ldag-caption" style={{
