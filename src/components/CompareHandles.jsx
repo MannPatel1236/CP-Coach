@@ -1,0 +1,208 @@
+// Greenhouse Phase 5a — CompareHandles dashboard section (spec §5.2 #8).
+// Two-handle solvedSet/mastery diff via useCompareHandle (localized secondary
+// analysis — never in primary context). Fallback: either handle fails → show the
+// resolved side + "second handle unavailable" chip; rule_based mastery on either
+// side is badged per §8 before diff coloring. Sibling text summary (§9).
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { UserIcon } from "./Icons";
+import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
+import useCompareHandle from "../hooks/useCompareHandle.js";
+import { labelOf } from "../lib/topicGraphLayout.js";
+import { panelTransition } from "../lib/motion.js";
+
+const LEAD_DELTA = 0.05;
+
+export default function CompareHandles() {
+  const { cfHandle, lcHandle, user, cfUser, lcUser, masteryScoresRef, solvedSet, modelUsed } = useAnalysisContext();
+  const { target, result, loading, error, run, clear } = useCompareHandle();
+  const [input, setInput] = useState("");
+  const [platform, setPlatform] = useState("cf");
+
+  const isCombined = Boolean(cfUser && lcUser);
+  const primaryPlatform = cfUser ? "cf" : lcUser ? "lc" : user?.platform === "lc" ? "lc" : "cf";
+  const primaryLabel = cfHandle || lcHandle || user?.handle || "";
+  const secondaryPlatform = isCombined ? platform : primaryPlatform;
+
+  // Primary mastery read directly from the context ref (same pattern as SkillFrontier):
+  // useAnalysis mutates masteryScoresRef immediately before setModelUsed() → the paired
+  // state flip re-renders with fresh mastery, so the ref is current at render time.
+  // eslint-disable-next-line react-hooks/refs
+  const primaryMastery = (masteryScoresRef && masteryScoresRef.current) || {};
+  const primarySolved = solvedSet || new Set();
+  const isEstimate = modelUsed !== "graph_dkt" || (result && result.modelUsed !== "graph_dkt");
+
+  if (!import.meta.env.VITE_API_URL) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={panelTransition}>
+        <div className="card dash-compare" style={{ padding: 24 }}>
+          <CompareHeader />
+          <p data-testid="compare-disabled" style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, margin: 0 }}>
+            Compare requires the backend service.
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+
+  const runCompare = () => {
+    if (!input.trim()) return;
+    run(input, secondaryPlatform);
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "Enter") runCompare();
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={panelTransition}>
+      <div className="card dash-compare" style={{ padding: 24 }}>
+        <CompareHeader />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+          <span data-testid="compare-primary" style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--color-accent-text)", background: "var(--surface-2)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-full)", padding: "4px 10px" }}>
+            {primaryLabel || "primary"}
+          </span>
+          <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>vs</span>
+          <input
+            data-testid="compare-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="second handle"
+            style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+          />
+          {isCombined && (
+            <select
+              data-testid="compare-platform"
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+            >
+              <option value="cf">cf</option>
+              <option value="lc">lc</option>
+            </select>
+          )}
+          <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
+            Compare
+          </button>
+        </div>
+
+        {loading && !result && (
+          <div data-testid="compare-loading" style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+            Analyzing {input || "second handle"}…
+          </div>
+        )}
+
+        {error && (
+          <div data-testid="compare-unavailable" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--surface-2)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <span style={{ fontSize: 13, color: "var(--warning)", lineHeight: 1.5 }}>
+              <strong style={{ color: "var(--on-surface)" }}>{target || input.trim() || "Second handle"}</strong> unavailable — {error}
+            </span>
+            {result && (
+              <button className="btn-primary" data-testid="compare-clear" onClick={clear} style={{ padding: "6px 12px", fontSize: 12, flexShrink: 0 }}>
+                Reset
+              </button>
+            )}
+          </div>
+        )}
+
+        {result && <DiffPanel primaryLabel={primaryLabel} primaryMastery={primaryMastery} primarySolved={primarySolved} secondary={result} estimate={isEstimate} />}
+      </div>
+    </motion.div>
+  );
+}
+
+function CompareHeader() {
+  return (
+    <div className="dash-compare-header" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+      <div style={{ background: "linear-gradient(135deg, var(--primary-container), var(--primary-dim))", borderRadius: "var(--radius-sm)", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--on-primary)", flexShrink: 0 }}>
+        <UserIcon size={16} />
+      </div>
+      <div className="font-heading" style={{ fontWeight: 600, fontSize: 18, color: "#ffffff", letterSpacing: "-0.01em" }}>Compare</div>
+    </div>
+  );
+}
+
+function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, estimate }) {
+  const topics = new Set([...Object.keys(primaryMastery), ...Object.keys(secondary.mastery)]);
+  const deltas = [];
+  for (const t of topics) {
+    const a = primaryMastery[t];
+    const b = secondary.mastery[t];
+    if (a === undefined || b === undefined) continue;
+    const delta = b - a;
+    if (Math.abs(delta) < 0.001) continue;
+    deltas.push({ topic: t, delta });
+  }
+  deltas.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+
+  const onlyA = [...primarySolved].filter((id) => !secondary.solvedSet.has(id));
+  const onlyB = [...secondary.solvedSet].filter((id) => !primarySolved.has(id));
+
+  const aLabel = primaryLabel || "A";
+  const bLabel = secondary.handle || "B";
+  const leadsA = deltas.filter((d) => d.delta <= -LEAD_DELTA).length;
+  const leadsB = deltas.filter((d) => d.delta >= LEAD_DELTA).length;
+
+  const maxAbs = Math.max(0.0001, ...deltas.map((d) => Math.abs(d.delta)));
+
+  return (
+    <div>
+      {estimate && (
+        <span data-testid="compare-estimate-badge" style={{ display: "inline-block", marginBottom: 12, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--warning)", background: "var(--warning-container)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: "var(--radius-full)", padding: "3px 8px" }}>
+          estimate · not graph-dkt
+        </span>
+      )}
+
+      <p data-testid="compare-summary" style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, margin: "0 0 14px" }}>
+        {`${aLabel} leads on ${leadsA} topic${leadsA === 1 ? "" : "s"} by ≥0.05, ${bLabel} leads on ${leadsB}; `}
+        {`${aLabel} solved ${onlyA.length} problem${onlyA.length === 1 ? "" : "s"} ${bLabel} hasn't, ${bLabel} solved ${onlyB.length} ${aLabel} hasn't.`}
+      </p>
+
+      {deltas.length === 0 ? (
+        <p data-testid="compare-no-overlap" style={{ fontSize: 13, color: "var(--on-surface-variant)", margin: 0 }}>
+          No shared mastery data to diff (different platforms or empty profiles).
+        </p>
+      ) : (
+        <div data-testid="compare-deltas" style={{ marginBottom: 16 }}>
+          {deltas.slice(0, 12).map((d) => {
+            const isUp = d.delta > 0;
+            return (
+              <div key={d.topic} data-testid="compare-delta" data-topic={d.topic} data-delta={d.delta.toFixed(3)} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ flex: "0 0 130px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--color-accent-text)", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{labelOf(d.topic)}</span>
+                <div style={{ flex: 1, height: 8, background: "var(--surface-2)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+                  <div
+                    data-testid="compare-delta-bar"
+                    style={{
+                      height: "100%", width: `${Math.min(100, (Math.abs(d.delta) / maxAbs) * 100)}%`,
+                      background: isUp ? "var(--success)" : "var(--error)", opacity: 0.85,
+                    }}
+                  />
+                </div>
+                <span style={{ flex: "0 0 52px", fontSize: 12, fontFamily: "var(--font-mono)", fontWeight: 600, color: isUp ? "var(--success)" : "var(--error)" }}>
+                  {isUp ? "+" : "−"}{d.delta.toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 200px", padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", border: "1px solid var(--outline-variant)" }}>
+          <div className="label-caps" style={{ marginBottom: 6 }}>Solved by {aLabel}, not {bLabel}</div>
+          <div data-testid="compare-exclusive-a" style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--on-surface)", lineHeight: 1.7 }}>
+            {onlyA.length === 0 ? <span style={{ color: "var(--text-muted)" }}>none</span> : <span>{onlyA.slice(0, 5).join(" · ")}{onlyA.length > 5 ? ` · +${onlyA.length - 5} more` : ""}</span>}
+          </div>
+        </div>
+        <div style={{ flex: "1 1 200px", padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", border: "1px solid var(--outline-variant)" }}>
+          <div className="label-caps" style={{ marginBottom: 6 }}>Solved by {bLabel}, not {aLabel}</div>
+          <div data-testid="compare-exclusive-b" style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--on-surface)", lineHeight: 1.7 }}>
+            {onlyB.length === 0 ? <span style={{ color: "var(--text-muted)" }}>none</span> : <span>{onlyB.slice(0, 5).join(" · ")}{onlyB.length > 5 ? ` · +${onlyB.length - 5} more` : ""}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
