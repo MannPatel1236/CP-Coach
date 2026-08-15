@@ -1,8 +1,42 @@
 """Recommendation engine."""
 
 import math
+from collections import deque
 
 from data.topic_graph import CPTopicGraph
+
+
+def _prereq_path(topic_graph: CPTopicGraph, target: str, root: str = "implementation") -> list[str]:
+    """Shortest prerequisite chain root → target, mirroring frontend prereqPath().
+
+    Walks the prerequisite DAG backward from target to root (BFS by hop count,
+    alphabetically tied), then reconstructs root → … → target. Graceful fallbacks:
+    target == root → [root]; unknown/orphan target → [root]; root unreachable → [target].
+    """
+    if not target or target == root:
+        return [root]
+    parents = topic_graph.get_prerequisites(target)
+    if not parents:
+        return [root]
+
+    prev: dict[str, str | None] = {target: None}
+    queue = deque([target])
+    while queue:
+        node = queue.popleft()
+        if node == root:
+            break
+        for p in sorted(topic_graph.get_prerequisites(node)):
+            if p not in prev:
+                prev[p] = node
+                queue.append(p)
+    if root not in prev:
+        return [target]
+    path = []
+    cur = root
+    while cur is not None:
+        path.append(cur)
+        cur = prev[cur]
+    return path
 
 
 class Recommender:
@@ -266,17 +300,38 @@ class Recommender:
 
         # ── 8. RETURN ────────────────────────────────────────────────
         results = normal_pool[:top_k]
-        return [
-            {
+        band = [max(800, user_rating - 100), user_rating + self.difficulty_band]
+        out = []
+        for i, p in enumerate(results):
+            # §7 provenance (Phase 4d) — server-side rationale mirroring the
+            # client's WhyThisRec computation so CF+backend clients get ground truth.
+            primaries = [t for t in p["matched_topics"] if t in primary_set]
+            if primaries:
+                trigger = min(primaries, key=lambda t: mastery_scores.get(t, 0.0))
+            elif p["matched_topics"]:
+                trigger = p["matched_topics"][0]
+            elif final_topics:
+                trigger = final_topics[0]
+            else:
+                trigger = "implementation"
+            next_diff = results[i + 1].get("difficulty") if i + 1 < len(results) else None
+            diff = p.get("difficulty")
+            margin = diff - next_diff if (diff is not None and next_diff is not None) else None
+            out.append({
                 "problem_id": p["problem_id"],
                 "platform": p["platform"],
                 "name": p.get("name", ""),
-                "difficulty": p.get("difficulty"),
+                "difficulty": diff,
                 "topics": p.get("topics", []),
                 "solve_count": p.get("solve_count", 0),
                 "url": p.get("url", ""),
                 "matched_topics": p["matched_topics"],
                 "is_stretch": p["is_stretch"],
-            }
-            for p in results
-        ]
+                "provenance": {
+                    "trigger_weak_tag": trigger,
+                    "prereq_path": _prereq_path(self.topic_graph, trigger),
+                    "band": band,
+                    "margin_vs_next": margin,
+                },
+            })
+        return out

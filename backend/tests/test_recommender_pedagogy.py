@@ -192,3 +192,67 @@ def test_focus_mode_topic_first_regression():
         top_k=10,
     )
     assert _ranking(auto_recs)[0] == "p-greedy", _ranking(auto_recs)
+
+
+# ── Greenhouse Phase 4d — per-item provenance payload ─────────────────────────
+
+def test_provenance_trigger_is_weakest_matched_primary():
+    """dp (mastery 0.0) beats greedy (0.55) as the trigger for the dp problem."""
+    rec = Recommender(GRAPH)
+    mastery = _mastery(dp=0.0, greedy=0.55)
+    problems = [
+        _problem("p-dp", ["dp", "greedy"], difficulty=1500),
+    ]
+    recs = rec.recommend(
+        user_rating=1500,
+        mastery_scores=mastery,
+        solved_problem_ids=set(),
+        all_problems=problems,
+        platforms=["cf"],
+        top_k=10,
+    )
+    prov = recs[0]["provenance"]
+    assert prov["trigger_weak_tag"] == "dp", prov          # weakest primary drives
+    assert prov["band"] == [1400, 1850], prov              # [rating-100, rating+350]
+    assert prov["prereq_path"][0] == "implementation"      # root-anchored
+    assert prov["prereq_path"][-1] == "dp", prov           # ends at the trigger
+
+
+def test_provenance_prereq_path_shortest_chain():
+    """dp (direct prereqs: dfs_and_similar, greedy) — path is the shortest chain."""
+    rec = Recommender(GRAPH)
+    mastery = _mastery(dp=0.0)
+    problems = [_problem("p-dp", ["dp"], difficulty=1500)]
+    recs = rec.recommend(
+        user_rating=1500,
+        mastery_scores=mastery,
+        solved_problem_ids=set(),
+        all_problems=problems,
+        platforms=["cf"],
+        top_k=10,
+    )
+    path = recs[0]["provenance"]["prereq_path"]
+    assert path[0] == "implementation" and path[-1] == "dp"
+    # implementation → math → greedy → dp is a valid 4-hop chain (one shortest route)
+    assert path == ["implementation", "math", "greedy", "dp"], path
+
+
+def test_provenance_margin_vs_next():
+    """margin = top.difficulty − next.difficulty; null for a single rec."""
+    rec = Recommender(GRAPH)
+    mastery = _mastery(dp=0.0)
+    problems = [
+        _problem("p-a", ["dp"], difficulty=1500),
+        _problem("p-b", ["dp"], difficulty=1400),
+    ]
+    recs = rec.recommend(
+        user_rating=1500,
+        mastery_scores=mastery,
+        solved_problem_ids=set(),
+        all_problems=problems,
+        platforms=["cf"],
+        top_k=10,
+    )
+    assert recs[0]["difficulty"] == 1400                 # diff_fit floats easier up
+    assert recs[0]["provenance"]["margin_vs_next"] == -100
+    assert recs[1]["provenance"]["margin_vs_next"] is None   # last item → null

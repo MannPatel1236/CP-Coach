@@ -33,6 +33,13 @@ class WeakAreaEntry(BaseModel):
 # ── Recommendations ──────────────────────────────────────────────────────────
 
 
+class RecommendationProvenance(BaseModel):
+    trigger_weak_tag: str
+    prereq_path: list[str]
+    band: list[int]
+    margin_vs_next: int | None = None
+
+
 class Recommendation(BaseModel):
     problem_id: str
     platform: str
@@ -43,6 +50,7 @@ class Recommendation(BaseModel):
     url: str = ""
     matched_topics: list[str] = Field(default_factory=list)
     is_stretch: bool = False
+    provenance: RecommendationProvenance | None = None
 
 
 class RecommendationsResponse(BaseModel):

@@ -33,7 +33,7 @@ jobs:
 
       - name: Compile check
         run: |
-          python -m py_compile main.py routes/analyze.py routes/recommend.py routes/progress.py routes/graph.py routes/trajectory.py
+          python -m py_compile main.py routes/analyze.py routes/recommend.py routes/progress.py routes/graph.py routes/trajectory.py models/recommender.py
 
       - name: Test
         run: python -m pytest tests/ -v
