@@ -17,7 +17,7 @@ load_dotenv()
 
 from rate_limiter import limiter  # noqa: E402
 from models.errors import handle_http_exception, handle_catchall  # noqa: E402
-from routes import analyze, recommend, progress, graph, user  # noqa: E402
+from routes import analyze, recommend, progress, graph, user, trajectory  # noqa: E402
 from routes.schemas import HealthResponse, HealthDeepResponse  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -187,6 +187,7 @@ app.add_middleware(
 app.include_router(analyze.router)
 app.include_router(recommend.router)
 app.include_router(progress.router)
+app.include_router(trajectory.router)
 app.include_router(graph.router)
 app.include_router(user.router)
 

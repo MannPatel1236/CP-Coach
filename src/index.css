@@ -469,3 +469,18 @@ body {
   .ldag-frame .ld-node { opacity: 1; }
   .ldag-frame .ld-edge { stroke-dashoffset: 0; opacity: .42; }
 }
+
+/* Greenhouse Phase 4a — RatingTrajectory (spec §5.2 #5) */
+.dash-traj .btn-primary {
+  background: var(--primary-container);
+  color: var(--on-primary);
+  border: 1px solid var(--primary-bright);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter 180ms var(--ease-out-expo);
+}
+.dash-traj .btn-primary:hover { filter: brightness(1.12); }
+.dash-traj .btn-primary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

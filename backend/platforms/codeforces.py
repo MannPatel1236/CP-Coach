@@ -79,6 +79,20 @@ class CFClient:
             await asyncio.sleep(PAGE_DELAY)
         return all_subs[:max_count]
 
+    # ── Rating history ────────────────────────────────────────────────
+
+    async def get_rating_history(self, handle: str) -> list[dict]:
+        """Fetch the user's rated-contest history (ratingUpdateTimeSeconds etc.).
+
+        Returns the raw CF result list (one entry per rated contest, ordered
+        chronologically). Used by GET /api/rating-trajectory (Phase 4a).
+        """
+        _validate_handle(handle)
+        data = await self._get(f"/user.rating?handle={handle}")
+        if data.get("status") != "OK":
+            raise RuntimeError("Could not fetch CF rating history")
+        return data["result"]
+
     # ── Problemset ───────────────────────────────────────────────────
 
     async def get_problemset(self) -> list[dict]:

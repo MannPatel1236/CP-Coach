@@ -70,6 +70,24 @@ class ProgressResponse(BaseModel):
     topic_progress: dict[str, list[WeeklyEntry]] = Field(default_factory=dict)
 
 
+# ── Rating trajectory (Phase 4a) ──────────────────────────────────────────────
+
+
+class RatingPoint(BaseModel):
+    contest_id: int | None = None
+    contest_name: str = ""
+    rank: int | None = None
+    old_rating: int | None = None
+    new_rating: int | None = None
+    timestamp: int = 0
+
+
+class RatingTrajectoryResponse(BaseModel):
+    handle: str
+    platform: str
+    points: list[RatingPoint] | None = None
+
+
 # ── Graph ─────────────────────────────────────────────────────────────────────
 
 

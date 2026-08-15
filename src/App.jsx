@@ -14,6 +14,7 @@ import SkillChart from "./components/SkillChart.jsx";
 import TopicPicker from "./components/TopicPicker.jsx";
 import Recommendations from "./components/Recommendations.jsx";
 import SkillFrontier from "./components/SkillFrontier.jsx";
+import RatingTrajectory from "./components/RatingTrajectory.jsx";
 import WhyThisRec from "./components/WhyThisRec.jsx";
 import ModelInsight from "./components/ModelInsight.jsx";
 import LandingPage from "./components/LandingPage.jsx";
@@ -151,6 +152,8 @@ export default function App() {
           <div className="column-panel" style={{ minWidth: 0 }}>
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
             {user && <SkillFrontier />}
+
+            {cfUser && <RatingTrajectory />}
 
             {tagProfile.length > 0 && weakTags.length === 0 && <SuccessBanner />}
 

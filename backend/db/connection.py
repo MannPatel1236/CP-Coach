@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy import (
     Column, Integer, String, Float, BigInteger, ForeignKey, TIMESTAMP, ARRAY, Text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 
@@ -120,6 +121,38 @@ class KTState(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     topic = Column(String(50), primary_key=True)
     p_mastery = Column(Float, nullable=False, default=0.0)
+    updated_at = Column(TIMESTAMP, nullable=True)
+
+
+class RatingTrajectory(Base):
+    __tablename__ = "rating_trajectory"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    platform = Column(String(5), default="cf")
+    payload = Column(JSONB, nullable=False)
+    fetched_at = Column(TIMESTAMP, nullable=True)
+
+
+class MasteryHistory(Base):
+    __tablename__ = "mastery_history"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    topic = Column(String(50), primary_key=True)
+    checkpoint_idx = Column(Integer, primary_key=True)
+    ts = Column(BigInteger, nullable=True)
+    p_mastery = Column(Float, nullable=False, default=0.0)
+    updated_at = Column(TIMESTAMP, nullable=True)
+
+
+class ActivityWeek(Base):
+    __tablename__ = "activity_weeks"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    week = Column(String(10), primary_key=True)
+    solved = Column(Integer, nullable=False, default=0)
+    total = Column(Integer, nullable=False, default=0)
+    active_days = Column(Integer, nullable=False, default=0)
     updated_at = Column(TIMESTAMP, nullable=True)
 
 

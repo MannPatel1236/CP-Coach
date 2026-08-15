@@ -69,6 +69,39 @@ CREATE TABLE IF NOT EXISTS kt_states (
 
 CREATE INDEX IF NOT EXISTS idx_kt_states_user ON kt_states(user_id);
 
+-- Greenhouse Phase 4: rating trajectory cache (per-handle, TTL checked in code)
+CREATE TABLE IF NOT EXISTS rating_trajectory (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  platform VARCHAR(5) NOT NULL DEFAULT 'cf',
+  payload JSONB NOT NULL,
+  fetched_at TIMESTAMP DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rating_trajectory_user ON rating_trajectory(user_id);
+
+-- Greenhouse Phase 4: mastery history snapshots (K=8 checkpoints per analyze)
+CREATE TABLE IF NOT EXISTS mastery_history (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  topic VARCHAR(50),
+  checkpoint_idx INTEGER,
+  ts BIGINT,
+  p_mastery FLOAT NOT NULL DEFAULT 0.0,
+  updated_at TIMESTAMP,
+  PRIMARY KEY (user_id, topic, checkpoint_idx)
+);
+CREATE INDEX IF NOT EXISTS idx_mastery_history_user ON mastery_history(user_id);
+
+-- Greenhouse Phase 4: per-week activity buckets (heatmap + streak derivation)
+CREATE TABLE IF NOT EXISTS activity_weeks (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  week VARCHAR(10),
+  solved INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0,
+  active_days INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP,
+  PRIMARY KEY (user_id, week)
+);
+
 -- Seed prerequisite graph (39 directed edges)
 INSERT INTO topic_graph (from_topic, to_topic, weight) VALUES
   -- Root
@@ -145,4 +178,13 @@ CREATE POLICY allow_all_topic_graph ON topic_graph FOR ALL USING (true);
 ALTER TABLE kt_states ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS allow_all_kt_states ON kt_states;
 CREATE POLICY allow_all_kt_states ON kt_states FOR ALL USING (true);
+ALTER TABLE rating_trajectory ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_rating_trajectory ON rating_trajectory;
+CREATE POLICY allow_all_rating_trajectory ON rating_trajectory FOR ALL USING (true);
+ALTER TABLE mastery_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_mastery_history ON mastery_history;
+CREATE POLICY allow_all_mastery_history ON mastery_history FOR ALL USING (true);
+ALTER TABLE activity_weeks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_activity_weeks ON activity_weeks;
+CREATE POLICY allow_all_activity_weeks ON activity_weeks FOR ALL USING (true);
 

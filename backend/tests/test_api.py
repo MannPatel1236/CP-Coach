@@ -42,14 +42,22 @@ def mock_cf_client(monkeypatch):
     async def mock_get_problemset():
         return stub_problems
 
+    async def mock_get_rating_history(handle):
+        if not _HANDLE_PATTERN.match(handle):
+            from platforms.codeforces import HandleError
+            raise HandleError(f"Invalid characters in handle: '{handle}'")
+        return []
+
     mock = AsyncMock()
     mock.get_user_info = mock_get_user_info
     mock.get_submissions = mock_get_submissions
     mock.get_all_submissions = mock_get_all_submissions
     mock.get_problemset = mock_get_problemset
+    mock.get_rating_history = mock_get_rating_history
     monkeypatch.setattr("routes.analyze.CFClient", lambda: mock)
     monkeypatch.setattr("routes.recommend.CFClient", lambda: mock)
     monkeypatch.setattr("routes.progress.CFClient", lambda: mock)
+    monkeypatch.setattr("routes.trajectory.CFClient", lambda: mock)
     return mock
 
 
