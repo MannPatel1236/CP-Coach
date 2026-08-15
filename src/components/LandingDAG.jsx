@@ -3,10 +3,10 @@
 // no weak annotation, no hover, no click. Reuses the shared topicGraphLayout engine
 // (real dagre layout, real pill-boundary bezier edges). Draw fires from one
 // IntersectionObserver on the frame; CSS drives the depth-staggered reveal.
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import useGraphLayout from "../hooks/useGraphLayout.js";
 import {
-  getEdgeEndpoints, bezierPathD, topicDepths,
+  getEdgeEndpoints, bezierPathD,
   pillWidth, labelOf, PILL_H, PILL_RX, ARROW_SIZE,
 } from "../lib/topicGraphLayout.js";
 
@@ -23,7 +23,7 @@ export default function LandingDAG() {
   // start hidden (data-anim="out") until the observer fires. `react-hooks/
   // set-state-in-effect` bans the synchronous setVisible(this guard — keep it out of the effect.
   const [visible, setVisible] = useState(() => typeof IntersectionObserver === "undefined");
-  const { graphData, layout } = useGraphLayout();
+  const { layout, depths } = useGraphLayout();
 
   // One IO on the frame → flip visible, disconnect. [] deps = observe once at mount.
   // CRITICAL: the frame wrapper renders on first paint (below), so frameRef.current is
@@ -39,12 +39,7 @@ export default function LandingDAG() {
     return () => io.disconnect();
   }, []);
 
-  // ponytail: depths recomputed from graphData edges — topicDepths is O(V*E) memoized, trivial at 29 nodes.
-  const depths = useMemo(
-    () => topicDepths((graphData && graphData.edges) || [], "implementation"),
-    [graphData]
-  );
-
+  
   return (
     <div ref={frameRef} className="ldag-frame" data-testid="dag-frame" data-anim={visible ? "in" : "out"}>
       <p data-testid="dag-caption" className="ldag-caption" style={{

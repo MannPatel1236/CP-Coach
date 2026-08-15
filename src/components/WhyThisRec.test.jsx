@@ -27,6 +27,29 @@ describe("WhyThisRec — breadcrumb + band + margin", () => {
     const { getByTestId } = renderInContext(<WhyThisRec />);
     expect(getByTestId("whyrec-margin").textContent).toContain("200");
   });
+
+  it("colors the margin `success` (green) when top rec is EASIER than next (margin < 0)", () => {
+    // Deterministic via injected provenance: margin_vs_next = -200 → success branch.
+    const recs = [{
+      ...baseContext.recommendations[0],
+      provenance: { trigger_weak_tag: "binary_search",
+        prereq_path: ["implementation", "binary_search"], band: [1400, 1900], margin_vs_next: -200 },
+    }, baseContext.recommendations[1]];
+    const { getByTestId } = renderInContext(<WhyThisRec />, { recommendations: recs });
+    // jsdom does not resolve CSS vars → style.color holds the literal var reference.
+    expect(getByTestId("whyrec-margin").style.color).toContain("success");
+  });
+
+  it("colors the margin `warning` (amber) when top rec is HARDER than next (margin ≥ 0)", () => {
+    const recs = [{
+      ...baseContext.recommendations[0],
+      provenance: { trigger_weak_tag: "binary_search",
+        prereq_path: ["implementation", "binary_search"], band: [1400, 1900], margin_vs_next: 150 },
+    }, baseContext.recommendations[1]];
+    const { getByTestId } = renderInContext(<WhyThisRec />, { recommendations: recs });
+    expect(getByTestId("whyrec-margin").style.color).toContain("warning");
+    expect(getByTestId("whyrec-margin").textContent).toContain("+150");
+  });
 });
 
 describe("WhyThisRec — §8 provenance badge", () => {

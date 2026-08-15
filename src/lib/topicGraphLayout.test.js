@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  FALLBACK_GRAPH, getLayout, pillWidth, getEdgeEndpoints, bezierPathD,
+  FALLBACK_GRAPH, getLayout, pillWidth, labelOf, getEdgeEndpoints, bezierPathD,
   prereqPath, topicDepths, fetchTopicGraph,
 } from "./topicGraphLayout.js";
 
@@ -36,6 +36,10 @@ describe("topicGraphLayout — geometry helpers", () => {
     const d = bezierPathD(10, 20, 200, 40);
     expect(d.startsWith("M ")).toBe(true);
     expect(d).toContain("C ");
+  });
+  it("labelOf converts snake_case ids to display labels", () => {
+    expect(labelOf("binary_search")).toBe("binary search");
+    expect(labelOf("implementation")).toBe("implementation");
   });
   it("getEdgeEndpoints returns two finite points", () => {
     const src = { id: "implementation", x: 100, y: 100 };

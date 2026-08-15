@@ -15,7 +15,25 @@ describe("Greenhouse Phase 2 — model_used + masteryScoresRef plumbing", () => 
   });
 
   it("useAnalysis resets modelUsed in clearAll", () => {
-    expect(useAnalysisSrc).toContain("setModelUsed(null)");
+    // Scope to the clearAll function body: setModelUsed(null) now appears twice in
+    // the file (clearAll + analyze() reset), so a raw .toContain matches both and
+    // proves neither. Slice clearAll's useCallback body — it ends at the `}, [`
+    // deps array — and assert the reset sits there (right after the masteryRef wipe).
+    const start = useAnalysisSrc.indexOf("const clearAll = useCallback");
+    expect(start).toBeGreaterThan(-1);
+    const body = useAnalysisSrc.slice(start, useAnalysisSrc.indexOf("}, [", start));
+    expect(body).toContain("setModelUsed(null)");
+    expect(body).toContain("masteryScoresRef.current = {}");
+  });
+
+  it("useAnalysis also resets modelUsed at the start of analyze() (not just in clearAll)", () => {
+    // modelused-not-reset-on-analyze fix: analyze()'s reset block sets
+    // setModelUsed(null) right after setError("") so a re-run on a new handle never
+    // carries a stale "graph_dkt"/"rule_based" badge from the previous run.
+    const start = useAnalysisSrc.indexOf("const analyze = useCallback");
+    expect(start).toBeGreaterThan(-1);
+    const body = useAnalysisSrc.slice(start, start + 600);
+    expect(body).toContain("setModelUsed(null)");
   });
 
   it("App.jsx surfaces modelUsed and masteryScoresRef on AnalysisContext", () => {

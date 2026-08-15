@@ -5,14 +5,14 @@ import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
 import useGraphLayout from "../hooks/useGraphLayout.js";
 import { panelTransition } from "../lib/motion.js";
 import {
-  prereqPath, topicDepths,
+  prereqPath,
   pillWidth, getEdgeEndpoints, bezierPathD, labelOf,
   PILL_H, PILL_RX, ARROW_SIZE,
 } from "../lib/topicGraphLayout.js";
 
 export default function SkillFrontier() {
   const { masteryScoresRef, weakTags, activeWeakTag, modelUsed } = useAnalysisContext();
-  const { graphData, layout } = useGraphLayout();
+  const { graphData, layout, depths } = useGraphLayout();
   const [selected, setSelected] = useState(null);     // click → reveal prereq chain
   const [hovered, setHovered] = useState(null);
   const [focused, setFocused] = useState(null);
@@ -24,7 +24,6 @@ export default function SkillFrontier() {
   const mastery = (masteryScoresRef && masteryScoresRef.current) || {};
 
   const weakSet = useMemo(() => new Set((weakTags || []).map((t) => t.tag)), [weakTags]);
-  const depths = useMemo(() => topicDepths((graphData && graphData.edges) || [], "implementation"), [graphData]);
   const chain = useMemo(
     () => (selected ? prereqPath((graphData && graphData.edges) || [], selected) : []),
     [selected, graphData]

@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { fetchTopicGraph, getLayout } from "../lib/topicGraphLayout.js";
+import { useState, useEffect, useMemo } from "react";
+import { fetchTopicGraph, getLayout, topicDepths } from "../lib/topicGraphLayout.js";
 
 // Shared graph-fetch + dagre-layout state, used by SkillFrontier (dashboard) and
-// LandingDAG (landing). Both mount the same two effects; extracted so the pairs
-// can never drift (ponytail: pull the identical fetch+layout effects up).
+// LandingDAG (landing). Both mount the same fetch + layout + depth effects;
+// extracted so the triples can never drift (ponytail: pull the identical effects up).
 export default function useGraphLayout() {
   const [graphData, setGraphData] = useState(null);   // { nodes, edges, fromFallback }
   const [layout, setLayout] = useState({ nodes: [], edges: [], svgWidth: 1000, svgHeight: 620 });
@@ -41,5 +41,12 @@ export default function useGraphLayout() {
     return () => { cancelled = true; };
   }, [graphData]);
 
-  return { graphData, layout };
+  // ponytail: topicDepths is O(V*E) memoized, trivial at 29 nodes; lifted here so both
+  // consumers share one depth computation instead of recomputing it independently.
+  const depths = useMemo(
+    () => topicDepths((graphData && graphData.edges) || [], "implementation"),
+    [graphData]
+  );
+
+  return { graphData, layout, depths };
 }

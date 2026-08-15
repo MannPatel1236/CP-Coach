@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import SearchBar from "./SearchBar";
 import LandingDAG from "./LandingDAG";
-import { staggerContainer, panelTransition } from "../lib/motion";
+import { staggerContainer, panelTransition } from "../lib/motion.js";
 
 // §3 lock 4 motion A — cinematic landing. Section/hero reveals stay UNDER the 560ms cap
 // with a landing-local variant, so the shared `fadeUp` (600ms, from ../lib/motion, used

@@ -1,7 +1,8 @@
 // Pure DAG layout + prerequisite-graph math for the CP topic graph.
-// Two consumers: SkillFrontier (dashboard, Phase 2) and LandingDAG (landing
-// presentation mode, Phase 3 — §5.1 "real dagre layout"). Extracted so they
-// share one engine, NOT to abstract a viz framework (ponytail: move-to-lib).
+// Three consumers: SkillFrontier + WhyThisRec (dashboard, Phase 2) and
+// LandingDAG (landing presentation mode, Phase 3 — §5.1 "real dagre layout").
+// Extracted so they share one engine, NOT to abstract a viz framework
+// (ponytail: move-to-lib).
 
 // Lazily loaded dagre (~200 KB). Only downloads when a graph is visible.
 const dagrePromise = import("dagre").then((mod) => mod.default || mod);
