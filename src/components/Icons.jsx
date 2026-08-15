@@ -94,6 +94,12 @@ export const BarChartIcon = ({ size = 18, className = "" }) => (
   </BaseIcon>
 );
 
+export const CalendarIcon = ({ size = 18, className = "" }) => (
+  <BaseIcon size={size} className={className}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+  </BaseIcon>
+);
+
 export const CodeforcesIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
     <rect x="1" y="7" width="6" height="14" rx="1" fill="#F6C43D"/>

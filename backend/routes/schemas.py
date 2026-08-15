@@ -64,10 +64,17 @@ class WeeklyEntry(BaseModel):
     solve_rate: float
 
 
+class ActivityWeek(BaseModel):
+    solved: int = 0
+    total: int = 0
+    active_days: int = 0
+
+
 class ProgressResponse(BaseModel):
     handle: str
     platform: str
     topic_progress: dict[str, list[WeeklyEntry]] = Field(default_factory=dict)
+    activity: dict[str, ActivityWeek] = Field(default_factory=dict)
 
 
 # ── Rating trajectory (Phase 4a) ──────────────────────────────────────────────

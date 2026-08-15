@@ -1,17 +1,20 @@
-"""Progress route — GET /api/progress/{handle}"""
+"""Progress route — GET /api/progress/{handle} (per-week activity buckets, Phase 4c)"""
 
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
-from routes.schemas import ProgressResponse, WeeklyEntry
+from db.connection import AsyncSessionLocal, User, ActivityWeek
+from routes.schemas import ProgressResponse, WeeklyEntry, ActivityWeek as ActivityWeekSchema
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,40 @@ async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
         return [n for n in (_normalizer.normalize_cf_submission(s) for s in raw_subs) if n]
 
 
+async def _persist_activity_weeks(handle: str, platform: str, activity: dict[str, dict]):
+    """Upsert per-week activity buckets keyed (user, week). Non-blocking — log failures only."""
+    try:
+        async with AsyncSessionLocal() as session:
+            handle_col = User.cf_handle if platform == "cf" else User.lc_handle
+            stmt = select(User).where(handle_col.ilike(handle))
+            user = (await session.execute(stmt)).scalar_one_or_none()
+            if not user:
+                user = User(cf_handle=handle if platform == "cf" else None,
+                            lc_handle=handle if platform == "lc" else None,
+                            primary_platform=platform)
+                session.add(user)
+                await session.flush()
+
+            now = datetime.now(timezone.utc)
+            rows = [
+                {"user_id": user.id, "week": week, "solved": a["solved"], "total": a["total"],
+                 "active_days": a["active_days"], "updated_at": now}
+                for week, a in activity.items()
+            ]
+            if not rows:
+                return
+            stmt = pg_insert(ActivityWeek).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["user_id", "week"],
+                set_={"solved": stmt.excluded.solved, "total": stmt.excluded.total,
+                      "active_days": stmt.excluded.active_days, "updated_at": stmt.excluded.updated_at},
+            )
+            await session.execute(stmt)
+            await session.commit()
+    except Exception as e:
+        logger.warning("Failed to persist activity_weeks for %s: %s", handle, e)
+
+
 @router.get("/progress/{handle}", response_model=ProgressResponse)
 @limiter.limit("30/minute")
 async def progress(request: Request, handle: str, platform: str = Query("cf"), _auth: None = Depends(verify_hmac)):
@@ -48,6 +85,9 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
 
     # Group by week and topic
     topic_weeks: dict[str, dict[str, dict]] = defaultdict(lambda: defaultdict(lambda: {"solved": 0, "total": 0}))
+    # Phase 4c — per-week activity buckets (heatmap + streak derivation §5.2 #7)
+    activity: dict[str, dict] = defaultdict(lambda: {"solved": 0, "total": 0, "active_days": 0})
+    active_day_keys: dict[str, set] = defaultdict(set)
 
     for sub in normalized:
         ts = sub.get("timestamp", 0) / 1000
@@ -56,10 +96,24 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
         week_key = dt.strftime("%Y-W%W")
 
+        activity[week_key]["total"] += 1
+        if sub.get("verdict") == "OK":
+            activity[week_key]["solved"] += 1
+        active_day_keys[week_key].add(dt.date().isoformat())
+
         for topic in sub.get("topics", []):
             topic_weeks[topic][week_key]["total"] += 1
             if sub.get("verdict") == "OK":
                 topic_weeks[topic][week_key]["solved"] += 1
+
+    for week_key, days in active_day_keys.items():
+        activity[week_key]["active_days"] = len(days)
+
+    # Persist activity buckets (non-blocking)
+    try:
+        await _persist_activity_weeks(handle, platform, dict(activity))
+    except Exception as e:
+        logger.warning("Failed to persist activity_weeks for %s: %s", handle, e)
 
     # Build response
     topic_progress = {}
@@ -70,8 +124,14 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
             weekly.append(WeeklyEntry(week=week, solve_rate=round(rate, 3)))
         topic_progress[topic] = weekly
 
+    activity_response = {
+        week: ActivityWeekSchema.model_validate(a)
+        for week, a in sorted(activity.items())
+    }
+
     return ProgressResponse(
         handle=handle,
         platform=platform,
         topic_progress=topic_progress,
+        activity=activity_response,
     )
