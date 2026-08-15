@@ -156,6 +156,17 @@ class ActivityWeek(Base):
     updated_at = Column(TIMESTAMP, nullable=True)
 
 
+class Plan(Base):
+    __tablename__ = "plans"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(120), nullable=False)
+    payload = Column(JSONB, nullable=False)
+    created_at = Column(TIMESTAMP, nullable=True)
+    updated_at = Column(TIMESTAMP, nullable=True)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

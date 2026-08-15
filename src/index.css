@@ -529,3 +529,18 @@ body {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* Greenhouse Phase 5b — Workbook (spec §5.2 #9) */
+.dash-workbook .btn-primary {
+  background: var(--primary-container);
+  color: var(--on-primary);
+  border: 1px solid var(--primary-bright);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter 180ms var(--ease-out-expo);
+}
+.dash-workbook .btn-primary:hover { filter: brightness(1.12); }
+.dash-workbook .btn-primary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

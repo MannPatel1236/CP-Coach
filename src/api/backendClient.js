@@ -67,3 +67,23 @@ export const getMasteryHistory = (handle, signal) =>
 
 export const getTopicGraph = (signal) =>
   apiFetch(`/api/graph`, signal);
+
+export const getPlans = (handle, signal) =>
+  apiFetch(`/api/plans/${encodeURIComponent(handle)}`, signal);
+
+export const createPlan = (handle, plan, signal) =>
+  apiFetch(`/api/plans/${encodeURIComponent(handle)}`, signal, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(plan),
+  });
+
+export const updatePlan = (handle, id, plan, signal) =>
+  apiFetch(`/api/plans/${encodeURIComponent(handle)}/${id}`, signal, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(plan),
+  });
+
+export const deletePlan = (handle, id, signal) =>
+  apiFetch(`/api/plans/${encodeURIComponent(handle)}/${id}`, signal, { method: "DELETE" });

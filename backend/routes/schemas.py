@@ -172,6 +172,22 @@ class DeleteUserResponse(BaseModel):
     message: str
 
 
+# ── Plans / Workbook (Phase 5b) ──────────────────────────────────────────────
+
+
+class PlanIn(BaseModel):
+    name: str
+    payload: dict = Field(default_factory=dict)
+
+
+class PlanOut(BaseModel):
+    id: int
+    name: str
+    payload: dict = Field(default_factory=dict)
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
 # ── Health ──────────────────────────────────────────────────────────────────
 
 

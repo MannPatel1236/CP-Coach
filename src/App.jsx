@@ -18,6 +18,7 @@ import RatingTrajectory from "./components/RatingTrajectory.jsx";
 import MasteryHistory from "./components/MasteryHistory.jsx";
 import ActivityHeatmap from "./components/ActivityHeatmap.jsx";
 import CompareHandles from "./components/CompareHandles.jsx";
+import Workbook from "./components/Workbook.jsx";
 import WhyThisRec from "./components/WhyThisRec.jsx";
 import ModelInsight from "./components/ModelInsight.jsx";
 import LandingPage from "./components/LandingPage.jsx";
@@ -193,6 +194,8 @@ export default function App() {
             )}
 
             {user && <CompareHandles />}
+
+            {user && <Workbook />}
           </div>
         </main>
       )}

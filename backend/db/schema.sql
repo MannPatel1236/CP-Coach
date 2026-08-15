@@ -102,6 +102,16 @@ CREATE TABLE IF NOT EXISTS activity_weeks (
   PRIMARY KEY (user_id, week)
 );
 
+-- Greenhouse Phase 5b: saved plans (the only DB change in the whole program)
+CREATE TABLE IF NOT EXISTS plans (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
 -- Seed prerequisite graph (39 directed edges)
 INSERT INTO topic_graph (from_topic, to_topic, weight) VALUES
   -- Root
@@ -187,4 +197,7 @@ CREATE POLICY allow_all_mastery_history ON mastery_history FOR ALL USING (true);
 ALTER TABLE activity_weeks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS allow_all_activity_weeks ON activity_weeks;
 CREATE POLICY allow_all_activity_weeks ON activity_weeks FOR ALL USING (true);
+ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS allow_all_plans ON plans;
+CREATE POLICY allow_all_plans ON plans FOR ALL USING (true);
 
