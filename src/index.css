@@ -484,3 +484,18 @@ body {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* Greenhouse Phase 4b — MasteryHistory (spec §5.2 #6) */
+.dash-mastery .btn-primary {
+  background: var(--primary-container);
+  color: var(--on-primary);
+  border: 1px solid var(--primary-bright);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter 180ms var(--ease-out-expo);
+}
+.dash-mastery .btn-primary:hover { filter: brightness(1.12); }
+.dash-mastery .btn-primary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

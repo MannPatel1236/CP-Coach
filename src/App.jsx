@@ -15,6 +15,7 @@ import TopicPicker from "./components/TopicPicker.jsx";
 import Recommendations from "./components/Recommendations.jsx";
 import SkillFrontier from "./components/SkillFrontier.jsx";
 import RatingTrajectory from "./components/RatingTrajectory.jsx";
+import MasteryHistory from "./components/MasteryHistory.jsx";
 import WhyThisRec from "./components/WhyThisRec.jsx";
 import ModelInsight from "./components/ModelInsight.jsx";
 import LandingPage from "./components/LandingPage.jsx";
@@ -154,6 +155,8 @@ export default function App() {
             {user && <SkillFrontier />}
 
             {cfUser && <RatingTrajectory />}
+
+            <MasteryHistory />
 
             {tagProfile.length > 0 && weakTags.length === 0 && <SuccessBanner />}
 

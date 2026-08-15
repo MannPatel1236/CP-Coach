@@ -15,8 +15,8 @@ from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
 from data.preprocessor import Preprocessor
 from data.topic_graph import CPTopicGraph
-from db.connection import AsyncSessionLocal, User, KTState
-from routes.schemas import AnalyzeResponse, TopicProfileEntry
+from db.connection import AsyncSessionLocal, User, KTState, MasteryHistory
+from routes.schemas import AnalyzeResponse, MasteryHistoryResponse, TopicProfileEntry
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,11 @@ async def _analyze_lc(handle: str, mode: str, _controller):
 
 
 def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
-    """Compute mastery scores — try Graph-DKT, fallback to rule-based."""
+    """Compute mastery scores — try Graph-DKT, fallback to rule-based.
+
+    Returns (mastery_scores, model_used, model) — the model is returned so the
+    caller can gather temporal checkpoints (Phase 4b) from the same object.
+    """
     model_used = "rule_based"
     mastery_scores = {t["topic"]: t["solve_rate"] for t in _preprocessor.build_topic_profile(normalized_subs)}
 
@@ -129,7 +133,24 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     canonical = set(_topic_graph.TOPICS)
     mastery_scores = {k: v for k, v in mastery_scores.items() if k in canonical}
 
-    return mastery_scores, model_used
+    return mastery_scores, model_used, model
+
+
+def _compute_mastery_history(sequence, model) -> dict | None:
+    """Gather K temporal checkpoints from the model's forward pass (Phase 4b).
+
+    Returns None when no model ran (rule-based path) — the UI renders the
+    disabled caption. Never raises: prediction failures degrade to None.
+    """
+    if model is None or not sequence:
+        return None
+    if not hasattr(model, "predict_mastery_history"):
+        return None
+    try:
+        return model.predict_mastery_history(sequence, _topic_graph)
+    except Exception as e:
+        logger.warning("Mastery history prediction failed: %s", e)
+        return None
 
 
 async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[str, float]):
@@ -163,6 +184,60 @@ async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[st
         await session.commit()
 
 
+async def _persist_mastery_history(handle: str, platform: str, history: dict):
+    """Upsert temporal mastery checkpoints (Phase 4b). Non-blocking — log failures only."""
+    try:
+        async with AsyncSessionLocal() as session:
+            handle_col = User.cf_handle if platform == "cf" else User.lc_handle
+            stmt = select(User).where(handle_col.ilike(handle))
+            user = (await session.execute(stmt)).scalar_one_or_none()
+            if not user:
+                user = User(cf_handle=handle if platform == "cf" else None,
+                            lc_handle=handle if platform == "lc" else None,
+                            primary_platform=platform)
+                session.add(user)
+                await session.flush()
+
+            now = datetime.now(timezone.utc)
+            rows = [
+                {"user_id": user.id, "topic": t, "checkpoint_idx": i,
+                 "ts": cp.get("ts", 0), "p_mastery": cp.get("p", 0.0), "updated_at": now}
+                for t, cps in history.items()
+                for i, cp in enumerate(cps)
+            ]
+            if not rows:
+                return
+            stmt = pg_insert(MasteryHistory).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["user_id", "topic", "checkpoint_idx"],
+                set_={"ts": stmt.excluded.ts, "p_mastery": stmt.excluded.p_mastery,
+                      "updated_at": stmt.excluded.updated_at},
+            )
+            await session.execute(stmt)
+            await session.commit()
+    except Exception as e:
+        logger.warning("Failed to persist mastery_history for %s: %s", handle, e)
+
+
+async def _read_mastery_history(handle: str, platform: str) -> dict | None:
+    """O(read) snapshot read — never a model rollout (spec §7 item 2)."""
+    async with AsyncSessionLocal() as session:
+        handle_col = User.cf_handle if platform == "cf" else User.lc_handle
+        stmt = select(User).where(handle_col.ilike(handle))
+        user = (await session.execute(stmt)).scalar_one_or_none()
+        if not user:
+            return None
+        rows = (await session.execute(
+            select(MasteryHistory).where(MasteryHistory.user_id == user.id)
+        )).scalars().all()
+        if len(rows) == 0:  # pyright: ignore[reportGeneralTypeIssues]
+            return None
+        history = {}
+        for r in sorted(rows, key=lambda r: (r.topic, r.checkpoint_idx)):
+            history.setdefault(r.topic, []).append({"ts": r.ts or 0, "p": r.p_mastery})  # pyright: ignore[reportGeneralTypeIssues]
+        return history
+
+
 @router.get("/analyze/{handle}", response_model=AnalyzeResponse)
 @limiter.limit("30/minute")
 async def analyze(request: Request, handle: str, platform: str = Query("cf"), mode: str = Query("quick"), _auth: None = Depends(verify_hmac)):
@@ -192,7 +267,10 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
 
         # 3. Mastery scores (use pre-loaded model from startup)
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
-        mastery_scores, model_used = _compute_mastery(sequence, normalized_subs, preloaded_model=preloaded)
+        mastery_scores, model_used, model = _compute_mastery(sequence, normalized_subs, preloaded_model=preloaded)
+
+        # 3b. Temporal checkpoints (Phase 4b) — same forward pass, no new rollout
+        mastery_history = _compute_mastery_history(sequence, model) if model_used == "graph_dkt" else None
 
         user_rating = profile.get("rating") if isinstance(profile, dict) else None
 
@@ -201,6 +279,10 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
             await _persist_kt_states(handle, platform, mastery_scores)
         except Exception as e:
             logger.warning("Failed to persist kt_states for %s: %s", handle, e)
+
+        # 4b. Persist the checkpoint snapshot (non-blocking)
+        if mastery_history:
+            await _persist_mastery_history(handle, platform, mastery_history)
 
         return AnalyzeResponse(
             handle=handle,
@@ -220,8 +302,43 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
             mastery_scores=mastery_scores,
             model_used=model_used,
             total_submissions=len(subs),
+            mastery_history=mastery_history,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("/mastery-history/{handle}", response_model=MasteryHistoryResponse)
+@limiter.limit("30/minute")
+async def mastery_history(
+    request: Request,
+    handle: str,
+    platform: str = Query("cf"),
+    _auth: None = Depends(verify_hmac),
+):
+    """Read the persisted checkpoint snapshot — O(read), never a model rollout.
+
+    Empty snapshot → mastery_history: null + note (never an error; the frontend
+    renders a caption per spec §5.2 #6).
+    """
+    verify_handle_signature(
+        handle=handle,
+        authorization=request.headers.get("Authorization"),
+        x_timestamp=request.headers.get("X-Timestamp"),
+    )
+    try:
+        history = await _read_mastery_history(handle, platform)
+        if history is None:
+            return MasteryHistoryResponse(
+                handle=handle, platform=platform, mastery_history=None,
+                note="No mastery history yet — run a deep analyze while Graph-DKT is loaded.",
+            )
+        return MasteryHistoryResponse(handle=handle, platform=platform, mastery_history=history)
+    except Exception as e:
+        logger.warning("Mastery history read failed for %s: %s", handle, e)
+        return MasteryHistoryResponse(
+            handle=handle, platform=platform, mastery_history=None,
+            note="Mastery history is temporarily unavailable.",
+        )

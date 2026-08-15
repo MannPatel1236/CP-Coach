@@ -72,6 +72,10 @@ class Preprocessor:
                     "timestamp_delta": max(delta, 0.0),
                     "weight": weight,
                     "platform": sub.get("platform", "cf"),
+                    # Raw ms timestamp — additive; collate_fn ignores it. Used by
+                    # GraphDKTModel.predict_mastery_history (Phase 4b) to date the
+                    # temporal checkpoints.
+                    "timestamp": sub.get("timestamp", 0),
                 })
         return sequence
 

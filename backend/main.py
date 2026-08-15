@@ -41,6 +41,22 @@ class _GraphDKTEnsemble:
                 acc[k] = acc.get(k, 0.0) + v
         return {k: v / len(self.folds) for k, v in acc.items()}
 
+    def predict_mastery_history(self, sequence, topic_graph, n_checkpoints: int = 8, device="cpu") -> dict[str, list[dict]]:
+        """Phase 4b: per-checkpoint mean across folds (timestamps align — same sequence)."""
+        acc = {t: [] for t in topic_graph.TOPICS}
+        for f in self.folds:
+            hist = f.predict_mastery_history(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)
+            for k, v in hist.items():
+                acc[k].append(v)
+        merged = {}
+        for k, per_fold in acc.items():
+            n = len(per_fold[0]) if per_fold else 0
+            merged[k] = [
+                {"ts": per_fold[0][i]["ts"], "p": sum(f[i]["p"] for f in per_fold) / len(per_fold)}
+                for i in range(n)
+            ]
+        return merged
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

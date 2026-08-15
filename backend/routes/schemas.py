@@ -107,6 +107,21 @@ class GraphResponse(BaseModel):
     edges: list[GraphEdge] = Field(default_factory=list)
 
 
+# ── Mastery history (Phase 4b) ────────────────────────────────────────────────
+
+
+class MasteryCheckpoint(BaseModel):
+    ts: int = 0
+    p: float
+
+
+class MasteryHistoryResponse(BaseModel):
+    handle: str
+    platform: str
+    mastery_history: dict[str, list[MasteryCheckpoint]] | None = None
+    note: str | None = None
+
+
 # ── Analyze (CF, LC normal) ──────────────────────────────────────────────────
 
 
@@ -129,6 +144,8 @@ class AnalyzeResponse(BaseModel):
     mastery_scores: dict[str, float] = Field(default_factory=dict)
     model_used: str = "rule_based"
     total_submissions: int = 0
+    # Phase 4b: temporal checkpoints when Graph-DKT ran; null on rule-based paths
+    mastery_history: dict[str, list[MasteryCheckpoint]] | None = None
     # Stats-only fields (unused for CF, present for LC stats_only variant)
     note: str | None = None
 

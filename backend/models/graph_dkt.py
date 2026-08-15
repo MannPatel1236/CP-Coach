@@ -199,6 +199,38 @@ else:
             last_pred = predictions[0, last_idx]
             return {topic_graph.idx_to_topic[i]: last_pred[i].item() for i in range(self.num_topics)}
 
+        def predict_mastery_history(self, sequence: list[dict], topic_graph, n_checkpoints: int = 8, device="cpu") -> dict[str, list[dict]]:
+            """Gather K temporal mastery checkpoints from the same forward pass.
+
+            Greenhouse Phase 4b: ``mastery_t`` rows are sampled at ``n_checkpoints``
+            evenly spaced row indices (last index = current mastery, matching
+            ``predict_mastery``), each dated by the sequence row's ``timestamp``
+            (added to sequence rows by the preprocessor — additive key).
+
+            Returns ``{topic: [{"ts": ms, "p": float}, ...]}`` — 29 topics × K.
+            """
+            if not sequence:
+                return {topic: [] for topic in topic_graph.TOPICS}
+            self.eval()
+            self.to(device)
+            batch = collate_fn([sequence], topic_graph)
+            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            with torch.no_grad():
+                _, mastery_t = self.forward(batch)
+            T = mastery_t.shape[1]
+            # Evenly spaced indices (deduped so short sequences never repeat a row)
+            if n_checkpoints <= 1:
+                idxs = [T - 1]
+            else:
+                idxs = list(dict.fromkeys(round(i * (T - 1) / (n_checkpoints - 1)) for i in range(n_checkpoints)))
+            checkpoints = [[] for _ in range(self.num_topics)]
+            for idx in idxs:
+                row = mastery_t[0, idx]
+                ts = int(sequence[idx].get("timestamp", 0))
+                for j in range(self.num_topics):
+                    checkpoints[j].append({"ts": ts, "p": row[j].item()})
+            return {topic_graph.idx_to_topic[j]: checkpoints[j] for j in range(self.num_topics)}
+
         def get_graph_influence(self, topic: str, topic_graph) -> dict[str, float]:
             """Approximate prerequisite influence via degree-normalized adjacency."""
             prereqs = topic_graph.get_prerequisites(topic)
