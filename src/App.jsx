@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import useAnalysis from "./hooks/useAnalysis.js";
 import useRecommendations from "./hooks/useRecommendations.js";
@@ -7,6 +7,7 @@ import { AnalysisContext } from "./hooks/AnalysisContext.jsx";
 
 import Header from "./components/Header.jsx";
 import SearchBar from "./components/SearchBar.jsx";
+import DashboardNav from "./components/DashboardNav.jsx";
 import ProfileCard from "./components/ProfileCard.jsx";
 import WeakAreas from "./components/WeakAreas.jsx";
 import TagOverview from "./components/TagOverview.jsx";
@@ -26,6 +27,13 @@ import LoadingState from "./components/LoadingState.jsx";
 import ErrorState from "./components/ErrorState.jsx";
 import SuccessBanner from "./components/SuccessBanner.jsx";
 import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
+
+const DASH_PANEL_IDS = ["practice", "analytics", "compare", "workbook"];
+
+const sanitizeTab = (raw) => {
+  const tab = String(raw || "").replace(/^#/, "").toLowerCase().trim();
+  return DASH_PANEL_IDS.includes(tab) ? tab : "practice";
+};
 
 export default function App() {
   const analysis = useAnalysis();
@@ -75,9 +83,30 @@ export default function App() {
     if (key === "3") setCombinedPlatform(!combinedPlatform);
   };
 
+  const [activeTab, setActiveTab] = useState(() => sanitizeTab(window.location.hash));
+
+  const switchTab = useCallback((tab) => {
+    const next = sanitizeTab(tab);
+    setActiveTab(next);
+    window.history.replaceState(null, "", "#" + next);
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    const onHash = () => setActiveTab(sanitizeTab(window.location.hash));
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  // Escape / home reset the analysis AND the view; clearAll itself stays untouched.
+  const handleClear = useCallback(() => {
+    clearAll();
+    switchTab("practice");
+  }, [clearAll, switchTab]);
+
   useKeyboardShortcuts({
     onFocusSearch: focusSearch,
-    onClear: clearAll,
+    onClear: handleClear,
     onPlatformToggle: handlePlatformToggle,
     disabled: !user,
   });
@@ -115,10 +144,14 @@ export default function App() {
       >
         Skip to content
       </a>
-      <Header onHome={clearAll} />
+      <Header onHome={handleClear} />
 
       {user && (
         <SearchBar />
+      )}
+
+      {user && (
+        <DashboardNav activeTab={activeTab} onSelectTab={switchTab} />
       )}
 
       {(loading || fetchingRecs) && (
@@ -132,71 +165,109 @@ export default function App() {
       )}
 
       {user && (
-        <main
-          id="main-content"
-          className="fade-in dashboard-grid dashboard-layout"
-        >
-          <div className="column-panel" style={{ minWidth: 0 }}>
-            {combinedPlatform && cfUser && lcUser ? (
-              <>
+        <main id="main-content" className="fade-in">
+          <section
+            id="panel-practice"
+            role="tabpanel"
+            aria-labelledby="tab-practice"
+            className="dash-panel dashboard-grid dashboard-layout"
+            hidden={activeTab !== "practice"}
+            inert={activeTab === "practice" ? undefined : ""}
+          >
+            <div className="column-panel" style={{ minWidth: 0 }}>
+              {combinedPlatform && cfUser && lcUser ? (
+                <>
+                  <ProfileCard user={cfUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+                  <ProfileCard user={lcUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+                </>
+              ) : combinedPlatform && cfUser ? (
                 <ProfileCard user={cfUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
+              ) : combinedPlatform && lcUser ? (
                 <ProfileCard user={lcUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
-              </>
-            ) : combinedPlatform && cfUser ? (
-              <ProfileCard user={cfUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
-            ) : combinedPlatform && lcUser ? (
-              <ProfileCard user={lcUser} tagCount={tagProfile.length} weakCount={weakTags.length} />
-            ) : (
-              <ProfileCard user={user} tagCount={tagProfile.length} weakCount={weakTags.length} />
-            )}
-            <WeakAreas weakTags={weakTags} selectedTag={activeWeakTag} onSelectTag={selectWeakTag} />
-            <TagOverview tags={tagProfile} />
-          </div>
+              ) : (
+                <ProfileCard user={user} tagCount={tagProfile.length} weakCount={weakTags.length} />
+              )}
+              <WeakAreas weakTags={weakTags} selectedTag={activeWeakTag} onSelectTag={selectWeakTag} />
+              <TagOverview tags={tagProfile} />
+            </div>
 
-          <div className="column-panel" style={{ minWidth: 0 }}>
-            {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
-            {user && <SkillFrontier />}
+            <div className="column-panel" style={{ minWidth: 0 }}>
+              {user && <SkillFrontier />}
 
-            {cfUser && <RatingTrajectory />}
+              {tagProfile.length > 0 && weakTags.length === 0 && <SuccessBanner />}
 
-            <MasteryHistory />
-
-            <ActivityHeatmap />
-
-            {tagProfile.length > 0 && weakTags.length === 0 && <SuccessBanner />}
-
-            {suggestedTopics.length > 0 && weakTags.length === 0 && (
-              <TopicPicker
-                topics={suggestedTopics}
-                selected={selectedTopics}
-                onToggle={toggleTopic}
-                onConfirm={fetchForSelectedTopics}
-                loading={fetchingRecs}
-              />
-            )}
-
-            <AnimatePresence>
-              {recommendations.length > 0 && (
-                <Recommendations
-                  recs={recommendations}
-                  userRating={cfUser?.rating || lcUser?.rating || user?.rating || 800}
-                  selectedTopics={selectedTopics}
+              {suggestedTopics.length > 0 && weakTags.length === 0 && (
+                <TopicPicker
+                  topics={suggestedTopics}
+                  selected={selectedTopics}
+                  onToggle={toggleTopic}
+                  onConfirm={fetchForSelectedTopics}
+                  loading={fetchingRecs}
                 />
               )}
-            </AnimatePresence>
 
-            {recommendations.length > 0 && (
-              <WhyThisRec />
-            )}
+              <AnimatePresence>
+                {recommendations.length > 0 && (
+                  <Recommendations
+                    recs={recommendations}
+                    userRating={cfUser?.rating || lcUser?.rating || user?.rating || 800}
+                    selectedTopics={selectedTopics}
+                  />
+                )}
+              </AnimatePresence>
 
-            {tagProfile.length > 0 && (
-              <ModelInsight topicProfile={tagProfile} selectedTopics={selectedTopics} />
-            )}
+              {recommendations.length > 0 && (
+                <WhyThisRec />
+              )}
 
-            {user && <CompareHandles />}
+              {tagProfile.length > 0 && (
+                <ModelInsight topicProfile={tagProfile} selectedTopics={selectedTopics} />
+              )}
+            </div>
+          </section>
 
-            {user && <Workbook />}
-          </div>
+          <section
+            id="panel-analytics"
+            role="tabpanel"
+            aria-labelledby="tab-analytics"
+            className="dash-panel dashboard-grid dashboard-layout"
+            hidden={activeTab !== "analytics"}
+            inert={activeTab === "analytics" ? undefined : ""}
+          >
+            <div className="column-panel" style={{ minWidth: 0 }}>
+              {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
+            </div>
+
+            <div className="column-panel" style={{ minWidth: 0 }}>
+              {cfUser && <RatingTrajectory />}
+
+              <MasteryHistory />
+
+              <ActivityHeatmap />
+            </div>
+          </section>
+
+          <section
+            id="panel-compare"
+            role="tabpanel"
+            aria-labelledby="tab-compare"
+            className="dash-panel dashboard-single-col"
+            hidden={activeTab !== "compare"}
+            inert={activeTab === "compare" ? undefined : ""}
+          >
+            <CompareHandles />
+          </section>
+
+          <section
+            id="panel-workbook"
+            role="tabpanel"
+            aria-labelledby="tab-workbook"
+            className="dash-panel dashboard-single-col"
+            hidden={activeTab !== "workbook"}
+            inert={activeTab === "workbook" ? undefined : ""}
+          >
+            <Workbook />
+          </section>
         </main>
       )}
       <PrivacyPolicy />
