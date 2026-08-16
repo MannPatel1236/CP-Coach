@@ -17,12 +17,10 @@ export default function CompareHandles() {
   const { cfHandle, lcHandle, user, cfUser, lcUser, masteryScoresRef, solvedSet, modelUsed } = useAnalysisContext();
   const { target, result, loading, error, run, clear } = useCompareHandle();
   const [input, setInput] = useState("");
-  const [platform, setPlatform] = useState("cf");
-
-  const isCombined = Boolean(cfUser && lcUser);
   const primaryPlatform = cfUser ? "cf" : lcUser ? "lc" : user?.platform === "lc" ? "lc" : "cf";
+  const [platform, setPlatform] = useState(primaryPlatform);
   const primaryLabel = cfHandle || lcHandle || user?.handle || "";
-  const secondaryPlatform = isCombined ? platform : primaryPlatform;
+  const secondaryPlatform = platform;
 
   // Primary mastery read directly from the context ref (same pattern as SkillFrontier):
   // useAnalysis mutates masteryScoresRef immediately before setModelUsed() → the paired
@@ -72,17 +70,16 @@ export default function CompareHandles() {
             placeholder="second handle"
             style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
           />
-          {isCombined && (
-            <select
-              data-testid="compare-platform"
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
-            >
-              <option value="cf">cf</option>
-              <option value="lc">lc</option>
-            </select>
-          )}
+          <select
+            data-testid="compare-platform"
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value)}
+            style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+          >
+            <option value="cf">cf</option>
+            <option value="lc">lc</option>
+            <option value="both">cf+lc</option>
+          </select>
           <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
             Compare
           </button>

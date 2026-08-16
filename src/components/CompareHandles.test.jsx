@@ -79,6 +79,32 @@ describe("CompareHandles — §5.2 #8", () => {
     expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
   });
 
+  it("supports cf+lc 'both' — parallel fetch, merged mastery + solved sets", async () => {
+    const LC_SECONDARY = {
+      ...SECONDARY,
+      platform: "lc",
+      mastery_scores: { ...SECONDARY.mastery_scores, dp: 0.90, geometry: 0.60 },
+      topic_profile: [{ topic: "dp", solved_problems: ["lc-dp-1"] }],
+    };
+    globalThis.fetch.mockImplementation((url) => {
+      if (String(url).includes("platform=lc")) return Promise.resolve(okResponse(LC_SECONDARY));
+      return Promise.resolve(okResponse(SECONDARY));
+    });
+    const { container, getByTestId } = renderInContext(<CompareHandles />);
+    fireEvent.change(getByTestId("compare-platform"), { target: { value: "both" } });
+    await typeAndCompare(getByTestId, "tourist");
+
+    await waitFor(() => {
+      expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2); // cf + lc in parallel
+    // Merged solved sets: 2 cf (cf-1A, cf-2B) + 1 lc (lc-dp-1) exclusive to tourist.
+    expect(getByTestId("compare-summary").textContent).toContain("tourist solved 3 mannpatel hasn't");
+    // dp only exists on the lc side → delta = primary dp 0.58 − secondary 0.90 = −0.320
+    const dp = container.querySelector("[data-topic='dp']");
+    expect(dp.getAttribute("data-delta")).toBe("-0.320");
+  });
+
   it("does not fetch until a second handle is typed", async () => {
     const { getByTestId } = renderInContext(<CompareHandles />);
     getByTestId("compare-analyze").click();
