@@ -8,7 +8,7 @@ beforeEach(() => { globalThis.fetch = vi.fn(); });
 afterEach(() => { globalThis.fetch = originalFetch; });
 
 // Secondary handle analyzed as "cf": mastery differs from the fixture primary on
-// binary_search (0.20 → 0.45, +0.25 up) and geometry (0.25 → 0.15, −0.10 down).
+// binary_search (0.20 → 0.45, primary −0.25 down) and geometry (0.25 → 0.15, primary +0.10 up).
 const SECONDARY = {
   handle: "tourist", platform: "cf", rating: 1800, rank: "master",
   model_used: "graph_dkt",
@@ -53,9 +53,9 @@ describe("CompareHandles — §5.2 #8", () => {
       expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
     });
     const binary = container.querySelector("[data-topic='binary_search']");
-    expect(binary.getAttribute("data-delta")).toBe("0.250"); // +0.25 up
+    expect(binary.getAttribute("data-delta")).toBe("-0.250"); // tourist up → primary −0.25
     const geometry = container.querySelector("[data-topic='geometry']");
-    expect(geometry.getAttribute("data-delta")).toBe("-0.100"); // −0.10 down
+    expect(geometry.getAttribute("data-delta")).toBe("0.100"); // primary up +0.10
     const summary = getByTestId("compare-summary").textContent;
     expect(summary).toContain("tourist leads");
     expect(summary).toContain("tourist solved 2 mannpatel hasn't"); // tourist solved 2 that mannpatel hasn't

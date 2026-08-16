@@ -230,21 +230,17 @@ export default function App() {
             id="panel-analytics"
             role="tabpanel"
             aria-labelledby="tab-analytics"
-            className="dash-panel dashboard-grid dashboard-layout"
+            className="dash-panel dashboard-single-col"
             hidden={activeTab !== "analytics"}
             inert={activeTab === "analytics" ? undefined : ""}
           >
-            <div className="column-panel" style={{ minWidth: 0 }}>
-              {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
-            </div>
+            {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
 
-            <div className="column-panel" style={{ minWidth: 0 }}>
-              {cfUser && <RatingTrajectory />}
+            {cfUser && <RatingTrajectory />}
 
-              <MasteryHistory />
+            <MasteryHistory />
 
-              <ActivityHeatmap />
-            </div>
+            <ActivityHeatmap />
           </section>
 
           <section

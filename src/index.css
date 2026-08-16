@@ -594,6 +594,9 @@ body {
 }
 
 .dashboard-single-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   max-width: var(--dash-max);
   margin: 0 auto;
   padding: 24px 48px 80px;

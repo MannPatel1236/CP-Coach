@@ -131,7 +131,8 @@ function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, est
     const a = primaryMastery[t];
     const b = secondary.mastery[t];
     if (a === undefined || b === undefined) continue;
-    const delta = b - a;
+    // delta = primary − secondary → "+" (green) always means the PRIMARY handle leads.
+    const delta = a - b;
     if (Math.abs(delta) < 0.001) continue;
     deltas.push({ topic: t, delta });
   }
@@ -142,8 +143,8 @@ function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, est
 
   const aLabel = primaryLabel || "A";
   const bLabel = secondary.handle || "B";
-  const leadsA = deltas.filter((d) => d.delta <= -LEAD_DELTA).length;
-  const leadsB = deltas.filter((d) => d.delta >= LEAD_DELTA).length;
+  const leadsA = deltas.filter((d) => d.delta >= LEAD_DELTA).length;
+  const leadsB = deltas.filter((d) => d.delta <= -LEAD_DELTA).length;
 
   const maxAbs = Math.max(0.0001, ...deltas.map((d) => Math.abs(d.delta)));
 
