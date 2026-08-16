@@ -79,9 +79,10 @@ describe("CompareHandles — §5.2 #8", () => {
     expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
   });
 
-  it("supports cf+lc 'both' — parallel fetch, merged mastery + solved sets", async () => {
+  it("supports cf+lc 'both' with separate handles — parallel fetch, merged mastery + solved sets", async () => {
     const LC_SECONDARY = {
       ...SECONDARY,
+      handle: "tourist_lc",
       platform: "lc",
       mastery_scores: { ...SECONDARY.mastery_scores, dp: 0.90, geometry: 0.60 },
       topic_profile: [{ topic: "dp", solved_problems: ["lc-dp-1"] }],
@@ -92,17 +93,36 @@ describe("CompareHandles — §5.2 #8", () => {
     });
     const { container, getByTestId } = renderInContext(<CompareHandles />);
     fireEvent.change(getByTestId("compare-platform"), { target: { value: "both" } });
-    await typeAndCompare(getByTestId, "tourist");
+    fireEvent.change(getByTestId("compare-input"), { target: { value: "tourist" } });
+    fireEvent.change(getByTestId("compare-input-lc"), { target: { value: "tourist_lc" } });
+    fireEvent.click(getByTestId("compare-analyze"));
 
     await waitFor(() => {
       expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
     });
     expect(globalThis.fetch).toHaveBeenCalledTimes(2); // cf + lc in parallel
     // Merged solved sets: 2 cf (cf-1A, cf-2B) + 1 lc (lc-dp-1) exclusive to tourist.
-    expect(getByTestId("compare-summary").textContent).toContain("tourist solved 3 mannpatel hasn't");
+    expect(getByTestId("compare-summary").textContent).toContain("tourist / tourist_lc solved 3 mannpatel hasn't");
     // dp only exists on the lc side → delta = primary dp 0.58 − secondary 0.90 = −0.320
     const dp = container.querySelector("[data-topic='dp']");
     expect(dp.getAttribute("data-delta")).toBe("-0.320");
+  });
+
+  it("'both' tolerates an empty LC side — falls back to cf-only", async () => {
+    globalThis.fetch.mockImplementation((url) => {
+      if (String(url).includes("platform=lc")) return Promise.resolve({ ok: false, status: 404 });
+      return Promise.resolve(okResponse(SECONDARY));
+    });
+    const { container, getByTestId } = renderInContext(<CompareHandles />);
+    fireEvent.change(getByTestId("compare-platform"), { target: { value: "both" } });
+    fireEvent.change(getByTestId("compare-input"), { target: { value: "tourist" } });
+    fireEvent.click(getByTestId("compare-analyze"));
+
+    await waitFor(() => {
+      expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1); // lc side empty → skipped, no fetch
+    expect(getByTestId("compare-summary").textContent).toContain("tourist solved 2 mannpatel hasn't");
   });
 
   it("does not fetch until a second handle is typed", async () => {

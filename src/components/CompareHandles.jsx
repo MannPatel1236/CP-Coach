@@ -17,6 +17,7 @@ export default function CompareHandles() {
   const { cfHandle, lcHandle, user, cfUser, lcUser, masteryScoresRef, solvedSet, modelUsed } = useAnalysisContext();
   const { target, result, loading, error, run, clear } = useCompareHandle();
   const [input, setInput] = useState("");
+  const [lcInput, setLcInput] = useState("");
   const primaryPlatform = cfUser ? "cf" : lcUser ? "lc" : user?.platform === "lc" ? "lc" : "cf";
   const [platform, setPlatform] = useState(primaryPlatform);
   const primaryLabel = cfHandle || lcHandle || user?.handle || "";
@@ -44,9 +45,16 @@ export default function CompareHandles() {
   }
 
   const runCompare = () => {
+    if (platform === "both") {
+      if (!input.trim() && !lcInput.trim()) return;
+      run({ cf: input, lc: lcInput }, "both");
+      return;
+    }
     if (!input.trim()) return;
     run(input, secondaryPlatform);
   };
+
+  const inputStyle = { flex: "1 1 150px", minWidth: 110, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" };
 
   const onKeyDown = (e) => {
     if (e.key === "Enter") runCompare();
@@ -62,14 +70,35 @@ export default function CompareHandles() {
             {primaryLabel || "primary"}
           </span>
           <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>vs</span>
-          <input
-            data-testid="compare-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="second handle"
-            style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
-          />
+          {platform === "both" ? (
+            <div style={{ display: "flex", gap: 8, flex: "1 1 300px", flexWrap: "wrap" }}>
+              <input
+                data-testid="compare-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="CF handle"
+                style={inputStyle}
+              />
+              <input
+                data-testid="compare-input-lc"
+                value={lcInput}
+                onChange={(e) => setLcInput(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="LC handle (optional)"
+                style={inputStyle}
+              />
+            </div>
+          ) : (
+            <input
+              data-testid="compare-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="second handle"
+              style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+            />
+          )}
           <select
             data-testid="compare-platform"
             value={platform}
@@ -87,7 +116,9 @@ export default function CompareHandles() {
 
         {loading && !result && (
           <div data-testid="compare-loading" style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
-            Analyzing {input || "second handle"}…
+            {platform === "both"
+              ? `Analyzing ${[input.trim(), lcInput.trim()].filter(Boolean).join(" / ") || "handles"}…`
+              : `Analyzing ${input || "second handle"}…`}
           </div>
         )}
 

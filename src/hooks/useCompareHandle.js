@@ -26,14 +26,13 @@ export default function useCompareHandle() {
     };
   }, []);
 
-  const run = useCallback(async (handle, platform, mode = "quick") => {
-    const trimmed = (handle || "").trim();
-    if (!trimmed) return;
+  const run = useCallback(async (handles, platform, mode = "quick") => {
     resetAbort();
     const controller = abortRef.current;
     setLoading(true);
     setError("");
     try {
+      const trimmed = String(handles && typeof handles === "object" ? handles.cf || "" : handles || "").trim();
       const build = (data, p) => {
         const solvedSet = new Set();
         for (const t of data.topic_profile || []) {
@@ -51,34 +50,40 @@ export default function useCompareHandle() {
       };
 
       if (platform === "both") {
-        // Parallel cf + lc; tolerate a missing profile on one side (allSettled).
-        const settled = await Promise.allSettled([
-          analyzeHandle(trimmed, "cf", mode, controller.signal),
-          analyzeHandle(trimmed, "lc", mode, controller.signal),
-        ]);
+        // Handles differ per platform: {cf, lc}. Empty sides are skipped; a
+        // missing profile on one side is tolerated (allSettled).
+        const requests = [];
+        if (handles.cf?.trim()) requests.push(["cf", handles.cf.trim()]);
+        if (handles.lc?.trim()) requests.push(["lc", handles.lc.trim()]);
+        if (requests.length === 0) return;
+        const settled = await Promise.allSettled(
+          requests.map(([p, h]) => analyzeHandle(h, p, mode, controller.signal))
+        );
         if (controller.signal.aborted) return;
-        const fulfilled = settled
-          .filter((s) => s.status === "fulfilled")
-          .map((s) => s.value);
-        if (fulfilled.length === 0) {
+        const parts = [];
+        for (let i = 0; i < settled.length; i++) {
+          if (settled[i].status === "fulfilled") parts.push(build(settled[i].value, requests[i][0]));
+        }
+        if (parts.length === 0) {
           const first = settled.find((s) => s.status === "rejected");
           throw first ? first.reason : new Error("Failed to analyze the second handle.");
         }
-        const parts = fulfilled.map((d, i) => build(d, i === 0 ? "cf" : "lc"));
-        const bothModels = parts.every((p) => p.modelUsed === "graph_dkt");
-        setTarget(trimmed);
+        const allGraphDkt = parts.every((p) => p.modelUsed === "graph_dkt");
+        const targetLabel = parts.map((p) => p.handle).join(" / ");
+        setTarget(targetLabel);
         setResult({
-          handle: trimmed,
+          handle: targetLabel,
           platform: parts.length === 2 ? "cf+lc" : parts[0].platform,
           rating: parts[0].rating ?? parts[1]?.rating ?? null,
           rank: parts[0].rank || parts[1]?.rank || null,
           mastery: { ...parts[0].mastery, ...(parts[1] ? parts[1].mastery : {}) },
           solvedSet: new Set(parts.flatMap((p) => [...p.solvedSet])),
-          modelUsed: bothModels ? "graph_dkt" : "rule_based",
+          modelUsed: allGraphDkt ? "graph_dkt" : "rule_based",
         });
         return;
       }
 
+      if (!trimmed) return;
       const data = await analyzeHandle(trimmed, platform, mode, controller.signal);
       if (controller.signal.aborted) return;
       setTarget(trimmed);
