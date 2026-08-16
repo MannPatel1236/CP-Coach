@@ -10,34 +10,52 @@ import {
 } from "../api.js";
 import { analyzeHandle, getRecommendations, getRecommendationsWithMastery } from "../api/backendClient.js";
 
+// Analysis snapshot persistence: a refresh restores the dashboard instead of the
+// landing page. Best-effort — storage-full/private-mode failures are swallowed.
+const SNAPSHOT_KEY = "cpcoach.analysis";
+let cachedSnapshot = null;
+const getSnapshot = () => {
+  if (cachedSnapshot) return cachedSnapshot;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SNAPSHOT_KEY);
+    if (!raw) return null;
+    cachedSnapshot = JSON.parse(raw);
+    return cachedSnapshot && cachedSnapshot.user ? cachedSnapshot : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function useAnalysis() {
-  const [handle, setHandle] = useState("");
-  const [cfHandle, setCfHandle] = useState("");
-  const [lcHandle, setLcHandle] = useState("");
+  const snap = getSnapshot();
+  const [handle, setHandle] = useState(() => snap?.handle || "");
+  const [cfHandle, setCfHandle] = useState(() => snap?.cfHandle || "");
+  const [lcHandle, setLcHandle] = useState(() => snap?.lcHandle || "");
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState("");
-  const [modelUsed, setModelUsed] = useState(null);  // §8: mastery provenance ("graph_dkt" | "rule_based" | "stats_only" | null)
+  const [modelUsed, setModelUsed] = useState(() => snap?.modelUsed || null);  // §8: mastery provenance ("graph_dkt" | "rule_based" | "stats_only" | null)
 
-  const [user, setUser] = useState(null);
-  const [cfUser, setCfUser] = useState(null);
-  const [lcUser, setLcUser] = useState(null);
-  const [tagProfile, setTagProfile] = useState([]);
-  const [weakTags, setWeakTags] = useState([]);
-  const [solvedSet, setSolvedSet] = useState(new Set());
+  const [user, setUser] = useState(() => snap?.user || null);
+  const [cfUser, setCfUser] = useState(() => snap?.cfUser || null);
+  const [lcUser, setLcUser] = useState(() => snap?.lcUser || null);
+  const [tagProfile, setTagProfile] = useState(() => snap?.tagProfile || []);
+  const [weakTags, setWeakTags] = useState(() => snap?.weakTags || []);
+  const [solvedSet, setSolvedSet] = useState(() => new Set(snap?.solvedSet || []));
 
-  const [suggestedTopics, setSuggestedTopics] = useState([]);
-  const [analysisMode, setAnalysisMode] = useState("quick");
-  const [platform, setPlatform] = useState("cf");
-  const [combinedPlatform, setCombinedPlatform] = useState(false);
+  const [suggestedTopics, setSuggestedTopics] = useState(() => snap?.suggestedTopics || []);
+  const [analysisMode, setAnalysisMode] = useState(() => snap?.analysisMode || "quick");
+  const [platform, setPlatform] = useState(() => snap?.platform || "cf");
+  const [combinedPlatform, setCombinedPlatform] = useState(() => snap?.combinedPlatform || false);
 
   const abortRef = useRef(null);
 
   // Refs to pass initial recommendations from analyze() to useRecommendations
-  const analysisRecommendationsRef = useRef([]);
-  const analysisSelectedTopicsRef = useRef([]);
-  const analysisActiveWeakTagRef = useRef(null);
-  const masteryScoresRef = useRef({});
+  const analysisRecommendationsRef = useRef(snap?.analysisRecommendations || []);
+  const analysisSelectedTopicsRef = useRef(snap?.analysisSelectedTopics || []);
+  const analysisActiveWeakTagRef = useRef(snap?.analysisActiveWeakTag || null);
+  const masteryScoresRef = useRef(snap?.masteryScores || {});
 
   const resetAbort = useCallback(() => {
     if (abortRef.current) {
@@ -55,8 +73,34 @@ export default function useAnalysis() {
     };
   }, []);
 
+  // Persist the resolved analysis so a refresh restores the dashboard + hash tab.
+  useEffect(() => {
+    if (!user) return;
+    const snapshot = {
+      handle, cfHandle, lcHandle,
+      user, cfUser, lcUser,
+      tagProfile, weakTags, suggestedTopics,
+      solvedSet: [...solvedSet],
+      analysisMode, platform, combinedPlatform, modelUsed,
+      masteryScores: masteryScoresRef.current,
+      analysisRecommendations: analysisRecommendationsRef.current,
+      analysisSelectedTopics: analysisSelectedTopicsRef.current,
+      analysisActiveWeakTag: analysisActiveWeakTagRef.current,
+    };
+    try {
+      window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch {
+      // persistence is best-effort
+    }
+  }, [user, handle, cfHandle, lcHandle, cfUser, lcUser, tagProfile, weakTags, suggestedTopics, solvedSet, analysisMode, platform, combinedPlatform, modelUsed]);
+
   const clearAll = useCallback(() => {
     resetAbort();
+    try {
+      window.localStorage.removeItem(SNAPSHOT_KEY);
+    } catch {
+      // ignore
+    }
     setUser(null);
     setCfUser(null);
     setLcUser(null);

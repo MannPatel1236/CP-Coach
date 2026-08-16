@@ -8,7 +8,7 @@ const appSrc = readFileSync(join(process.cwd(), "src", "App.jsx"), "utf8");
 
 describe("Greenhouse Phase 2 — model_used + masteryScoresRef plumbing", () => {
   it("useAnalysis declares modelUsed state and exposes it in the return", () => {
-    expect(useAnalysisSrc).toMatch(/const \[modelUsed, setModelUsed\] = useState\(null\)/);
+    expect(useAnalysisSrc).toMatch(/const \[modelUsed, setModelUsed\] = useState\(\(\) => snap\?\.modelUsed \|\| null\)/);
     const returnStart = useAnalysisSrc.indexOf("return {");
     expect(returnStart).toBeGreaterThan(-1);
     expect(useAnalysisSrc.slice(returnStart)).toContain("modelUsed");

@@ -3,7 +3,7 @@
 // analysis — never in primary context). Fallback: either handle fails → show the
 // resolved side + "second handle unavailable" chip; rule_based mastery on either
 // side is badged per §8 before diff coloring. Sibling text summary (§9).
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { UserIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
@@ -16,12 +16,23 @@ const LEAD_DELTA = 0.05;
 export default function CompareHandles() {
   const { cfHandle, lcHandle, user, cfUser, lcUser, masteryScoresRef, solvedSet, modelUsed } = useAnalysisContext();
   const { target, result, loading, error, run, clear } = useCompareHandle();
+  const primaryCmp = useCompareHandle();
   const [input, setInput] = useState("");
   const [lcInput, setLcInput] = useState("");
+  const [pCfInput, setPCfInput] = useState("");
+  const [pLcInput, setPLcInput] = useState("");
   const primaryPlatform = cfUser ? "cf" : lcUser ? "lc" : user?.platform === "lc" ? "lc" : "cf";
   const [platform, setPlatform] = useState(primaryPlatform);
   const primaryLabel = cfHandle || lcHandle || user?.handle || "";
   const secondaryPlatform = platform;
+
+  // In "both" mode the PRIMARY side also gets cf/lc inputs, prefilled from the
+  // analyzed context (editable — e.g. when the primary was analyzed cf-only).
+  useEffect(() => {
+    if (platform !== "both") return;
+    setPCfInput((v) => v || (cfHandle || user?.handle?.split(" / ")[0] || ""));
+    setPLcInput((v) => v || (lcHandle || ""));
+  }, [platform, cfHandle, lcHandle, user]);
 
   // Primary mastery read directly from the context ref (same pattern as SkillFrontier):
   // useAnalysis mutates masteryScoresRef immediately before setModelUsed() → the paired
@@ -29,7 +40,26 @@ export default function CompareHandles() {
   // eslint-disable-next-line react-hooks/refs
   const primaryMastery = (masteryScoresRef && masteryScoresRef.current) || {};
   const primarySolved = solvedSet || new Set();
-  const isEstimate = modelUsed !== "graph_dkt" || (result && result.modelUsed !== "graph_dkt");
+  const primarySide = (() => {
+    if (platform === "both" && primaryCmp.result) {
+      // Fetched platforms override the context refs; empty platforms fall back to
+      // the analyzed context (e.g. cf-only primary + freshly typed LC handle).
+      return {
+        handle: primaryCmp.result.handle,
+        mastery: { ...primaryMastery, ...primaryCmp.result.mastery },
+        solvedSet: new Set([...primarySolved, ...primaryCmp.result.solvedSet]),
+        modelUsed: primaryCmp.result.modelUsed,
+      };
+    }
+    return { handle: primaryLabel, mastery: primaryMastery, solvedSet: primarySolved, modelUsed };
+  })();
+  const isEstimate = primarySide.modelUsed !== "graph_dkt" || (result && result.modelUsed !== "graph_dkt");
+  const isLoading = platform === "both" ? loading || primaryCmp.loading : loading;
+  const activeError = platform === "both" ? error || primaryCmp.error : error;
+  const resetAll = () => {
+    clear();
+    primaryCmp.clear();
+  };
 
   if (!import.meta.env.VITE_API_URL) {
     return (
@@ -47,6 +77,11 @@ export default function CompareHandles() {
   const runCompare = () => {
     if (platform === "both") {
       if (!input.trim() && !lcInput.trim()) return;
+      if (pCfInput.trim() || pLcInput.trim()) {
+        primaryCmp.run({ cf: pCfInput, lc: pLcInput }, "both");
+      } else {
+        primaryCmp.clear();
+      }
       run({ cf: input, lc: lcInput }, "both");
       return;
     }
@@ -55,6 +90,7 @@ export default function CompareHandles() {
   };
 
   const inputStyle = { flex: "1 1 150px", minWidth: 110, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" };
+  const chipStyle = { fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--color-accent-text)", background: "var(--surface-2)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-full)", padding: "4px 10px" };
 
   const onKeyDown = (e) => {
     if (e.key === "Enter") runCompare();
@@ -65,77 +101,120 @@ export default function CompareHandles() {
       <div className="card dash-compare" style={{ padding: 24 }}>
         <CompareHeader />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-          <span data-testid="compare-primary" style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--color-accent-text)", background: "var(--surface-2)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-full)", padding: "4px 10px" }}>
-            {primaryLabel || "primary"}
-          </span>
-          <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>vs</span>
+        <div style={platform === "both" ? { display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 } : { display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
           {platform === "both" ? (
-            <div style={{ display: "flex", gap: 8, flex: "1 1 300px", flexWrap: "wrap" }}>
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span data-testid="compare-primary" style={chipStyle}>{primaryLabel || "primary"}</span>
+                <input
+                  data-testid="compare-primary-cf"
+                  value={pCfInput}
+                  onChange={(e) => setPCfInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="CF handle"
+                  style={inputStyle}
+                />
+                <input
+                  data-testid="compare-primary-lc"
+                  value={pLcInput}
+                  onChange={(e) => setPLcInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="LC handle (optional)"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={chipStyle}>second</span>
+                <input
+                  data-testid="compare-input"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="CF handle"
+                  style={inputStyle}
+                />
+                <input
+                  data-testid="compare-input-lc"
+                  value={lcInput}
+                  onChange={(e) => setLcInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="LC handle (optional)"
+                  style={inputStyle}
+                />
+                <select
+                  data-testid="compare-platform"
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+                >
+                  <option value="cf">cf</option>
+                  <option value="lc">lc</option>
+                  <option value="both">cf+lc</option>
+                </select>
+                <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
+                  Compare
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span data-testid="compare-primary" style={chipStyle}>{primaryLabel || "primary"}</span>
+              <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>vs</span>
               <input
                 data-testid="compare-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="CF handle"
-                style={inputStyle}
+                placeholder="second handle"
+                style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
               />
-              <input
-                data-testid="compare-input-lc"
-                value={lcInput}
-                onChange={(e) => setLcInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="LC handle (optional)"
-                style={inputStyle}
-              />
-            </div>
-          ) : (
-            <input
-              data-testid="compare-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder="second handle"
-              style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
-            />
+              <select
+                data-testid="compare-platform"
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+                style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+              >
+                <option value="cf">cf</option>
+                <option value="lc">lc</option>
+                <option value="both">cf+lc</option>
+              </select>
+              <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
+                Compare
+              </button>
+            </>
           )}
-          <select
-            data-testid="compare-platform"
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
-            style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
-          >
-            <option value="cf">cf</option>
-            <option value="lc">lc</option>
-            <option value="both">cf+lc</option>
-          </select>
-          <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
-            Compare
-          </button>
         </div>
 
-        {loading && !result && (
+        {isLoading && !result && (
           <div data-testid="compare-loading" style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
             {platform === "both"
-              ? `Analyzing ${[input.trim(), lcInput.trim()].filter(Boolean).join(" / ") || "handles"}…`
+              ? `Analyzing ${[pCfInput.trim(), pLcInput.trim(), input.trim(), lcInput.trim()].filter(Boolean).join(" / ") || "handles"}…`
               : `Analyzing ${input || "second handle"}…`}
           </div>
         )}
 
-        {error && (
+        {activeError && (
           <div data-testid="compare-unavailable" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--surface-2)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <span style={{ fontSize: 13, color: "var(--warning)", lineHeight: 1.5 }}>
-              <strong style={{ color: "var(--on-surface)" }}>{target || input.trim() || "Second handle"}</strong> unavailable — {error}
+              <strong style={{ color: "var(--on-surface)" }}>{target || input.trim() || "Second handle"}</strong> unavailable — {activeError}
             </span>
             {result && (
-              <button className="btn-primary" data-testid="compare-clear" onClick={clear} style={{ padding: "6px 12px", fontSize: 12, flexShrink: 0 }}>
+              <button className="btn-primary" data-testid="compare-clear" onClick={resetAll} style={{ padding: "6px 12px", fontSize: 12, flexShrink: 0 }}>
                 Reset
               </button>
             )}
           </div>
         )}
 
-        {result && <DiffPanel primaryLabel={primaryLabel} primaryMastery={primaryMastery} primarySolved={primarySolved} secondary={result} estimate={isEstimate} />}
+        {result && (
+          <DiffPanel
+            primaryLabel={primarySide.handle}
+            primaryMastery={primarySide.mastery}
+            primarySolved={primarySide.solvedSet}
+            secondary={result}
+            estimate={isEstimate}
+          />
+        )}
       </div>
     </motion.div>
   );

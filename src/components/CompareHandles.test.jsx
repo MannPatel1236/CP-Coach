@@ -38,6 +38,14 @@ function err400() {
   };
 }
 
+// Primary-side "both" fetch: cf mastery mirrors the fixture primary (binary_search
+// 0.20, geometry 0.25, dp 0.58) so merged primarySide == context values.
+const PRIMARY_CF = {
+  handle: "mannpatel", platform: "cf", model_used: "graph_dkt",
+  mastery_scores: { binary_search: 0.20, geometry: 0.25, dp: 0.58 },
+  topic_profile: [],
+};
+
 async function typeAndCompare(getByTestId, value) {
   fireEvent.change(getByTestId("compare-input"), { target: { value } });
   getByTestId("compare-analyze").click();
@@ -79,7 +87,7 @@ describe("CompareHandles — §5.2 #8", () => {
     expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
   });
 
-  it("supports cf+lc 'both' with separate handles — parallel fetch, merged mastery + solved sets", async () => {
+  it("supports cf+lc 'both' with separate handles — primary + secondary both analyzed per platform", async () => {
     const LC_SECONDARY = {
       ...SECONDARY,
       handle: "tourist_lc",
@@ -88,11 +96,15 @@ describe("CompareHandles — §5.2 #8", () => {
       topic_profile: [{ topic: "dp", solved_problems: ["lc-dp-1"] }],
     };
     globalThis.fetch.mockImplementation((url) => {
-      if (String(url).includes("platform=lc")) return Promise.resolve(okResponse(LC_SECONDARY));
+      const u = String(url);
+      if (u.includes("platform=lc")) return Promise.resolve(okResponse(LC_SECONDARY));
+      if (u.includes("mannpatel")) return Promise.resolve(okResponse(PRIMARY_CF));
       return Promise.resolve(okResponse(SECONDARY));
     });
     const { container, getByTestId } = renderInContext(<CompareHandles />);
     fireEvent.change(getByTestId("compare-platform"), { target: { value: "both" } });
+    // Primary inputs appear prefilled from the analyzed context.
+    await waitFor(() => { expect(getByTestId("compare-primary-cf").value).toBe("mannpatel"); });
     fireEvent.change(getByTestId("compare-input"), { target: { value: "tourist" } });
     fireEvent.change(getByTestId("compare-input-lc"), { target: { value: "tourist_lc" } });
     fireEvent.click(getByTestId("compare-analyze"));
@@ -100,7 +112,7 @@ describe("CompareHandles — §5.2 #8", () => {
     await waitFor(() => {
       expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
     });
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2); // cf + lc in parallel
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3); // primary cf + secondary cf + secondary lc
     // Merged solved sets: 2 cf (cf-1A, cf-2B) + 1 lc (lc-dp-1) exclusive to tourist.
     expect(getByTestId("compare-summary").textContent).toContain("tourist / tourist_lc solved 3 mannpatel hasn't");
     // dp only exists on the lc side → delta = primary dp 0.58 − secondary 0.90 = −0.320
@@ -110,19 +122,54 @@ describe("CompareHandles — §5.2 #8", () => {
 
   it("'both' tolerates an empty LC side — falls back to cf-only", async () => {
     globalThis.fetch.mockImplementation((url) => {
-      if (String(url).includes("platform=lc")) return Promise.resolve({ ok: false, status: 404 });
+      const u = String(url);
+      if (u.includes("platform=lc")) return Promise.resolve({ ok: false, status: 404 });
+      if (u.includes("mannpatel")) return Promise.resolve(okResponse(PRIMARY_CF));
       return Promise.resolve(okResponse(SECONDARY));
     });
     const { container, getByTestId } = renderInContext(<CompareHandles />);
     fireEvent.change(getByTestId("compare-platform"), { target: { value: "both" } });
+    await waitFor(() => { expect(getByTestId("compare-primary-cf").value).toBe("mannpatel"); });
     fireEvent.change(getByTestId("compare-input"), { target: { value: "tourist" } });
     fireEvent.click(getByTestId("compare-analyze"));
 
     await waitFor(() => {
       expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
     });
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1); // lc side empty → skipped, no fetch
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2); // primary cf + secondary cf; lc side skipped
     expect(getByTestId("compare-summary").textContent).toContain("tourist solved 2 mannpatel hasn't");
+  });
+
+  it("'both' analyzes the primary's LC handle too when typed (asymmetric primary handles)", async () => {
+    const PRIMARY_LC = {
+      ...PRIMARY_CF,
+      handle: "mannpatel_lc",
+      platform: "lc",
+      mastery_scores: { dp: 0.99 },
+      topic_profile: [{ topic: "dp", solved_problems: ["lc-p-9"] }],
+    };
+    globalThis.fetch.mockImplementation((url) => {
+      const u = String(url);
+      if (u.includes("platform=lc")) return Promise.resolve(okResponse(PRIMARY_LC));
+      if (u.includes("mannpatel")) return Promise.resolve(okResponse(PRIMARY_CF));
+      return Promise.resolve(okResponse(SECONDARY));
+    });
+    const { container, getByTestId } = renderInContext(<CompareHandles />);
+    fireEvent.change(getByTestId("compare-platform"), { target: { value: "both" } });
+    await waitFor(() => { expect(getByTestId("compare-primary-cf").value).toBe("mannpatel"); });
+    fireEvent.change(getByTestId("compare-primary-lc"), { target: { value: "mannpatel_lc" } });
+    fireEvent.change(getByTestId("compare-input"), { target: { value: "tourist" } });
+    fireEvent.click(getByTestId("compare-analyze"));
+
+    await waitFor(() => {
+      expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3); // primary cf + primary lc + secondary cf
+    // lc-p-9 lands in the primary's solved set (context ∪ fetched).
+    expect(getByTestId("compare-summary").textContent).toContain("mannpatel / mannpatel_lc solved 1 problem tourist hasn't");
+    // dp now primary 0.99 − secondary 0.58 = +0.410 → primary up
+    const dp = container.querySelector("[data-topic='dp']");
+    expect(dp.getAttribute("data-delta")).toBe("0.410");
   });
 
   it("does not fetch until a second handle is typed", async () => {
