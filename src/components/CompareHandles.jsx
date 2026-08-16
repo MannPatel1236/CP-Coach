@@ -124,7 +124,7 @@ export default function CompareHandles() {
                 />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={chipStyle}>second</span>
+                <span style={chipStyle}>opponent</span>
                 <input
                   data-testid="compare-input"
                   value={input}
