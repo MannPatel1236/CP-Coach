@@ -123,7 +123,7 @@ class FakeSession:
     def add(self, obj):
         if isinstance(obj, User):
             FakeUser._seq += 1
-            obj.id = FakeUser._seq
+            obj.id = FakeUser._seq  # pyright: ignore[reportAttributeAccessIssue]
             self._store.users.append(obj)
         elif isinstance(obj, Plan):
             FakePlan._seq += 1

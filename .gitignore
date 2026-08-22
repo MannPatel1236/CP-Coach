@@ -62,3 +62,6 @@ workflows/
 skills-lock.json
 AUDIT_REPORT.md
 /*.png
+
+# AI workflow artifacts
+/docs/superpowers/
