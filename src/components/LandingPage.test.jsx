@@ -25,12 +25,12 @@ describe("LandingPage — lane-05 editorial narrative (§5.1)", () => {
     expect(container.querySelector("h1").textContent).toContain("Where do you stand");
   });
 
-  it("shows the credibility micro-strip under the CTA (rated difficulty, CF + LC)", async () => {
+  it("shows the credibility micro-strip under the CTA (skill graph, CF + LC)", async () => {
     const { container } = renderInContext(<LandingPage />);
     await waitFor(() => expect(container.querySelector("h1")).toBeTruthy());
     const strip = container.querySelector("[data-testid='credibility-strip']");
     expect(strip).toBeTruthy();
-    expect(strip.textContent).toContain("800–3500");
+    expect(strip.textContent).toContain("29");
     expect(strip.textContent).toContain("CF + LC");
   });
 

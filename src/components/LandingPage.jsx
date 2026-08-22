@@ -31,11 +31,11 @@ const HOW_IT_WORKS = [
   },
 ];
 
-// §5.1 "Credibility stats" — real, verifiable facts: general CP + product (independent of any research).
+// §5.1 "Credibility stats" — real, verifiable product facts (independent of any research).
 const CREDIBILITY = [
-  { value: "800–3500", label: "difficulty band carried by every Codeforces problem — your next problem lives inside it" },
-  { value: "10", label: "rating tiers separate newbie from legendary grandmaster — closed by topic depth, not luck" },
-  { value: "29", label: "topics on the prerequisite skill graph, wired by 39 dependency edges" },
+  { value: "8k", label: "submissions scanned per deep analysis — every verdict, tag, and rating band, weighted toward your recent form" },
+  { value: "29", label: "topics on the prerequisite skill graph, wired by 39 dependency edges from implementation to matrices" },
+  { value: "0", label: "accounts required — analyze any public handle, erase your data anytime" },
 ];
 
 const section = { maxWidth: "var(--landing-max)", margin: "0 auto", padding: "80px 24px" };
@@ -69,7 +69,7 @@ export default function LandingPage() {
         <motion.div data-testid="credibility-strip" initial="hidden" animate="visible" variants={fadeIn} custom={4}
           style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "baseline",
             fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>
-          <span><strong style={{ color: "var(--color-accent-text)" }}>800–3500</strong> rated difficulty</span>
+          <span><strong style={{ color: "var(--color-accent-text)" }}>29</strong>-topic skill graph</span>
           <span>·</span>
           <span><strong style={{ color: "var(--color-accent-text)" }}>CF + LC</strong></span>
           <span>·</span>

@@ -99,10 +99,14 @@ export default function App() {
   }, []);
 
   // Escape / home reset the analysis AND the view; clearAll itself stays untouched.
+  // Going home lands on the landing page, so the URL drops the tab hash entirely
+  // (switchTab would write "#practice" onto a page with no dashboard tabs).
   const handleClear = useCallback(() => {
     clearAll();
-    switchTab("practice");
-  }, [clearAll, switchTab]);
+    setActiveTab("practice");
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.scrollTo(0, 0);
+  }, [clearAll]);
 
   useKeyboardShortcuts({
     onFocusSearch: focusSearch,
