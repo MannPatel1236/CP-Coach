@@ -1,6 +1,7 @@
 """Greenhouse Phase 4c — /api/progress activity buckets (heatmap + streak data)."""
 
 import pytest
+from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from main import app
 
@@ -51,7 +52,7 @@ class TestProgressActivity:
         data = r.json()
         assert data["activity"], "activity buckets should be non-empty"
         weeks = list(data["activity"].keys())
-        assert len(weeks) == 2, f"expected 2 distinct weeks, got {weeks}"
+        # The two real submission weeks stay first (zero-fill only appends later keys)
         a, b = data["activity"][weeks[0]], data["activity"][weeks[1]]
         # Week with the two same-week submissions: 2 active days, 1 solved of 2 total
         assert a["active_days"] == 2
@@ -61,6 +62,22 @@ class TestProgressActivity:
         assert b["active_days"] == 1
         assert b["total"] == 1
         assert b["solved"] == 0
+
+    def test_zero_fill_extends_to_current_week(self):
+        """Trailing weeks are zero-filled through NOW so the latest bucket is the
+        current week — an old active week must never count as the current streak."""
+        r = client.get("/api/progress/tourist?platform=cf")
+        weeks = list(r.json()["activity"].keys())
+        current_key = datetime.now(timezone.utc).strftime("%Y-W%W")
+        assert weeks[-1] == current_key, f"latest bucket {weeks[-1]} != current week {current_key}"
+        assert r.json()["activity"][current_key] == {"solved": 0, "total": 0, "active_days": 0}
+        # No gaps: every Monday-based %W label between first and last is present.
+        expected = set()
+        cursor = datetime(2020, 9, 8, tzinfo=timezone.utc)
+        while cursor <= datetime.now(timezone.utc):
+            expected.add(cursor.strftime("%Y-W%W"))
+            cursor += timedelta(days=7)
+        assert set(weeks) == expected
 
     def test_week_keys_are_sorted_chronologically(self):
         r = client.get("/api/progress/tourist?platform=cf")

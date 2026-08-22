@@ -2,7 +2,7 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
@@ -108,6 +108,19 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
 
     for week_key, days in active_day_keys.items():
         activity[week_key]["active_days"] = len(days)
+
+    # Zero-fill from the first bucket through the CURRENT week. Without this, a
+    # stale last-active week stays the newest key and the heatmap's current-streak
+    # logic (breaks on inactive latest week) never sees weeks of inactivity.
+    stamps = [s.get("timestamp", 0) / 1000 for s in normalized if s.get("timestamp", 0) > 0]
+    if stamps:
+        cursor = datetime.fromtimestamp(min(stamps), tz=timezone.utc)
+        end = datetime.now(timezone.utc)
+        while cursor <= end:
+            week_key = cursor.strftime("%Y-W%W")
+            if week_key not in activity:
+                activity[week_key] = {"solved": 0, "total": 0, "active_days": 0}
+            cursor += timedelta(days=7)
 
     # Persist activity buckets (non-blocking)
     try:

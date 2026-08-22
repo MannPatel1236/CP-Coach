@@ -213,9 +213,22 @@ def test_provenance_trigger_is_weakest_matched_primary():
     )
     prov = recs[0]["provenance"]
     assert prov["trigger_weak_tag"] == "dp", prov          # weakest primary drives
-    assert prov["band"] == [1400, 1850], prov              # [rating-100, rating+350]
+    assert prov["band"] == [1400, 1900], prov              # floor/ceil to 100-pt step
     assert prov["prereq_path"][0] == "implementation"      # root-anchored
     assert prov["prereq_path"][-1] == "dp", prov           # ends at the trigger
+
+
+def test_provenance_band_rounds_to_100_point_step():
+    """Non-multiple-of-100 ratings: lo floors, hi ceils (parity with recBand.js)."""
+    recs = Recommender(GRAPH).recommend(
+        user_rating=1523,
+        mastery_scores=_mastery(dp=0.0),
+        solved_problem_ids=set(),
+        all_problems=[_problem("p-dp", ["dp"], difficulty=1600)],
+        platforms=["cf"],
+        top_k=10,
+    )
+    assert recs[0]["provenance"]["band"] == [1400, 1900]
 
 
 def test_provenance_prereq_path_shortest_chain():

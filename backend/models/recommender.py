@@ -300,7 +300,12 @@ class Recommender:
 
         # ── 8. RETURN ────────────────────────────────────────────────
         results = normal_pool[:top_k]
-        band = [max(800, user_rating - 100), user_rating + self.difficulty_band]
+        # Band mirrors the frontend bandFor() (src/lib/recBand.js): lo floors and
+        # hi ceils to the 100-point CF rating step so displayed bands are round.
+        band = [
+            max(800, math.floor((user_rating - 100) / 100) * 100),
+            max(800, math.ceil((user_rating + self.difficulty_band) / 100) * 100),
+        ]
         out = []
         for i, p in enumerate(results):
             # §7 provenance (Phase 4d) — server-side rationale mirroring the
