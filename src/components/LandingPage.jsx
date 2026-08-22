@@ -31,11 +31,11 @@ const HOW_IT_WORKS = [
   },
 ];
 
-// §5.1 "Credibility stats" — the three deployed-model numbers from CLAUDE.md.
+// §5.1 "Credibility stats" — real, verifiable facts: general CP + product (independent of any research).
 const CREDIBILITY = [
-  { value: "0.969", label: "AUC · 5-fold CV on the deployed Graph-DKT ensemble (10k sequences)" },
-  { value: "5.17M", label: "submissions read across 1,341 handles" },
-  { value: "29 → 25", label: "canonical topics; 25 evaluated, 4 held out for zero CF test data" },
+  { value: "800–3500", label: "difficulty band carried by every Codeforces problem — your next problem lives inside it" },
+  { value: "10", label: "rating tiers separate newbie from legendary grandmaster — closed by topic depth, not luck" },
+  { value: "29", label: "topics on the prerequisite skill graph, wired by 39 dependency edges" },
 ];
 
 const section = { maxWidth: "var(--landing-max)", margin: "0 auto", padding: "80px 24px" };
@@ -69,11 +69,11 @@ export default function LandingPage() {
         <motion.div data-testid="credibility-strip" initial="hidden" animate="visible" variants={fadeIn} custom={4}
           style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "baseline",
             fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>
-          <span><strong style={{ color: "var(--color-accent-text)" }}>0.969</strong> AUC</span>
+          <span><strong style={{ color: "var(--color-accent-text)" }}>800–3500</strong> rated difficulty</span>
           <span>·</span>
-          <span><strong style={{ color: "var(--color-accent-text)" }}>5.17M</strong> submissions</span>
+          <span><strong style={{ color: "var(--color-accent-text)" }}>CF + LC</strong></span>
           <span>·</span>
-          <span>EDM 2027</span>
+          <span>no account needed</span>
         </motion.div>
       </section>
 
@@ -93,7 +93,7 @@ export default function LandingPage() {
         <LandingDAG />
       </section>
 
-      {/* Self-selection story — §5.1 "Why your rating is lying to you" (the 87.7% finding, 3 beats) */}
+      {/* Self-selection story — §5.1 "Why your rating is lying to you" (3 beats) */}
       <section data-testid="self-selection-story" style={{ ...section, borderTop: "1px solid var(--outline)", maxWidth: 760 }}>
         <motion.p className="label-caps" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }}
           variants={fadeIn} style={{ color: "var(--color-accent-text)", marginBottom: 12 }}>
@@ -108,8 +108,8 @@ export default function LandingPage() {
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={staggerContainer}
           style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {[
-            { n: "01", p: "Competitive programmers practice what they're already good at. Across 5.17M submissions, the topic-switch rate is 87.7% — solvers stay in streaks." },
-            { n: "02", p: "That streaking is what a knowledge-tracing model learns. AUC climbs to 0.969 and keeps rising with activity — not because the model is clever, but because self-selection makes outcomes predictable." },
+            { n: "01", p: "Competitive programmers practice what they're already good at. Watch any solver's history and you'll see streaks — same tag, same difficulty band, night after night." },
+            { n: "02", p: "Streaks feel like progress, and rating rewards them. But a rating is one number across ten tiers of skill — it can't tell you that your graphs are carried by your dp." },
             { n: "03", p: "Your rating reports the streak. CP Coach reports the gaps underneath it — the prerequisite frontier you keep skipping. That's where the next problem lives." },
           ].map((beat) => (
             <motion.div key={beat.n} variants={fadeIn} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
@@ -122,7 +122,7 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* Credibility stats + paper reference strip */}
+      {/* Credibility stats strip */}
       <section style={{ ...section, borderTop: "1px solid var(--outline)" }}>
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={staggerContainer}
           style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24 }}>
@@ -137,7 +137,7 @@ export default function LandingPage() {
         </motion.div>
         <motion.p initial="hidden" whileInView="visible" viewport={{ once: true, margin: "0px" }} variants={fadeIn}
           style={{ marginTop: 32, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
-          Graph-Augmented Knowledge Tracing · KSAP base (Wang et al., KAIS 2025) · targeting EDM 2027
+          Knowledge tracing over a 29-topic competitive-programming prerequisite graph
         </motion.p>
       </section>
 

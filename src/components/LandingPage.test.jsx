@@ -25,13 +25,13 @@ describe("LandingPage — lane-05 editorial narrative (§5.1)", () => {
     expect(container.querySelector("h1").textContent).toContain("Where do you stand");
   });
 
-  it("shows the credibility micro-strip under the CTA (0.969 AUC)", async () => {
+  it("shows the credibility micro-strip under the CTA (rated difficulty, CF + LC)", async () => {
     const { container } = renderInContext(<LandingPage />);
     await waitFor(() => expect(container.querySelector("h1")).toBeTruthy());
     const strip = container.querySelector("[data-testid='credibility-strip']");
     expect(strip).toBeTruthy();
-    expect(strip.textContent).toContain("0.969");
-    expect(strip.textContent).toContain("AUC");
+    expect(strip.textContent).toContain("800–3500");
+    expect(strip.textContent).toContain("CF + LC");
   });
 
   it("embeds the LandingDAG centerpiece — 29 nodes render, caption present (not image-only)", async () => {
@@ -40,11 +40,11 @@ describe("LandingPage — lane-05 editorial narrative (§5.1)", () => {
     expect(getByTestId("dag-caption")).toBeTruthy();
   });
 
-  it("tells the self-selection story (the 87.7% finding) in text", async () => {
+  it("tells the streak story (general CP observation, no paper stats) in text", async () => {
     const { container } = renderInContext(<LandingPage />);
     await waitFor(() => expect(container.querySelector("h1")).toBeTruthy());
     const story = container.querySelector("[data-testid='self-selection-story']");
     expect(story).toBeTruthy();
-    expect(story.textContent).toContain("87.7");
+    expect(story.textContent).toContain("streaks");
   });
 });
