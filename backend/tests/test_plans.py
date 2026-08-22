@@ -21,9 +21,12 @@ client = TestClient(app)
 
 
 class FakeUser:
-    def __init__(self):
-        self.id = 1
-        self.cf_handle = None
+    _seq = 0
+
+    def __init__(self, cf_handle=None):
+        FakeUser._seq += 1
+        self.id = FakeUser._seq
+        self.cf_handle = cf_handle
         self.lc_handle = None
 
 
@@ -43,7 +46,7 @@ class FakePlan:
 
 class FakeStore:
     def __init__(self):
-        self.user = FakeUser()
+        self.users = []
         self.plans = []
 
 
@@ -71,27 +74,58 @@ class FakeSession:
     async def __aexit__(self, *args):
         return False
 
+    def _match_user(self, stmt):
+        """Resolve the handle bound in the (cf | lc) ilike criteria, else None."""
+        handle = None
+        for crit in stmt._where_criteria:
+            for cl in getattr(crit, "clauses", [crit]):
+                v = getattr(getattr(cl, "right", None), "value", None)
+                if isinstance(v, str):
+                    handle = v
+        if handle is None:
+            return None
+        for u in self._store.users:
+            if (u.cf_handle or "").lower() == handle.lower():
+                return u
+            if (u.lc_handle or "").lower() == handle.lower():
+                return u
+        return None
+
     async def execute(self, stmt):
         entity = stmt.column_descriptions[0]["entity"]
         if entity is User:
-            return FakeResult(self._store.user)
-        wc = stmt._where_criteria[0]
-        col = wc.left.name
-        if col == "user_id":
-            uid = wc.right.value
+            return FakeResult(self._match_user(stmt))
+        cols = {
+            wc.left.name: getattr(getattr(wc, "right", None), "value", None)
+            for wc in stmt._where_criteria
+        }
+        if "id" in cols:
+            pid = cols["id"]
+            uid = cols.get("user_id")
+            plan = next(
+                (
+                    p
+                    for p in self._store.plans
+                    if p.id == pid and (uid is None or p.user_id == uid)
+                ),
+                None,
+            )
+            return FakeResult(plan)
+        if "user_id" in cols:
             ordered = sorted(
-                (p for p in self._store.plans if p.user_id == uid),
+                (p for p in self._store.plans if p.user_id == cols["user_id"]),
                 key=lambda p: p.updated_at,
                 reverse=True,
             )
             return FakeResult(ordered)
-        if col == "id":
-            pid = wc.right.value
-            return FakeResult(next((p for p in self._store.plans if p.id == pid), None))
         return FakeResult(None)
 
     def add(self, obj):
-        if isinstance(obj, Plan):
+        if isinstance(obj, User):
+            FakeUser._seq += 1
+            obj.id = FakeUser._seq
+            self._store.users.append(obj)
+        elif isinstance(obj, Plan):
             FakePlan._seq += 1
             obj.id = FakePlan._seq  # pyright: ignore[reportAttributeAccessIssue]
             obj.created_at = datetime(2026, 1, obj.id, tzinfo=timezone.utc)  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
@@ -177,6 +211,33 @@ class TestPlansCrud:
     def test_delete_unknown_plan_404(self, fake_db):
         r = client.delete("/api/plans/tourist/999")
         assert r.status_code == 404
+
+
+class TestPlansOwnership:
+    """IDOR: writes must be scoped to the URL handle's own plans."""
+
+    def test_put_other_users_plan_404(self, fake_db):
+        client.post("/api/plans/alice", json=_plan("Alice plan"))
+        client.post("/api/plans/bob", json=_plan("Bob plan"))  # bob exists
+        r = client.put("/api/plans/bob/1", json=_plan("hijacked"))
+        assert r.status_code == 404
+        assert [p["name"] for p in client.get("/api/plans/alice").json()] == ["Alice plan"]
+
+    def test_delete_other_users_plan_404(self, fake_db):
+        client.post("/api/plans/alice", json=_plan("Alice plan"))
+        client.post("/api/plans/bob", json=_plan("Bob plan"))
+        r = client.delete("/api/plans/bob/1")
+        assert r.status_code == 404
+        assert [p["name"] for p in client.get("/api/plans/alice").json()] == ["Alice plan"]
+
+    def test_put_unknown_handle_404(self, fake_db):
+        client.post("/api/plans/alice", json=_plan("Alice plan"))
+        r = client.put("/api/plans/ghost/1", json=_plan("ghosted"))
+        assert r.status_code == 404
+
+    def test_delete_unknown_handle_404(self, fake_db):
+        client.post("/api/plans/alice", json=_plan("Alice plan"))
+        assert client.delete("/api/plans/ghost/1").status_code == 404
 
 
 class TestPlansFailures:

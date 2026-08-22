@@ -39,6 +39,14 @@ async def _resolve_or_create_user(session, handle: str) -> int:
     return user.id  # pyright: ignore[reportReturnType]
 
 
+async def _find_user(session, handle: str):
+    """Find the user row by CF or LC handle (case-insensitive), else None."""
+    stmt = select(User).where(
+        (User.cf_handle.ilike(handle)) | (User.lc_handle.ilike(handle))
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
 def _plan_out(p: Plan) -> PlanOut:
     return PlanOut(
         id=p.id,  # pyright: ignore[reportArgumentType]
@@ -123,8 +131,11 @@ async def update_plan(
     )
     try:
         async with AsyncSessionLocal() as session:
-            stmt = select(Plan).where(Plan.id == plan_id)
-            plan = (await session.execute(stmt)).scalar_one_or_none()
+            user = await _find_user(session, handle)
+            plan = None
+            if user:
+                stmt = select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)
+                plan = (await session.execute(stmt)).scalar_one_or_none()
             if not plan:
                 raise HTTPException(404, detail=f"Plan {plan_id} not found.")
             plan.name = body.name  # pyright: ignore[reportAttributeAccessIssue]
@@ -155,8 +166,11 @@ async def delete_plan(
     )
     try:
         async with AsyncSessionLocal() as session:
-            stmt = select(Plan).where(Plan.id == plan_id)
-            plan = (await session.execute(stmt)).scalar_one_or_none()
+            user = await _find_user(session, handle)
+            plan = None
+            if user:
+                stmt = select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)
+                plan = (await session.execute(stmt)).scalar_one_or_none()
             if not plan:
                 raise HTTPException(404, detail=f"Plan {plan_id} not found.")
             await session.delete(plan)

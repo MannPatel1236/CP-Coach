@@ -30,8 +30,10 @@ export default function CompareHandles() {
   // analyzed context (editable — e.g. when the primary was analyzed cf-only).
   useEffect(() => {
     if (platform !== "both") return;
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional one-way prefill from the analyzed context when entering both-mode */
     setPCfInput((v) => v || (cfHandle || user?.handle?.split(" / ")[0] || ""));
     setPLcInput((v) => v || (lcHandle || ""));
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [platform, cfHandle, lcHandle, user]);
 
   // Primary mastery read directly from the context ref (same pattern as SkillFrontier):
@@ -53,6 +55,7 @@ export default function CompareHandles() {
     }
     return { handle: primaryLabel, mastery: primaryMastery, solvedSet: primarySolved, modelUsed };
   })();
+  // eslint-disable-next-line react-hooks/refs -- ref-tainted via primarySide.mastery; same intentional pattern as primaryMastery above
   const isEstimate = primarySide.modelUsed !== "graph_dkt" || (result && result.modelUsed !== "graph_dkt");
   const isLoading = platform === "both" ? loading || primaryCmp.loading : loading;
   const activeError = platform === "both" ? error || primaryCmp.error : error;
@@ -208,8 +211,11 @@ export default function CompareHandles() {
 
         {result && (
           <DiffPanel
+            // eslint-disable-next-line react-hooks/refs -- ref-tainted via primarySide (see primaryMastery note)
             primaryLabel={primarySide.handle}
+            // eslint-disable-next-line react-hooks/refs
             primaryMastery={primarySide.mastery}
+            // eslint-disable-next-line react-hooks/refs
             primarySolved={primarySide.solvedSet}
             secondary={result}
             estimate={isEstimate}

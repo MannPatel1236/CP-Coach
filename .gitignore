@@ -53,3 +53,12 @@ data/training.meta.json
 /_paper/
 /.paper_review/
 /.paper_review_updated/
+
+# Local working artifacts (never commit)
+.agents/
+.playwright-mcp/
+design-mockups/
+workflows/
+skills-lock.json
+AUDIT_REPORT.md
+/*.png
