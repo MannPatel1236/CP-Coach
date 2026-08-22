@@ -59,11 +59,15 @@ CSV format: `user_id, topic, solved, difficulty, timestamp_delta, weight`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Health check |
+| GET | `/health` | Health check (`model_loaded` flag included) |
 | GET | `/health/deep` | Probes CF and LC API reachability |
-| GET | `/api/analyze/{handle}?platform=cf&mode=quick` | Analyze user |
-| GET/POST | `/api/recommend/{handle}?platforms=cf&top_k=20` | Recommendations |
-| GET | `/api/progress/{handle}` | Weekly progress |
+| GET | `/api/analyze/{handle}?platform=cf&mode=quick` | Analyze user (returns mastery scores + checkpoints) |
+| GET/POST | `/api/recommend/{handle}?platforms=cf&top_k=20` | Recommendations (POST returns per-item provenance) |
+| GET | `/api/rating-trajectory/{handle}?platform=cf` | Cached rating history points (TTL cache) |
+| GET | `/api/mastery-history/{handle}?platform=cf` | Stored per-topic mastery snapshots |
+| GET | `/api/progress/{handle}` | Weekly per-topic solve rates + weekly activity buckets |
+| GET/POST | `/api/plans/{handle}` | List / create saved workbook plans |
+| PUT/DELETE | `/api/plans/{handle}/{plan_id}` | Update / delete a plan — writes are ownership-scoped to `handle`; foreign or unknown plans return 404 |
 | GET | `/api/graph` | Topic prerequisite graph |
 | DELETE | `/api/user/{handle}` | GDPR erasure (requires HMAC auth) |
 
@@ -122,7 +126,7 @@ The target topology is:
 6. Quick smoke test:
    ```bash
    curl https://<render-service>.onrender.com/health
-   # {"status":"ok","version":"2.0","platforms":["cf","lc"]}
+   # {"status":"ok","version":"2.0","platforms":["cf","lc"],"model_loaded":true}
    ```
 
 ### 3. Vercel — Frontend

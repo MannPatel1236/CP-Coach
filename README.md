@@ -27,13 +27,17 @@ CP Coach is a full-stack web application that connects to your **Codeforces** an
 ### Key Features
 
 - **Multi-Platform Analysis** - Supports Codeforces + LeetCode, individually or combined
-- **Skill Visualization** - Bar charts showing recency-weighted topic mastery
+- **Four-View Dashboard** - Practice, Analytics, Compare and Workbook views with deep-linkable tab hashes
+- **Skill Frontier DAG** - Your mastery painted onto the interactive prerequisite graph
 - **Weak Area Detection** - Identifies your weakest topics with severity indicators
+- **Rating Trajectory** - Rating history chart from cached snapshots
+- **Mastery History** - Per-topic mastery sparkline tracked across analyses
+- **Activity Heatmap** - 12-week solved grid with current/longest streaks
+- **Handle Compare** - Two-handle solved-set and mastery diff (cf/lc/cf+lc)
+- **Workbook** - Save recommendations as checklists, rename, track completion
 - **Graph-DKT Model** - LSTM + GCN hybrid for personalized mastery prediction
-- **Smart Matching** - Difficulty band recommendation with stretch fallback
+- **Explainable Recommendations** - Per-item provenance: trigger topic, prerequisite path, difficulty band
 - **Prerequisite-Aware** - Recommendations respect topic dependency graph
-
-> **Research Inspiration:** *"KSAP - Knowledge Structure-Aware Problem Recommendation"* (Wang et al., Springer KAIS, 2025)
 
 ---
 
@@ -146,10 +150,14 @@ Services:
 |----------|:------:|-------------|
 | `/api/analyze/{handle}` | GET | Analyze profile (`platform=cf\|lc`, `mode=quick\|deep`) |
 | `/api/recommend/{handle}` | GET/POST | Get recommendations (`platforms=cf,lc`, `focus_topics=...`) |
-| `/api/progress/{handle}` | GET | Weekly per-topic solve rates |
+| `/api/rating-trajectory/{handle}` | GET | Cached rating history points |
+| `/api/mastery-history/{handle}` | GET | Stored per-topic mastery snapshots |
+| `/api/progress/{handle}` | GET | Weekly per-topic solve rates + weekly activity buckets |
+| `/api/plans/{handle}` | GET/POST | List / create saved workbook plans (handle-scoped) |
+| `/api/plans/{handle}/{plan_id}` | PUT/DELETE | Update / delete a plan (404 unless owned by handle) |
 | `/api/graph` | GET | Prerequisite graph topology (JSON) |
 | `/api/user/{handle}` | DELETE | GDPR erasure (requires HMAC auth if `CP_API_SECRET` set) |
-| `/health` | GET | Health check |
+| `/health` | GET | Health check (`model_loaded` flag included) |
 | `/health/deep` | GET | Probes CF and LeetCode API reachability |
 
 **Example:**
@@ -261,28 +269,46 @@ CP-Coach/
 │   ├── hooks/
 │   │   ├── AnalysisContext.jsx  # React context + useAnalysisContext()
 │   │   ├── useAnalysis.js      # Analysis state machine
+│   │   ├── useCompareHandle.js # Localized second-handle analysis
+│   │   ├── useGraphLayout.js   # Cached dagre layout hook
 │   │   ├── useRecommendations.js
 │   │   └── useKeyboardShortcuts.js
-│   ├── components/             # UI components
-│   ├── App.jsx                 # Root component
+│   ├── lib/
+│   │   ├── topicGraphLayout.js # dagre layout + prereq-path engine
+│   │   ├── recBand.js          # Shared difficulty-band math (100-pt rounding)
+│   │   ├── workbookStore.js    # Plans localStorage cache
+│   │   └── motion.js           # Shared framer-motion variants
+│   ├── components/
+│   │   ├── DashboardNav.jsx    # Tab bar (practice/analytics/compare/workbook)
+│   │   ├── SkillFrontier.jsx   # Mastery-painted prerequisite DAG
+│   │   ├── WhyThisRec.jsx      # Per-item recommendation provenance
+│   │   ├── RatingTrajectory.jsx# Rating history line chart
+│   │   ├── MasteryHistory.jsx  # Mastery sparklines
+│   │   ├── ActivityHeatmap.jsx # 12-week grid + streaks
+│   │   ├── CompareHandles.jsx  # Two-handle diff
+│   │   ├── Workbook.jsx        # Saved plan checklists
+│   │   ├── LandingDAG.jsx      # Landing page graph centerpiece
+│   │   └── ...                 # ProfileCard, WeakAreas, Recommendations, etc.
+│   ├── App.jsx                 # Root component + tab routing
 │   ├── main.jsx                # Entry point
-│   └── index.css               # Design system CSS
+│   └── index.css               # Design system CSS (OKLCH tokens)
 ├── api/                        # Vercel serverless functions
 │   └── cf.js                   # CORS proxy for Codeforces
 ├── backend/
-│   ├── main.py                 # FastAPI entry point, CORS, lifespan
+│   ├── main.py                 # FastAPI entry point, CORS, lifespan, mastery-history route
 │   ├── auth.py                 # HMAC-signed request auth
 │   ├── rate_limiter.py         # slowapi with trusted-proxy-aware IP
 │   ├── Dockerfile
 │   ├── startup.sh              # Startup script (local/cloud split)
-│   ├── .env.local              # Local dev (no DATABASE_URL)
 │   ├── .env.example            # Production template
 │   ├── .dockerignore           # Prevents secrets in Docker context
 │   ├── routes/
 │   │   ├── schemas.py          # Pydantic response models
-│   │   ├── analyze.py          # GET /api/analyze
-│   │   ├── recommend.py        # GET/POST /api/recommend
-│   │   ├── progress.py         # GET /api/progress
+│   │   ├── analyze.py          # GET /api/analyze (+ mastery checkpoints)
+│   │   ├── recommend.py        # GET/POST /api/recommend (+ per-item provenance)
+│   │   ├── progress.py         # GET /api/progress (topics + weekly activity)
+│   │   ├── trajectory.py       # GET /api/rating-trajectory (TTL-cached snapshots)
+│   │   ├── plans.py            # Workbook plans CRUD (ownership-scoped writes)
 │   │   ├── graph.py            # GET /api/graph
 │   │   └── user.py             # DELETE /api/user (GDPR erasure)
 │   ├── platforms/
@@ -291,7 +317,7 @@ CP-Coach/
 │   │   └── normalizer.py       # Normalized format conversion
 │   ├── models/
 │   │   ├── dkt.py              # LSTM backbone
-│   │   ├── graph_dkt.py        # GCN-augmented DKT
+│   │   ├── graph_dkt.py        # GCN-augmented DKT (+ mastery checkpoint gather)
 │   │   ├── recommender.py      # Prerequisite-aware engine
 │   │   └── errors.py           # FastAPI exception handlers
 │   ├── data/
@@ -305,7 +331,7 @@ CP-Coach/
 │   │   ├── evaluate.py         # AUC, accuracy, per-topic metrics
 │   │   ├── eval_folds.py       # 5-fold CV evaluation
 │   │   └── scrape_cf_data.py   # CF API scraper → training CSV
-│   ├── tests/                  # pytest smoke tests
+│   ├── tests/                  # pytest suite (72 tests)
 │   └── weights/                # Model checkpoints (gitignored)
 ├── docker-compose.yml          # PG + backend stack
 ├── vercel.json                 # Vercel routing
@@ -365,6 +391,47 @@ CREATE TABLE IF NOT EXISTS kt_states (
   p_mastery FLOAT NOT NULL DEFAULT 0.0,
   updated_at TIMESTAMP,
   PRIMARY KEY (user_id, topic)
+);
+
+-- Cached CF rating points (rating trajectory chart)
+CREATE TABLE IF NOT EXISTS rating_trajectory (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  platform VARCHAR(5) NOT NULL DEFAULT 'cf',
+  payload JSONB NOT NULL,
+  fetched_at TIMESTAMP DEFAULT now()
+);
+
+-- Per-topic mastery snapshots across analyses
+CREATE TABLE IF NOT EXISTS mastery_history (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  topic VARCHAR(50),
+  checkpoint_idx INTEGER,
+  ts BIGINT,
+  p_mastery FLOAT NOT NULL DEFAULT 0.0,
+  updated_at TIMESTAMP,
+  PRIMARY KEY (user_id, topic, checkpoint_idx)
+);
+
+-- Weekly activity buckets (heatmap + streaks)
+CREATE TABLE IF NOT EXISTS activity_weeks (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  week VARCHAR(10),
+  solved INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0,
+  active_days INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP,
+  PRIMARY KEY (user_id, week)
+);
+
+-- Saved workbook plans (handle-keyed, no account system)
+CREATE TABLE IF NOT EXISTS plans (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 ```
 
