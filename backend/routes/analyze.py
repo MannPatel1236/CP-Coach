@@ -102,13 +102,12 @@ async def _analyze_lc(handle: str, mode: str, _controller):
 def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     """Compute mastery scores + Phase-4b checkpoints — try Graph-DKT, fallback rule-based.
 
-    Returns (mastery_scores, model_used, model, mastery_history). When the model
-    exposes ``predict_mastery_full``, BOTH outputs come from a single forward
-    pass per fold (running predict_mastery + predict_mastery_history separately
-    re-collates and re-runs the full LSTM+GCN twice per fold — 10 forwards for
-    the 5-fold ensemble). Models without it fall back to predict_mastery and
-    history stays None. History is None on the rule-based path — the UI renders
-    the disabled caption. Never raises: prediction failures degrade to fallback.
+    Returns (mastery_scores, model_used, mastery_history). Both outputs come
+    from a single forward pass per fold via predict_mastery_full (running
+    predict_mastery + predict_mastery_history separately re-collates and
+    re-runs the full LSTM+GCN twice per fold — 10 forwards for the 5-fold
+    ensemble). History is None on the rule-based path — the UI renders the
+    disabled caption. Never raises: prediction failures degrade to fallback.
     """
     model_used = "rule_based"
     mastery_history = None
@@ -127,10 +126,7 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
 
     if model is not None and sequence:
         try:
-            if hasattr(model, "predict_mastery_full"):
-                mastery_scores, mastery_history = model.predict_mastery_full(sequence, _topic_graph)
-            else:
-                mastery_scores = model.predict_mastery(sequence, _topic_graph)
+            mastery_scores, mastery_history = model.predict_mastery_full(sequence, _topic_graph)
             model_used = "graph_dkt"
         except Exception as e:
             logger.warning("Graph-DKT prediction failed: %s", e)
@@ -144,7 +140,7 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     canonical = set(_topic_graph.TOPICS)
     mastery_scores = {k: v for k, v in mastery_scores.items() if k in canonical}
 
-    return mastery_scores, model_used, model, mastery_history
+    return mastery_scores, model_used, mastery_history
 
 
 async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[str, float]):
@@ -196,7 +192,7 @@ async def _persist_mastery_history(handle: str, platform: str, history: dict):
 async def _read_mastery_history(handle: str, platform: str) -> dict | None:
     """O(read) snapshot read — never a model rollout (spec §7 item 2)."""
     async with AsyncSessionLocal() as session:
-        user = await find_user_by_handle(session, handle)
+        user = await find_user_by_handle(session, handle, platform)
         if not user:
             return None
         rows = (await session.execute(
@@ -239,7 +235,7 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
 
         # 3. Mastery scores + Phase-4b checkpoints — one forward pass per fold
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
-        mastery_scores, model_used, model, mastery_history = _compute_mastery(
+        mastery_scores, model_used, mastery_history = _compute_mastery(
             sequence, normalized_subs, preloaded_model=preloaded,
         )
 

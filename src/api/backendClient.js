@@ -59,6 +59,7 @@ export const getRecommendationsWithMastery = (handle, platforms, topK, signal, f
 export const getProgress = (handle, signal, platform = "cf") =>
   apiFetch(`/api/progress/${encodeURIComponent(handle)}?platform=${platform}`, signal);
 
+// Trajectory is CF-only by route contract (LC renders a disabled card client-side)
 export const getRatingTrajectory = (handle, signal) =>
   apiFetch(`/api/rating-trajectory/${encodeURIComponent(handle)}?platform=cf`, signal);
 

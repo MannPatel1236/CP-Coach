@@ -311,8 +311,13 @@ export default function useAnalysis() {
     };
 
     setUser(userInfo);
+    // Symmetric with the CF path: clear the absent side's user AND handle so
+    // Phase-4 sections keyed on cfHandle never route LC data at CF endpoints
+    // after a platform switch.
     setCfUser(null);
+    setCfHandle("");
     setLcUser(userInfo);
+    setLcHandle(handle.trim());
     setTagProfile(profile);
     setWeakTags(weak);
     setSuggestedTopics([]);
@@ -420,6 +425,7 @@ export default function useAnalysis() {
       setCfUser(userInfo);
       setCfHandle(handle.trim());
       setLcUser(null);
+      setLcHandle("");
       setTagProfile(profile);
       setWeakTags(weak);
       setSolvedSet(solved || new Set());
@@ -435,6 +441,7 @@ export default function useAnalysis() {
       setCfUser(userInfo);
       setCfHandle(handle.trim());
       setLcUser(null);
+      setLcHandle("");
       setTagProfile(profile);
       setWeakTags(weak);
       setSolvedSet(solved || new Set());

@@ -74,4 +74,26 @@ describe("MasteryHistory — §5.2 #6", () => {
     const { getByTestId } = renderInContext(<MasteryHistory />);
     await waitFor(() => { expect(getByTestId("mastery-note").textContent).toContain("No mastery history yet"); });
   });
+
+  it("fetches with platform=lc when only lcHandle is set (regression: client hardcoded cf)", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "lcuser", platform: "lc", mastery_history: HISTORY, note: null }),
+    });
+    const { container } = renderInContext(<MasteryHistory />, { cfHandle: "", lcHandle: "lcuser" });
+    await rowsMounted(container);
+    const url = String(globalThis.fetch.mock.calls[0][0]);
+    expect(url).toContain("/api/mastery-history/lcuser?platform=lc");
+  });
+
+  it("prefers cf when both handles are set", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", mastery_history: HISTORY, note: null }),
+    });
+    const { container } = renderInContext(<MasteryHistory />, { cfHandle: "mannpatel", lcHandle: "lcuser" });
+    await rowsMounted(container);
+    const url = String(globalThis.fetch.mock.calls[0][0]);
+    expect(url).toContain("/api/mastery-history/mannpatel?platform=cf");
+  });
 });

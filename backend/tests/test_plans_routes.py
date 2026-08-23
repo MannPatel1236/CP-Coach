@@ -146,3 +146,55 @@ class TestPlansContracts:
         fake_db(fail=True)
         r = client.delete("/api/plans/mannpatel/5")
         assert r.status_code == 502
+
+
+class TestPlansBodyLimitAndAuth:
+    """MaxBodySizeMiddleware covers PUT too; HMAC opt-in locks plans when set."""
+
+    def test_oversized_post_body_rejected_413(self, fake_db):
+        # Middleware short-circuits before any DB touch — no fake results needed.
+        fake_db()
+        big = {"name": "x" * 1_100_000, "payload": {}}
+        r = client.post("/api/plans/mannpatel", json=big)
+        assert r.status_code == 413
+
+    def test_oversized_put_body_rejected_413(self, fake_db):
+        fake_db()
+        big = {"name": "x" * 1_100_000, "payload": {}}
+        r = client.put("/api/plans/mannpatel/1", json=big)
+        assert r.status_code == 413
+
+    def test_normal_size_post_passes_middleware(self, fake_db):
+        fake_db(_FakeResult(None))
+        r = client.post("/api/plans/mannpatel", json=PLAN_BODY)
+        assert r.status_code == 201
+
+    def _hmac_headers(self, handle, ts=None):
+        import time
+        from auth import _hmac_sign
+        ts = ts or str(int(time.time()))
+        return {"Authorization": f"HMAC {_hmac_sign(ts, handle)}", "X-Timestamp": ts}
+
+    def test_unsigned_post_rejected_401_when_secret_set(self, fake_db, monkeypatch):
+        import auth as auth_mod
+        monkeypatch.setattr(auth_mod, "_API_SECRET", "test-secret")
+        fake_db(_FakeResult(None))
+        r = client.post("/api/plans/mannpatel", json=PLAN_BODY)
+        assert r.status_code == 401
+
+    def test_signed_post_passes_and_creates_plan(self, fake_db, monkeypatch):
+        import auth as auth_mod
+        monkeypatch.setattr(auth_mod, "_API_SECRET", "test-secret")
+        fake_db(_FakeResult(None))
+        r = client.post("/api/plans/mannpatel", json=PLAN_BODY,
+                        headers=self._hmac_headers("mannpatel"))
+        assert r.status_code == 201, r.json()
+        assert r.json()["id"] == 101
+
+    def test_signature_bound_to_other_handle_rejected_401(self, fake_db, monkeypatch):
+        import auth as auth_mod
+        monkeypatch.setattr(auth_mod, "_API_SECRET", "test-secret")
+        fake_db(_FakeResult(None))
+        r = client.post("/api/plans/mannpatel", json=PLAN_BODY,
+                        headers=self._hmac_headers("someone-else"))
+        assert r.status_code == 401

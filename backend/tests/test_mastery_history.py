@@ -123,9 +123,10 @@ class TestMasteryHistoryRoute:
         finally:
             app.state.graph_dkt_model = None
 
-    def test_analyze_with_legacy_predict_only_model_leaves_history_none(self, monkeypatch):
-        """Models exposing only predict_mastery still analyze, but cannot inline
-        temporal checkpoints — history degrades to None (disabled UI caption)."""
+    def test_analyze_with_legacy_predict_only_model_degrades_to_rule_based(self, monkeypatch):
+        """_compute_mastery calls predict_mastery_full unconditionally — a model
+        exposing only the old predict_mastery raises AttributeError inside the
+        try-block and degrades to rule_based with no checkpoints."""
         from unittest.mock import AsyncMock
 
         async def one_sub(handle, **kwargs):
@@ -160,8 +161,64 @@ class TestMasteryHistoryRoute:
             r = client.get("/api/analyze/tourist?platform=cf&mode=quick")
             assert r.status_code == 200, r.json()
             data = r.json()
-            assert data["model_used"] == "graph_dkt"
-            assert fake.n_calls == 1
+            assert data["model_used"] == "rule_based"
+            assert fake.n_calls == 0, "legacy model is never called — full API only"
             assert data["mastery_history"] is None
         finally:
             app.state.graph_dkt_model = None
+
+
+class TestEnsembleMerge:
+    """_GraphDKTEnsemble folds ONE forward per fold into per-topic means."""
+
+    def _fold(self, tg, mastery_value, p_values):
+        class _Fold:
+            def predict_mastery_full(self, sequence, topic_graph, n_checkpoints=8, device="cpu"):
+                mastery = {t: mastery_value for t in topic_graph.TOPICS}
+                history = {
+                    t: [{"ts": 1_700_000_000_000 + i, "p": p_values[i]} for i in range(len(p_values))]
+                    for t in topic_graph.TOPICS
+                }
+                return mastery, history
+
+        return _Fold()
+
+    def test_mean_across_folds_single_forward_each(self):
+        from main import _GraphDKTEnsemble
+
+        tg = CPTopicGraph()
+        calls = []
+
+        class CountingFold:
+            def __init__(self, m, ps):
+                self._m, self._ps = m, ps
+
+            def predict_mastery_full(self, sequence, topic_graph, n_checkpoints=8, device="cpu"):
+                calls.append(n_checkpoints)
+                history = {
+                    t: [{"ts": 1_700_000_000_000 + i, "p": self._ps[i]} for i in range(len(self._ps))]
+                    for t in topic_graph.TOPICS
+                }
+                return {t: self._m for t in topic_graph.TOPICS}, history
+
+        ens = _GraphDKTEnsemble([CountingFold(0.2, [0.1, 0.3]), CountingFold(0.6, [0.5, 0.7])])
+        seq = _make_sequence(n_rows=4)
+        mastery, merged = ens.predict_mastery_full(seq, tg, n_checkpoints=2)
+
+        assert calls == [2, 2], "exactly one forward per fold"
+        assert all(abs(v - 0.4) < 1e-9 for v in mastery.values())
+        for cps in merged.values():
+            assert len(cps) == 2
+            # ts comes from fold 0; p is the cross-fold mean at each checkpoint
+            assert cps[0]["ts"] == 1_700_000_000_000
+            assert abs(cps[0]["p"] - 0.3) < 1e-9
+            assert abs(cps[1]["p"] - 0.5) < 1e-9
+
+    def test_empty_sequence_returns_zero_mastery_and_empty_history(self):
+        from main import _GraphDKTEnsemble
+
+        tg = CPTopicGraph()
+        ens = _GraphDKTEnsemble([self._fold(tg, 0.9, [0.5])])
+        mastery, merged = ens.predict_mastery_full([], tg)
+        assert all(v == 0.9 for v in mastery.values())
+        assert set(merged.keys()) == set(tg.TOPICS)

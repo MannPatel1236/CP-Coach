@@ -28,13 +28,10 @@ from db.connection import create_tables  # noqa: E402
 
 
 class _GraphDKTEnsemble:
-    """Thin wrapper averaging N Graph-DKT folds' predict_mastery output."""
+    """Thin wrapper averaging N Graph-DKT folds' single-forward-pass output."""
 
     def __init__(self, folds: list) -> None:
         self.folds = folds
-
-    def predict_mastery(self, sequence, topic_graph, device="cpu") -> dict[str, float]:
-        return self.predict_mastery_full(sequence, topic_graph, device=device)[0]
 
     def predict_mastery_full(self, sequence, topic_graph, n_checkpoints: int = 8, device="cpu"):
         """ONE forward per fold → (per-topic mean mastery, per-checkpoint mean history).
@@ -59,22 +56,6 @@ class _GraphDKTEnsemble:
                 for i in range(n)
             ]
         return mastery, merged
-
-    def predict_mastery_history(self, sequence, topic_graph, n_checkpoints: int = 8, device="cpu") -> dict[str, list[dict]]:
-        """Phase 4b: per-checkpoint mean across folds (timestamps align — same sequence)."""
-        acc = {t: [] for t in topic_graph.TOPICS}
-        for f in self.folds:
-            hist = f.predict_mastery_history(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)
-            for k, v in hist.items():
-                acc[k].append(v)
-        merged = {}
-        for k, per_fold in acc.items():
-            n = len(per_fold[0]) if per_fold else 0
-            merged[k] = [
-                {"ts": per_fold[0][i]["ts"], "p": sum(f[i]["p"] for f in per_fold) / len(per_fold)}
-                for i in range(n)
-            ]
-        return merged
 
 
 @asynccontextmanager
@@ -168,13 +149,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Reject oversized POST bodies (> 1 MB) on the JSON-write endpoints
+# Reject oversized JSON-write bodies (> 1 MB) on /recommend and /plans
 class MaxBodySizeMiddleware(BaseHTTPMiddleware):
-    """Reject request bodies larger than MAX_SIZE bytes for POST /recommend and /plans."""
+    """Reject request bodies larger than MAX_SIZE bytes for POST/PUT /recommend and /plans.
+
+    PUT is included: PlanIn.payload is an untyped dict, so an uncapped PUT
+    reopens the same hole this middleware closes for POST. DELETE carries no body.
+    """
     MAX_SIZE = 1_000_000  # 1 MB
 
     async def dispatch(self, request, call_next):
-        if request.method == "POST" and request.url.path.startswith(("/api/recommend", "/api/plans")):
+        if request.method in ("POST", "PUT") and request.url.path.startswith(("/api/recommend", "/api/plans")):
             content_length = request.headers.get("content-length")
             if content_length:
                 try:

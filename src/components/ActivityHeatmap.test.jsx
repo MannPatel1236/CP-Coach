@@ -76,4 +76,26 @@ describe("ActivityHeatmap + Streaks — §5.2 #7", () => {
     const { getByTestId } = renderInContext(<ActivityHeatmap />);
     await waitFor(() => { expect(getByTestId("heat-empty")).toBeTruthy(); });
   });
+
+  it("fetches with platform=lc when only lcHandle is set (regression: client hardcoded cf)", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "lcuser", platform: "lc", topic_progress: {}, activity: ACTIVITY }),
+    });
+    const { container } = renderInContext(<ActivityHeatmap />, { cfHandle: "", lcHandle: "lcuser" });
+    await gridMounted(container);
+    const url = String(globalThis.fetch.mock.calls[0][0]);
+    expect(url).toContain("/api/progress/lcuser?platform=lc");
+  });
+
+  it("prefers cf when both handles are set", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", topic_progress: {}, activity: ACTIVITY }),
+    });
+    const { container } = renderInContext(<ActivityHeatmap />, { cfHandle: "mannpatel", lcHandle: "lcuser" });
+    await gridMounted(container);
+    const url = String(globalThis.fetch.mock.calls[0][0]);
+    expect(url).toContain("/api/progress/mannpatel?platform=cf");
+  });
 });

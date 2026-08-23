@@ -70,6 +70,18 @@ describe("CompareHandles — §5.2 #8", () => {
     expect(queryByTestId("compare-estimate-badge")).toBeNull(); // both graph_dkt
   });
 
+  it("renders negative deltas with a true minus sign (U+2212), not hyphen-minus", async () => {
+    globalThis.fetch.mockResolvedValue(okResponse(SECONDARY));
+    const { container, getByTestId } = renderInContext(<CompareHandles />);
+    await typeAndCompare(getByTestId, "tourist");
+    await waitFor(() => {
+      expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
+    });
+    const binaryRow = container.querySelector("[data-topic='binary_search']"); // primary −0.25
+    const signSpan = binaryRow.querySelectorAll("span")[1]; // [0]=topic label, [1]=signed value
+    expect(signSpan.textContent).toBe("−0.25"); // "−0.25" — U+2212, typographic minus
+  });
+
   it("shows 'second handle unavailable' chip on failure, primary side still renders", async () => {
     globalThis.fetch.mockResolvedValue(err400());
     const { getByTestId, queryByTestId } = renderInContext(<CompareHandles />);

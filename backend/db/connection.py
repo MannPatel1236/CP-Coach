@@ -183,22 +183,32 @@ def utcnow_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-async def find_user_by_handle(session, handle: str) -> User | None:
-    """Exact case-insensitive match on cf_handle OR lc_handle, else None.
+async def find_user_by_handle(session, handle: str, platform: str | None = None) -> User | None:
+    """Exact case-insensitive user lookup, else None.
 
     lower()== equality, NOT ilike() — '_' is legal in CF handles and is a
     LIKE wildcard, so ilike('a_b') would resolve to a stranger's row 'aXb'.
+
+    Platform-scoped callers (analyze/progress/trajectory persistence) pass
+    `platform` so an LC analysis can never resolve onto a stranger's CF row
+    whose handle string happens to collide. Callers with no platform context
+    (plans CRUD keyed by either handle) omit it and get either-column matching.
     """
-    stmt = select(User).where(
-        (func.lower(User.cf_handle) == handle.lower())
-        | (func.lower(User.lc_handle) == handle.lower())
-    )
+    h = handle.lower()
+    if platform == "cf":
+        cond = func.lower(User.cf_handle) == h
+    elif platform == "lc":
+        cond = func.lower(User.lc_handle) == h
+    else:
+        cond = (func.lower(User.cf_handle) == h) | (func.lower(User.lc_handle) == h)
+    stmt = select(User).where(cond)
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def get_or_create_user(session, handle: str, platform: str = "cf") -> User:
-    """find_user_by_handle(), creating a row keyed to `platform` when absent."""
-    user = await find_user_by_handle(session, handle)
+    """find_user_by_handle() scoped to `platform`'s column, creating a row
+    keyed to that platform when absent."""
+    user = await find_user_by_handle(session, handle, platform)
     if not user:
         user = User(cf_handle=handle if platform == "cf" else None,
                     lc_handle=handle if platform == "lc" else None,

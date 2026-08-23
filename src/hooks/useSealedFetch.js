@@ -6,14 +6,13 @@
 // component keeps only its render logic. The async IIFE keeps setState off the
 // synchronous effect path (react-hooks/set-state-in-effect); the cancelled flag
 // mirrors useGraphLayout's pattern.
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export function useSealedFetch(fetcher, enabled) {
   const [data, setData] = useState(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const abortRef = useRef(null);
 
   const run = useCallback(async (controller) => {
     setLoading(true);
@@ -35,15 +34,12 @@ export function useSealedFetch(fetcher, enabled) {
     if (!enabled) return undefined;
     let cancelled = false;
     const controller = new AbortController();
-    abortRef.current = controller;
     (async () => { await run(controller); if (cancelled) setLoading(false); })();
     return () => { cancelled = true; controller.abort(); };
   }, [enabled, run]);
 
   const retry = useCallback(() => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    run(controller);
+    run(new AbortController());
   }, [run]);
 
   return { data, note, error, loading, retry };
