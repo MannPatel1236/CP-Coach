@@ -135,4 +135,30 @@ describe("Workbook — §5.2 #9", () => {
     });
     expect(container.querySelectorAll("[data-testid='wb-plan']").length).toBe(1);
   });
+
+  it("write-failure contract: failed POST keeps the optimistic local copy + local-only note", async () => {
+    // Read succeeds empty; every write 5xxes (backend plans storage down).
+    globalThis.fetch.mockImplementation((url, options = {}) => {
+      if ((options.method || "GET") === "GET") return Promise.resolve(okResponse([]));
+      return Promise.resolve({
+        ok: false, status: 502,
+        headers: { get: () => "application/json" },
+        json: () => Promise.resolve({ detail: "Plans storage unavailable." }),
+      });
+    });
+    const { getByTestId } = renderInContext(<Workbook />);
+    await waitFor(() => { expect(getByTestId("wb-blank")).toBeTruthy(); });
+
+    fireEvent.click(getByTestId("wb-save"));
+
+    // apiFetch retries the 502 twice with backoff before the catch fires —
+    // give the optimistic-copy assertion room to outlive the retry ladder.
+    await waitFor(() => { expect(getByTestId("wb-local-note")).toBeTruthy(); }, { timeout: 6000 });
+    expect(getByTestId("wb-plan")).toBeTruthy();
+    expect(getByTestId("wb-local-note")).toBeTruthy();
+    // The optimistic copy is durable in localStorage keyed by handle — a reload
+    // must not lose the plan the user thinks they saved.
+    expect(loadLocalPlans("mannpatel").length).toBe(1);
+    expect(loadLocalPlans("mannpatel")[0].payload.items.length).toBeGreaterThan(0);
+  });
 });

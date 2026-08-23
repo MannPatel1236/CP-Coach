@@ -20,11 +20,3 @@ export function saveLocalPlans(handle, plans) {
     return false;
   }
 }
-
-export function clearLocalPlans(handle) {
-  try {
-    window.localStorage.removeItem(keyOf(handle));
-  } catch {
-    /* ignore quota/private-mode errors */
-  }
-}

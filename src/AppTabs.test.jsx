@@ -67,3 +67,34 @@ describe("AppTabs — Phase 6 Step 4 (zero-refetch proof)", () => {
     }
   });
 });
+
+describe("AppTabs — hash routing contract", () => {
+  it("restores the deep-linked tab from the URL hash on load", () => {
+    window.history.replaceState(null, "", "/#analytics");
+    const { container } = render(<App />);
+
+    expect(container.querySelector("#panel-analytics").hasAttribute("hidden")).toBe(false);
+    expect(container.querySelector("#panel-practice").hasAttribute("hidden")).toBe(true);
+  });
+
+  it("falls back to practice for an unknown hash (in memory — URL untouched until a switch)", () => {
+    window.history.replaceState(null, "", "/#garbage");
+    const { container } = render(<App />);
+
+    expect(container.querySelector("#panel-practice").hasAttribute("hidden")).toBe(false);
+    expect(window.location.hash).toBe("#garbage");
+  });
+
+  it("switchTab writes the tab hash; going home strips it entirely", () => {
+    const { container, getByTestId } = render(<App />);
+
+    fireEvent.click(getByTestId("nav-tab-workbook"));
+    expect(window.location.hash).toBe("#workbook");
+
+    // Header logo = home: dashboard state clears AND the URL drops the tab hash
+    // (a "#practice" hash on the landing page would deep-link to nothing).
+    fireEvent.click(container.querySelector(".header-logo-group"));
+    expect(window.location.hash).toBe("");
+    expect(container.querySelector("#panel-practice").hasAttribute("hidden")).toBe(false);
+  });
+});

@@ -186,18 +186,45 @@ else:
             idx = t_ids.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, hc.size(-1))
             return hc.gather(2, idx).squeeze(2)                          # (B,K,gcn_hidden)
 
-        def predict_mastery(self, sequence: list[dict], topic_graph, device="cpu") -> dict[str, float]:
-            """Run inference on a single sequence."""
+        def predict_mastery_full(self, sequence: list[dict], topic_graph, n_checkpoints: int = 8, device="cpu"):
+            """ONE forward pass → (current mastery per topic, temporal checkpoints).
+
+            Phase 4b perf: callers need both outputs; running predict_mastery +
+            predict_mastery_history separately re-collates and re-runs the full
+            LSTM+GCN twice per model. Returns
+            ``({topic: p}, {topic: [{"ts": ms, "p": float}, ...]})``.
+            """
             self.eval()
             self.to(device)
             batch = collate_fn([sequence], topic_graph)
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
             with torch.no_grad():
-                predictions, _ = self.forward(batch)
+                predictions, mastery_t = self.forward(batch)
+
             mask = batch["mask"][0]
             last_idx = max(mask.sum().long().item() - 1, 0)
             last_pred = predictions[0, last_idx]
-            return {topic_graph.idx_to_topic[i]: last_pred[i].item() for i in range(self.num_topics)}
+            mastery = {topic_graph.idx_to_topic[i]: last_pred[i].item() for i in range(self.num_topics)}
+
+            T = mastery_t.shape[1]
+            # Evenly spaced indices (deduped so short sequences never repeat a row);
+            # last index = current mastery row.
+            if n_checkpoints <= 1:
+                idxs = [T - 1]
+            else:
+                idxs = list(dict.fromkeys(round(i * (T - 1) / (n_checkpoints - 1)) for i in range(n_checkpoints)))
+            checkpoints = [[] for _ in range(self.num_topics)]
+            for idx in idxs:
+                row = mastery_t[0, idx]
+                ts = int(sequence[idx].get("timestamp", 0))
+                for j in range(self.num_topics):
+                    checkpoints[j].append({"ts": ts, "p": row[j].item()})
+            history = {topic_graph.idx_to_topic[j]: checkpoints[j] for j in range(self.num_topics)}
+            return mastery, history
+
+        def predict_mastery(self, sequence: list[dict], topic_graph, device="cpu") -> dict[str, float]:
+            """Run inference on a single sequence."""
+            return self.predict_mastery_full(sequence, topic_graph, n_checkpoints=1, device=device)[0]
 
         def predict_mastery_history(self, sequence: list[dict], topic_graph, n_checkpoints: int = 8, device="cpu") -> dict[str, list[dict]]:
             """Gather K temporal mastery checkpoints from the same forward pass.
@@ -211,25 +238,7 @@ else:
             """
             if not sequence:
                 return {topic: [] for topic in topic_graph.TOPICS}
-            self.eval()
-            self.to(device)
-            batch = collate_fn([sequence], topic_graph)
-            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
-            with torch.no_grad():
-                _, mastery_t = self.forward(batch)
-            T = mastery_t.shape[1]
-            # Evenly spaced indices (deduped so short sequences never repeat a row)
-            if n_checkpoints <= 1:
-                idxs = [T - 1]
-            else:
-                idxs = list(dict.fromkeys(round(i * (T - 1) / (n_checkpoints - 1)) for i in range(n_checkpoints)))
-            checkpoints = [[] for _ in range(self.num_topics)]
-            for idx in idxs:
-                row = mastery_t[0, idx]
-                ts = int(sequence[idx].get("timestamp", 0))
-                for j in range(self.num_topics):
-                    checkpoints[j].append({"ts": ts, "p": row[j].item()})
-            return {topic_graph.idx_to_topic[j]: checkpoints[j] for j in range(self.num_topics)}
+            return self.predict_mastery_full(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)[1]
 
         def get_graph_influence(self, topic: str, topic_graph) -> dict[str, float]:
             """Approximate prerequisite influence via degree-normalized adjacency."""

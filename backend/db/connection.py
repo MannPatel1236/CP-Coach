@@ -2,10 +2,12 @@
 
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import (
     Column, Integer, String, Float, BigInteger, ForeignKey, TIMESTAMP, ARRAY, Text,
+    func, select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -170,6 +172,41 @@ class Plan(Base):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def utcnow_naive() -> datetime:
+    """Naive UTC wall clock for TIMESTAMP (without time zone) columns.
+
+    asyncpg's naive-timestamp codec cannot encode tz-aware datetimes — an
+    aware value raises DataError at bind-encode time. Every writer into a
+    TIMESTAMP column must use this, not datetime.now(timezone.utc).
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+async def find_user_by_handle(session, handle: str) -> User | None:
+    """Exact case-insensitive match on cf_handle OR lc_handle, else None.
+
+    lower()== equality, NOT ilike() — '_' is legal in CF handles and is a
+    LIKE wildcard, so ilike('a_b') would resolve to a stranger's row 'aXb'.
+    """
+    stmt = select(User).where(
+        (func.lower(User.cf_handle) == handle.lower())
+        | (func.lower(User.lc_handle) == handle.lower())
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def get_or_create_user(session, handle: str, platform: str = "cf") -> User:
+    """find_user_by_handle(), creating a row keyed to `platform` when absent."""
+    user = await find_user_by_handle(session, handle)
+    if not user:
+        user = User(cf_handle=handle if platform == "cf" else None,
+                    lc_handle=handle if platform == "lc" else None,
+                    primary_platform=platform)
+        session.add(user)
+        await session.flush()
+    return user
+
 
 async def create_tables():
     """Read schema.sql and execute it against the database."""

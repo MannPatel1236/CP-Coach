@@ -1,11 +1,13 @@
 // Greenhouse Phase 4a — RatingTrajectory dashboard section (spec §5.2 #5).
 // CF-only: LeetCode handles render a disabled card with a caption (never an error).
 // Hand-built SVG line chart (spec §13.3 — no charting lib for the new sections),
-// self-fetching via backendClient with sealed empty-state + retry (§8).
-import { useEffect, useState, useRef, useCallback } from "react";
+// self-fetching via backendClient with sealed empty-state + retry (§8) through
+// the shared useSealedFetch scaffold.
+import { useCallback } from "react";
 import { motion } from "framer-motion";
 import { TrendUpIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
+import { useSealedFetch } from "../hooks/useSealedFetch.js";
 import { getRatingTrajectory } from "../api/backendClient.js";
 import { panelTransition } from "../lib/motion.js";
 
@@ -18,41 +20,13 @@ const PAD_B = 22;
 
 export default function RatingTrajectory() {
   const { cfHandle } = useAnalysisContext();
-  const [points, setPoints] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef(null);
 
-  const run = useCallback(async (controller) => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getRatingTrajectory(cfHandle.trim(), controller.signal);
-      setPoints(data.points || []);
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      setError(err.message || "Failed to load rating history.");
-    } finally {
-      setLoading(false);
-    }
+  const fetcher = useCallback(async (signal) => {
+    const data = await getRatingTrajectory(cfHandle.trim(), signal);
+    return { data: data.points || [] };
   }, [cfHandle]);
 
-  // Async IIFE keeps setState off the synchronous effect path (react-hooks/
-  // set-state-in-effect); the cancelled flag mirrors useGraphLayout's pattern.
-  useEffect(() => {
-    if (!cfHandle) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    (async () => { await run(controller); if (cancelled) setLoading(false); })();
-    return () => { cancelled = true; controller.abort(); };
-  }, [cfHandle, run]);
-
-  const retry = () => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    run(controller);
-  };
+  const { data: points, error, loading, retry } = useSealedFetch(fetcher, !!cfHandle);
 
   if (!cfHandle) {
     return (

@@ -76,6 +76,13 @@ export default function useAnalysis() {
   // Persist the resolved analysis so a refresh restores the dashboard + hash tab.
   useEffect(() => {
     if (!user) return;
+    // Identity guard: while the search box holds a query matching none of the
+    // analyzed handles (a new search typed over a displayed analysis), skip the
+    // write so the snapshot never pairs one handle's profile with another's name.
+    const q = handle.trim().toLowerCase();
+    const analyzedIds = [cfHandle, lcHandle, ...(user.handle || "").split(" / ")]
+      .map((h) => (h || "").trim().toLowerCase()).filter(Boolean);
+    if (q && analyzedIds.length > 0 && !analyzedIds.includes(q)) return;
     const snapshot = {
       handle, cfHandle, lcHandle,
       user, cfUser, lcUser,
@@ -408,7 +415,10 @@ export default function useAnalysis() {
       }
 
       setUser(userInfo);
-      setCfUser(null);
+      // CF-only path still populates cfUser/cfHandle so Phase-4 sections keyed on
+      // them (RatingTrajectory gate, heatmap/mastery platform pick) stay live.
+      setCfUser(userInfo);
+      setCfHandle(handle.trim());
       setLcUser(null);
       setTagProfile(profile);
       setWeakTags(weak);
@@ -422,7 +432,8 @@ export default function useAnalysis() {
       const suggested = findNextTopics(profile, userInfo.rating || 800, 5);
 
       setUser(userInfo);
-      setCfUser(null);
+      setCfUser(userInfo);
+      setCfHandle(handle.trim());
       setLcUser(null);
       setTagProfile(profile);
       setWeakTags(weak);
@@ -447,6 +458,10 @@ export default function useAnalysis() {
     setLoading(true);
     setError("");
     setModelUsed(null);
+    // A re-analysis invalidates the stored snapshot immediately: if this run
+    // fails, a refresh must land on the landing page — not resurrect the
+    // previous handle's dashboard under the newly typed query.
+    try { window.localStorage.removeItem(SNAPSHOT_KEY); } catch { /* ignore */ }
     setUser(null);
     setTagProfile([]);
     setWeakTags([]);

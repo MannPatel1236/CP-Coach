@@ -3,10 +3,13 @@
 // rule-based mastery must never be presented as Graph-DKT output). Hand-built
 // SVG sparklines (spec §13.3), self-fetching with sealed empty-state + retry.
 // Reduced-motion is CSS-only in this repo — no JS matchMedia needed (§8).
-import { useEffect, useState, useRef, useCallback } from "react";
+// Platform is threaded explicitly so the read route resolves the user by the
+// SAME handle column the analyze wrote to.
+import { useCallback } from "react";
 import { motion } from "framer-motion";
 import { ZapIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
+import { useSealedFetch } from "../hooks/useSealedFetch.js";
 import { getMasteryHistory } from "../api/backendClient.js";
 import { panelTransition } from "../lib/motion.js";
 import { labelOf } from "../lib/topicGraphLayout.js";
@@ -17,47 +20,18 @@ const MAX_ROWS = 8;
 
 export default function MasteryHistory() {
   const { modelUsed, cfHandle, lcHandle, user } = useAnalysisContext();
-  const [history, setHistory] = useState(null);
-  const [note, setNote] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef(null);
 
   const handle = cfHandle || lcHandle || (user && user.handle) || "";
-
-  const run = useCallback(async (controller) => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getMasteryHistory(handle.trim(), controller.signal);
-      setHistory(data.mastery_history || null);
-      setNote(data.note || "");
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      setError(err.message || "Failed to load mastery history.");
-    } finally {
-      setLoading(false);
-    }
-  }, [handle]);
-
+  const platform = cfHandle ? "cf" : "lc";
   const graphDkt = modelUsed === "graph_dkt";
 
-  // Async IIFE keeps setState off the synchronous effect path (react-hooks/
-  // set-state-in-effect). Skipped entirely when the rule-based badge applies.
-  useEffect(() => {
-    if (!graphDkt || !handle) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    (async () => { await run(controller); if (cancelled) setLoading(false); })();
-    return () => { cancelled = true; controller.abort(); };
-  }, [graphDkt, handle, run]);
+  const fetcher = useCallback(async (signal) => {
+    const data = await getMasteryHistory(handle.trim(), signal, platform);
+    return { data: data.mastery_history || null, note: data.note || "" };
+  }, [handle, platform]);
 
-  const retry = () => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    run(controller);
-  };
+  // Skipped entirely when the rule-based badge applies.
+  const { data: history, note, error, loading, retry } = useSealedFetch(fetcher, graphDkt && !!handle);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={panelTransition}>

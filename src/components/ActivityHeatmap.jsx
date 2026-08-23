@@ -2,11 +2,14 @@
 // Derives from submission timestamps, so it works on rule_based AND graph_dkt
 // paths alike (no mastery dependency). Weekly buckets (locked decision): 12-week
 // grid colored by solved count + current/longest weekly streaks. Hand-built CSS
-// grid (§13.3); sealed empty-state + retry (§8).
-import { useEffect, useState, useRef, useCallback } from "react";
+// grid (§13.3); sealed empty-state + retry (§8) via the shared useSealedFetch
+// scaffold. Platform is threaded explicitly — the backend defaults to "cf" and
+// would query the CF API with an LC handle.
+import { useCallback } from "react";
 import { motion } from "framer-motion";
 import { CalendarIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
+import { useSealedFetch } from "../hooks/useSealedFetch.js";
 import { getProgress } from "../api/backendClient.js";
 import { panelTransition } from "../lib/motion.js";
 
@@ -14,41 +17,16 @@ const N_WEEKS = 12;
 
 export default function ActivityHeatmap() {
   const { cfHandle, lcHandle, user } = useAnalysisContext();
-  const [activity, setActivity] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef(null);
 
   const handle = cfHandle || lcHandle || (user && user.handle) || "";
+  const platform = cfHandle ? "cf" : "lc";
 
-  const run = useCallback(async (controller) => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getProgress(handle.trim(), controller.signal);
-      setActivity(data.activity || {});
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      setError(err.message || "Failed to load activity.");
-    } finally {
-      setLoading(false);
-    }
-  }, [handle]);
+  const fetcher = useCallback(async (signal) => {
+    const data = await getProgress(handle.trim(), signal, platform);
+    return { data: data.activity || {} };
+  }, [handle, platform]);
 
-  useEffect(() => {
-    if (!handle) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    (async () => { await run(controller); if (cancelled) setLoading(false); })();
-    return () => { cancelled = true; controller.abort(); };
-  }, [handle, run]);
-
-  const retry = () => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    run(controller);
-  };
+  const { data: activity, error, loading, retry } = useSealedFetch(fetcher, !!handle);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={panelTransition}>

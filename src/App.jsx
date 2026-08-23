@@ -7,7 +7,7 @@ import { AnalysisContext } from "./hooks/AnalysisContext.jsx";
 
 import Header from "./components/Header.jsx";
 import SearchBar from "./components/SearchBar.jsx";
-import DashboardNav from "./components/DashboardNav.jsx";
+import DashboardNav, { DASH_TABS } from "./components/DashboardNav.jsx";
 import ProfileCard from "./components/ProfileCard.jsx";
 import WeakAreas from "./components/WeakAreas.jsx";
 import TagOverview from "./components/TagOverview.jsx";
@@ -28,7 +28,8 @@ import ErrorState from "./components/ErrorState.jsx";
 import SuccessBanner from "./components/SuccessBanner.jsx";
 import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
 
-const DASH_PANEL_IDS = ["practice", "analytics", "compare", "workbook"];
+// Single source of truth for the dashboard tabs lives in DashboardNav (DASH_TABS)
+const DASH_PANEL_IDS = DASH_TABS.map((t) => t.id);
 
 const sanitizeTab = (raw) => {
   const tab = String(raw || "").replace(/^#/, "").toLowerCase().trim();

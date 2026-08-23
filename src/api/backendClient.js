@@ -56,14 +56,14 @@ export const getRecommendationsWithMastery = (handle, platforms, topK, signal, f
     }),
   });
 
-export const getProgress = (handle, signal) =>
-  apiFetch(`/api/progress/${encodeURIComponent(handle)}`, signal);
+export const getProgress = (handle, signal, platform = "cf") =>
+  apiFetch(`/api/progress/${encodeURIComponent(handle)}?platform=${platform}`, signal);
 
 export const getRatingTrajectory = (handle, signal) =>
   apiFetch(`/api/rating-trajectory/${encodeURIComponent(handle)}?platform=cf`, signal);
 
-export const getMasteryHistory = (handle, signal) =>
-  apiFetch(`/api/mastery-history/${encodeURIComponent(handle)}`, signal);
+export const getMasteryHistory = (handle, signal, platform = "cf") =>
+  apiFetch(`/api/mastery-history/${encodeURIComponent(handle)}?platform=${platform}`, signal);
 
 export const getTopicGraph = (signal) =>
   apiFetch(`/api/graph`, signal);

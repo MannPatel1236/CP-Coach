@@ -295,7 +295,7 @@ function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, est
                   />
                 </div>
                 <span style={{ flex: "0 0 52px", fontSize: 12, fontFamily: "var(--font-mono)", fontWeight: 600, color: isUp ? "var(--success)" : "var(--error)" }}>
-                  {isUp ? "+" : "−"}{d.delta.toFixed(2)}
+                  {isUp ? "+" : "−"}{Math.abs(d.delta).toFixed(2)}
                 </span>
               </div>
             );

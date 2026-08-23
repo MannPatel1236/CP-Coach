@@ -34,12 +34,31 @@ class _GraphDKTEnsemble:
         self.folds = folds
 
     def predict_mastery(self, sequence, topic_graph, device="cpu") -> dict[str, float]:
+        return self.predict_mastery_full(sequence, topic_graph, device=device)[0]
+
+    def predict_mastery_full(self, sequence, topic_graph, n_checkpoints: int = 8, device="cpu"):
+        """ONE forward per fold → (per-topic mean mastery, per-checkpoint mean history).
+
+        Phase 4b perf: analyze() needs both outputs; calling predict_mastery and
+        predict_mastery_history separately runs the whole ensemble twice.
+        """
         acc = {t: 0.0 for t in topic_graph.TOPICS}
+        hists = []
         for f in self.folds:
-            m = f.predict_mastery(sequence, topic_graph, device=device)
+            m, h = f.predict_mastery_full(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)
             for k, v in m.items():
                 acc[k] = acc.get(k, 0.0) + v
-        return {k: v / len(self.folds) for k, v in acc.items()}
+            hists.append(h)
+        mastery = {k: v / len(self.folds) for k, v in acc.items()}
+        merged = {}
+        for k in topic_graph.TOPICS:
+            per_fold = [h[k] for h in hists]
+            n = len(per_fold[0]) if per_fold else 0
+            merged[k] = [
+                {"ts": per_fold[0][i]["ts"], "p": sum(f[i]["p"] for f in per_fold) / len(per_fold)}
+                for i in range(n)
+            ]
+        return mastery, merged
 
     def predict_mastery_history(self, sequence, topic_graph, n_checkpoints: int = 8, device="cpu") -> dict[str, list[dict]]:
         """Phase 4b: per-checkpoint mean across folds (timestamps align — same sequence)."""
@@ -149,13 +168,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Reject POST /api/recommend bodies > 1MB
+# Reject oversized POST bodies (> 1 MB) on the JSON-write endpoints
 class MaxBodySizeMiddleware(BaseHTTPMiddleware):
-    """Reject request bodies larger than MAX_SIZE bytes for POST /recommend."""
+    """Reject request bodies larger than MAX_SIZE bytes for POST /recommend and /plans."""
     MAX_SIZE = 1_000_000  # 1 MB
 
     async def dispatch(self, request, call_next):
-        if request.method == "POST" and request.url.path.startswith("/api/recommend"):
+        if request.method == "POST" and request.url.path.startswith(("/api/recommend", "/api/plans")):
             content_length = request.headers.get("content-length")
             if content_length:
                 try:

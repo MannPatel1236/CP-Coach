@@ -2,7 +2,6 @@
 
 import os
 import logging
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
@@ -15,7 +14,10 @@ from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
 from data.preprocessor import Preprocessor
 from data.topic_graph import CPTopicGraph
-from db.connection import AsyncSessionLocal, User, KTState, MasteryHistory
+from db.connection import (
+    AsyncSessionLocal, KTState, MasteryHistory,
+    find_user_by_handle, get_or_create_user, utcnow_naive,
+)
 from routes.schemas import AnalyzeResponse, MasteryHistoryResponse, TopicProfileEntry
 
 logger = logging.getLogger(__name__)
@@ -98,12 +100,18 @@ async def _analyze_lc(handle: str, mode: str, _controller):
 
 
 def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
-    """Compute mastery scores — try Graph-DKT, fallback to rule-based.
+    """Compute mastery scores + Phase-4b checkpoints — try Graph-DKT, fallback rule-based.
 
-    Returns (mastery_scores, model_used, model) — the model is returned so the
-    caller can gather temporal checkpoints (Phase 4b) from the same object.
+    Returns (mastery_scores, model_used, model, mastery_history). When the model
+    exposes ``predict_mastery_full``, BOTH outputs come from a single forward
+    pass per fold (running predict_mastery + predict_mastery_history separately
+    re-collates and re-runs the full LSTM+GCN twice per fold — 10 forwards for
+    the 5-fold ensemble). Models without it fall back to predict_mastery and
+    history stays None. History is None on the rule-based path — the UI renders
+    the disabled caption. Never raises: prediction failures degrade to fallback.
     """
     model_used = "rule_based"
+    mastery_history = None
     mastery_scores = {t["topic"]: t["solve_rate"] for t in _preprocessor.build_topic_profile(normalized_subs)}
 
     model = preloaded_model
@@ -119,7 +127,10 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
 
     if model is not None and sequence:
         try:
-            mastery_scores = model.predict_mastery(sequence, _topic_graph)
+            if hasattr(model, "predict_mastery_full"):
+                mastery_scores, mastery_history = model.predict_mastery_full(sequence, _topic_graph)
+            else:
+                mastery_scores = model.predict_mastery(sequence, _topic_graph)
             model_used = "graph_dkt"
         except Exception as e:
             logger.warning("Graph-DKT prediction failed: %s", e)
@@ -133,45 +144,16 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     canonical = set(_topic_graph.TOPICS)
     mastery_scores = {k: v for k, v in mastery_scores.items() if k in canonical}
 
-    return mastery_scores, model_used, model
-
-
-def _compute_mastery_history(sequence, model) -> dict | None:
-    """Gather K temporal checkpoints from the model's forward pass (Phase 4b).
-
-    Returns None when no model ran (rule-based path) — the UI renders the
-    disabled caption. Never raises: prediction failures degrade to None.
-    """
-    if model is None or not sequence:
-        return None
-    if not hasattr(model, "predict_mastery_history"):
-        return None
-    try:
-        return model.predict_mastery_history(sequence, _topic_graph)
-    except Exception as e:
-        logger.warning("Mastery history prediction failed: %s", e)
-        return None
+    return mastery_scores, model_used, model, mastery_history
 
 
 async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[str, float]):
     """Upsert mastery scores for a user into kt_states table."""
     async with AsyncSessionLocal() as session:
-        # Map platform to the correct handle column
-        handle_col = User.cf_handle if platform == "cf" else User.lc_handle
+        # Find or create user (exact case-insensitive handle match)
+        user = await get_or_create_user(session, handle, platform)
 
-        # Find or create user
-        stmt = select(User).where(handle_col.ilike(handle))
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-
-        if not user:
-            user = User(cf_handle=handle if platform == "cf" else None,
-                        lc_handle=handle if platform == "lc" else None,
-                        primary_platform=platform)
-            session.add(user)
-            await session.flush()  # get the ID
-
-        now = datetime.now(timezone.utc)
+        now = utcnow_naive()
         stmt = pg_insert(KTState).values([
             {"user_id": user.id, "topic": t, "p_mastery": s, "updated_at": now}
             for t, s in mastery_scores.items()
@@ -188,17 +170,9 @@ async def _persist_mastery_history(handle: str, platform: str, history: dict):
     """Upsert temporal mastery checkpoints (Phase 4b). Non-blocking — log failures only."""
     try:
         async with AsyncSessionLocal() as session:
-            handle_col = User.cf_handle if platform == "cf" else User.lc_handle
-            stmt = select(User).where(handle_col.ilike(handle))
-            user = (await session.execute(stmt)).scalar_one_or_none()
-            if not user:
-                user = User(cf_handle=handle if platform == "cf" else None,
-                            lc_handle=handle if platform == "lc" else None,
-                            primary_platform=platform)
-                session.add(user)
-                await session.flush()
+            user = await get_or_create_user(session, handle, platform)
 
-            now = datetime.now(timezone.utc)
+            now = utcnow_naive()
             rows = [
                 {"user_id": user.id, "topic": t, "checkpoint_idx": i,
                  "ts": cp.get("ts", 0), "p_mastery": cp.get("p", 0.0), "updated_at": now}
@@ -222,9 +196,7 @@ async def _persist_mastery_history(handle: str, platform: str, history: dict):
 async def _read_mastery_history(handle: str, platform: str) -> dict | None:
     """O(read) snapshot read — never a model rollout (spec §7 item 2)."""
     async with AsyncSessionLocal() as session:
-        handle_col = User.cf_handle if platform == "cf" else User.lc_handle
-        stmt = select(User).where(handle_col.ilike(handle))
-        user = (await session.execute(stmt)).scalar_one_or_none()
+        user = await find_user_by_handle(session, handle)
         if not user:
             return None
         rows = (await session.execute(
@@ -265,12 +237,11 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         topic_profile = [TopicProfileEntry.model_validate(t) for t in raw_profile]
         weak_areas = _preprocessor.detect_weak_areas(raw_profile)
 
-        # 3. Mastery scores (use pre-loaded model from startup)
+        # 3. Mastery scores + Phase-4b checkpoints — one forward pass per fold
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
-        mastery_scores, model_used, model = _compute_mastery(sequence, normalized_subs, preloaded_model=preloaded)
-
-        # 3b. Temporal checkpoints (Phase 4b) — same forward pass, no new rollout
-        mastery_history = _compute_mastery_history(sequence, model) if model_used == "graph_dkt" else None
+        mastery_scores, model_used, model, mastery_history = _compute_mastery(
+            sequence, normalized_subs, preloaded_model=preloaded,
+        )
 
         user_rating = profile.get("rating") if isinstance(profile, dict) else None
 

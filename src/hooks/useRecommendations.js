@@ -54,7 +54,9 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
       setActiveWeakTag(analysisActiveWeakTagRef.current);
       setInitialized(true);
     }
-  }, [initialized, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef]);
+  // `user` is a dep on purpose: refs are mutated (not state) inside analyze(), so a
+  // fresh first analysis never re-triggers this effect unless user identity changes.
+  }, [initialized, user, analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef]);
 
   // Shared recommendation fetch — called by selectWeakTag and fetchForSelectedTopics
   const fetchRecommendations = useCallback(async (topics) => {

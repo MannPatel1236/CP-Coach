@@ -1,50 +1,29 @@
 """Plans route — GET/POST /api/plans/{handle}, PUT/DELETE /api/plans/{handle}/{id}
 
 Greenhouse Phase 5b — the only DB change in the whole program (spec §7). Saved
-Workbook checklists, handle-keyed (no account system, §13 #4). Writes are open
-(no HMAC — the frontend cannot sign; auth is a future spec), matching the
-analyze/recommend surface. Read-side DB failure → [] (frontend falls back to
-localStorage, spec §5.2 #9); write-side failure → 502 (frontend keeps the
-optimistic localStorage copy + toast, never silently loses data).
+Workbook checklists, handle-keyed (no account system, §13 #4). Routes carry the
+same opt-in ``Depends(verify_hmac)`` as every sibling handle-keyed route
+(pass-through unless CP_API_SECRET is set). Read-side DB failure → [] (frontend
+falls back to localStorage, spec §5.2 #9); write-side failure → 502 (frontend
+keeps the optimistic localStorage copy + toast, never silently loses data).
 """
 
 import logging
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from auth import verify_handle_signature
+from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
-from db.connection import AsyncSessionLocal, User, Plan
+from db.connection import (
+    AsyncSessionLocal, Plan, find_user_by_handle, get_or_create_user, utcnow_naive,
+)
 from routes.schemas import PlanIn, PlanOut
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["plans"])
-
-
-async def _resolve_or_create_user(session, handle: str) -> int:
-    """Find the user row by CF or LC handle (case-insensitive), else create it."""
-    stmt = select(User).where(
-        (User.cf_handle.ilike(handle)) | (User.lc_handle.ilike(handle))
-    )
-    result = await session.execute(stmt)
-    user = result.scalar_one_or_none()
-    if not user:
-        user = User(cf_handle=handle, lc_handle=None, primary_platform="cf")
-        session.add(user)
-        await session.flush()
-    return user.id  # pyright: ignore[reportReturnType]
-
-
-async def _find_user(session, handle: str):
-    """Find the user row by CF or LC handle (case-insensitive), else None."""
-    stmt = select(User).where(
-        (User.cf_handle.ilike(handle)) | (User.lc_handle.ilike(handle))
-    )
-    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 def _plan_out(p: Plan) -> PlanOut:
@@ -62,6 +41,7 @@ def _plan_out(p: Plan) -> PlanOut:
 async def list_plans(
     request: Request,
     handle: str,
+    _auth: None = Depends(verify_hmac),
 ):
     """List saved plans newest-first. No user / DB failure → [] (never an error)."""
     verify_handle_signature(
@@ -71,10 +51,7 @@ async def list_plans(
     )
     try:
         async with AsyncSessionLocal() as session:
-            stmt = select(User).where(
-                (User.cf_handle.ilike(handle)) | (User.lc_handle.ilike(handle))
-            )
-            user = (await session.execute(stmt)).scalar_one_or_none()
+            user = await find_user_by_handle(session, handle)
             if not user:
                 return []
             plans = (await session.execute(
@@ -93,6 +70,7 @@ async def create_plan(
     handle: str,
     body: PlanIn,
     response: Response,
+    _auth: None = Depends(verify_hmac),
 ):
     """Create a plan. DB failure → 502 so the frontend keeps localStorage + toasts."""
     verify_handle_signature(
@@ -102,8 +80,8 @@ async def create_plan(
     )
     try:
         async with AsyncSessionLocal() as session:
-            user_id = await _resolve_or_create_user(session, handle)
-            plan = Plan(user_id=user_id, name=body.name, payload=body.payload)
+            user = await get_or_create_user(session, handle)
+            plan = Plan(user_id=user.id, name=body.name, payload=body.payload)  # pyright: ignore[reportAttributeAccessIssue]
             session.add(plan)
             await session.commit()
             await session.refresh(plan)
@@ -122,6 +100,7 @@ async def update_plan(
     plan_id: int,
     body: PlanIn,
     response: Response,
+    _auth: None = Depends(verify_hmac),
 ):
     """Update name/payload. Missing plan → 404."""
     verify_handle_signature(
@@ -131,16 +110,16 @@ async def update_plan(
     )
     try:
         async with AsyncSessionLocal() as session:
-            user = await _find_user(session, handle)
+            user = await find_user_by_handle(session, handle)
             plan = None
             if user:
-                stmt = select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)
+                stmt = select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)  # pyright: ignore[reportAttributeAccessIssue]
                 plan = (await session.execute(stmt)).scalar_one_or_none()
             if not plan:
                 raise HTTPException(404, detail=f"Plan {plan_id} not found.")
             plan.name = body.name  # pyright: ignore[reportAttributeAccessIssue]
             plan.payload = body.payload  # pyright: ignore[reportAttributeAccessIssue]
-            plan.updated_at = datetime.now(timezone.utc)  # pyright: ignore[reportAttributeAccessIssue]
+            plan.updated_at = utcnow_naive()  # pyright: ignore[reportAttributeAccessIssue]
             await session.commit()
             await session.refresh(plan)
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
@@ -157,6 +136,7 @@ async def delete_plan(
     handle: str,
     plan_id: int,
     response: Response,
+    _auth: None = Depends(verify_hmac),
 ):
     """Delete a plan. Missing plan → 404."""
     verify_handle_signature(
@@ -166,10 +146,10 @@ async def delete_plan(
     )
     try:
         async with AsyncSessionLocal() as session:
-            user = await _find_user(session, handle)
+            user = await find_user_by_handle(session, handle)
             plan = None
             if user:
-                stmt = select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)
+                stmt = select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)  # pyright: ignore[reportAttributeAccessIssue]
                 plan = (await session.execute(stmt)).scalar_one_or_none()
             if not plan:
                 raise HTTPException(404, detail=f"Plan {plan_id} not found.")

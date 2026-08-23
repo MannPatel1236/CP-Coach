@@ -13,13 +13,15 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
-from db.connection import AsyncSessionLocal, User, RatingTrajectory
+from db.connection import (
+    AsyncSessionLocal, User, RatingTrajectory, get_or_create_user, utcnow_naive,
+)
 from routes.schemas import RatingPoint, RatingTrajectoryResponse
 
 logger = logging.getLogger(__name__)
@@ -54,13 +56,17 @@ async def _load_pg_cache(handle: str) -> list[RatingPoint] | None:
     try:
         async with AsyncSessionLocal() as session:
             stmt = select(RatingTrajectory).join(User, User.id == RatingTrajectory.user_id).where(
-                User.cf_handle.ilike(handle)
+                (func.lower(User.cf_handle) == handle.lower())
+                | (func.lower(User.lc_handle) == handle.lower())
             )
             row = (await session.execute(stmt)).scalars().first()
             if row is None or row.fetched_at is None:
                 return None
-            fetched = row.fetched_at.replace(tzinfo=None)
-            if (time.time() - fetched.timestamp()) >= _CACHE_TTL:
+            # fetched_at is a naive TIMESTAMP holding UTC wall clock — pin the
+            # tz explicitly or .timestamp() reads it in the host's local zone
+            # and skews the TTL by the UTC offset.
+            fetched = row.fetched_at.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - fetched).total_seconds() >= _CACHE_TTL:
                 return None
             return _validate_points(row.payload)  # pyright: ignore[reportArgumentType]
     except Exception as e:
@@ -72,15 +78,10 @@ async def _save_pg_cache(handle: str, payload: list[RatingPoint]):
     """Upsert the per-handle trajectory row (non-fatal on failure)."""
     try:
         async with AsyncSessionLocal() as session:
-            stmt = select(User).where(User.cf_handle.ilike(handle))
-            user = (await session.execute(stmt)).scalar_one_or_none()
-            if user is None:
-                user = User(cf_handle=handle, primary_platform="cf")
-                session.add(user)
-                await session.flush()
+            user = await get_or_create_user(session, handle)
             stmt = pg_insert(RatingTrajectory).values(
                 user_id=user.id, platform="cf", payload=[p.model_dump() for p in payload],
-                fetched_at=datetime.now(timezone.utc),
+                fetched_at=utcnow_naive(),
             )
             stmt = stmt.on_conflict_do_update(
                 index_elements=["user_id"],

@@ -5,7 +5,6 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
@@ -13,7 +12,7 @@ from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from platforms.leetcode import LeetCodeClient
 from platforms.normalizer import Normalizer
-from db.connection import AsyncSessionLocal, User, ActivityWeek
+from db.connection import AsyncSessionLocal, ActivityWeek, get_or_create_user, utcnow_naive
 from routes.schemas import ProgressResponse, WeeklyEntry, ActivityWeek as ActivityWeekSchema
 
 logger = logging.getLogger(__name__)
@@ -38,17 +37,9 @@ async def _persist_activity_weeks(handle: str, platform: str, activity: dict[str
     """Upsert per-week activity buckets keyed (user, week). Non-blocking — log failures only."""
     try:
         async with AsyncSessionLocal() as session:
-            handle_col = User.cf_handle if platform == "cf" else User.lc_handle
-            stmt = select(User).where(handle_col.ilike(handle))
-            user = (await session.execute(stmt)).scalar_one_or_none()
-            if not user:
-                user = User(cf_handle=handle if platform == "cf" else None,
-                            lc_handle=handle if platform == "lc" else None,
-                            primary_platform=platform)
-                session.add(user)
-                await session.flush()
+            user = await get_or_create_user(session, handle, platform)
 
-            now = datetime.now(timezone.utc)
+            now = utcnow_naive()
             rows = [
                 {"user_id": user.id, "week": week, "solved": a["solved"], "total": a["total"],
                  "active_days": a["active_days"], "updated_at": now}
@@ -109,24 +100,23 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
     for week_key, days in active_day_keys.items():
         activity[week_key]["active_days"] = len(days)
 
-    # Zero-fill from the first bucket through the CURRENT week. Without this, a
-    # stale last-active week stays the newest key and the heatmap's current-streak
-    # logic (breaks on inactive latest week) never sees weeks of inactivity.
+    # Zero-fill through the CURRENT week, bounded to the heatmap window (+4w
+    # margin). Without the fill, a stale last-active week stays the newest key
+    # and the heatmap's current-streak logic (breaks on inactive latest week)
+    # never sees weeks of inactivity; without the bound, every GET writes empty
+    # rows back to the user's first-ever submission.
     stamps = [s.get("timestamp", 0) / 1000 for s in normalized if s.get("timestamp", 0) > 0]
     if stamps:
-        cursor = datetime.fromtimestamp(min(stamps), tz=timezone.utc)
         end = datetime.now(timezone.utc)
+        cursor = max(datetime.fromtimestamp(min(stamps), tz=timezone.utc), end - timedelta(weeks=16))
         while cursor <= end:
             week_key = cursor.strftime("%Y-W%W")
             if week_key not in activity:
                 activity[week_key] = {"solved": 0, "total": 0, "active_days": 0}
             cursor += timedelta(days=7)
 
-    # Persist activity buckets (non-blocking)
-    try:
-        await _persist_activity_weeks(handle, platform, dict(activity))
-    except Exception as e:
-        logger.warning("Failed to persist activity_weeks for %s: %s", handle, e)
+    # Persist activity buckets (function logs + swallows its own failures)
+    await _persist_activity_weeks(handle, platform, dict(activity))
 
     # Build response
     topic_progress = {}

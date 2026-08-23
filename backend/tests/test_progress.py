@@ -65,19 +65,28 @@ class TestProgressActivity:
 
     def test_zero_fill_extends_to_current_week(self):
         """Trailing weeks are zero-filled through NOW so the latest bucket is the
-        current week — an old active week must never count as the current streak."""
+        current week — an old active week must never count as the current streak.
+        The fill is bounded to the heatmap window (+4w margin) so a GET never
+        writes empty rows back to the user's first-ever submission."""
         r = client.get("/api/progress/tourist?platform=cf")
-        weeks = list(r.json()["activity"].keys())
+        activity = r.json()["activity"]
+        weeks = list(activity.keys())
         current_key = datetime.now(timezone.utc).strftime("%Y-W%W")
         assert weeks[-1] == current_key, f"latest bucket {weeks[-1]} != current week {current_key}"
-        assert r.json()["activity"][current_key] == {"solved": 0, "total": 0, "active_days": 0}
-        # No gaps: every Monday-based %W label between first and last is present.
+        assert activity[current_key] == {"solved": 0, "total": 0, "active_days": 0}
+        # No gaps in the trailing window: every %W label from 16w ago through
+        # now is present.
         expected = set()
-        cursor = datetime(2020, 9, 8, tzinfo=timezone.utc)
+        cursor = datetime.now(timezone.utc) - timedelta(weeks=16)
         while cursor <= datetime.now(timezone.utc):
             expected.add(cursor.strftime("%Y-W%W"))
             cursor += timedelta(days=7)
-        assert set(weeks) == expected
+        assert set(weeks) >= expected
+        # The bound holds: zero-filled buckets can only come from the fill, and
+        # at most ~17 of them exist (window + %W boundary rounding). Real
+        # submission weeks all carry total >= 1.
+        zero_weeks = [w for w, e in activity.items() if e["total"] == 0]
+        assert len(zero_weeks) <= 17, f"zero-fill exceeded the 16w bound: {len(zero_weeks)} empty weeks"
 
     def test_week_keys_are_sorted_chronologically(self):
         r = client.get("/api/progress/tourist?platform=cf")
@@ -92,3 +101,35 @@ class TestProgressActivity:
         # Every activity entry carries the three bucket fields
         for entry in data["activity"].values():
             assert set(entry.keys()) == {"solved", "total", "active_days"}
+
+
+class TestProgressMalformedInputs:
+    """Gate finding: ts<=0 / empty-submission branches had no coverage."""
+
+    def test_empty_submission_list_yields_empty_activity(self, mock_cf_submissions):
+        async def empty(handle, **kwargs):
+            return []
+        mock_cf_submissions.get_submissions = empty
+        mock_cf_submissions.get_all_submissions = empty
+
+        r = client.get("/api/progress/tourist?platform=cf")
+        assert r.status_code == 200
+        # No valid stamps → no buckets, no zero-fill (bounded fill needs a floor)
+        assert r.json()["activity"] == {}
+
+    def test_zero_timestamp_submissions_are_skipped(self, mock_cf_submissions):
+        async def malformed(handle, **kwargs):
+            return [
+                {"problem": {"contestId": 1, "index": "A", "rating": 1500, "tags": ["math"]},
+                 "verdict": "OK", "creationTimeSeconds": 0},
+                {"problem": {"contestId": 1, "index": "B", "rating": 1500, "tags": ["math"]},
+                 "verdict": "OK", "creationTimeSeconds": -42},
+            ]
+        mock_cf_submissions.get_submissions = malformed
+        mock_cf_submissions.get_all_submissions = malformed
+
+        r = client.get("/api/progress/tourist?platform=cf")
+        assert r.status_code == 200
+        # ts<=0 is skipped by the bucket loop AND the zero-fill stamp filter —
+        # epoch-week phantom buckets must never appear.
+        assert r.json()["activity"] == {}

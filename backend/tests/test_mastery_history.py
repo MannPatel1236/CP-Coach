@@ -100,15 +100,14 @@ class TestMasteryHistoryRoute:
             def __init__(self):
                 self.n_calls = 0
 
-            def predict_mastery(self, sequence, topic_graph):
+            def predict_mastery_full(self, sequence, topic_graph, n_checkpoints=8):
                 self.n_calls += 1
-                return {t: 0.5 for t in topic_graph.TOPICS}
-
-            def predict_mastery_history(self, sequence, topic_graph, n_checkpoints=8):
-                return {
+                mastery = {t: 0.5 for t in topic_graph.TOPICS}
+                history = {
                     t: [{"ts": 1_600_000_000_000 + i * 1000, "p": 0.4 + 0.1 * (i / 7)} for i in range(8)]
                     for t in topic_graph.TOPICS
                 }
+                return mastery, history
 
         fake = FakeModel()
         app.state.graph_dkt_model = fake
@@ -117,9 +116,52 @@ class TestMasteryHistoryRoute:
             assert r.status_code == 200, r.json()
             data = r.json()
             assert data["model_used"] == "graph_dkt"
-            assert fake.n_calls == 1
+            assert fake.n_calls == 1, "mastery + checkpoints must share ONE forward pass"
             assert data["mastery_history"] is not None
             assert len(data["mastery_history"]) == 29
             assert len(data["mastery_history"]["implementation"]) == 8
+        finally:
+            app.state.graph_dkt_model = None
+
+    def test_analyze_with_legacy_predict_only_model_leaves_history_none(self, monkeypatch):
+        """Models exposing only predict_mastery still analyze, but cannot inline
+        temporal checkpoints — history degrades to None (disabled UI caption)."""
+        from unittest.mock import AsyncMock
+
+        async def one_sub(handle, **kwargs):
+            return [{
+                "problem": {"contestId": 1, "index": "A", "rating": 1500, "tags": ["implementation"]},
+                "verdict": "OK", "creationTimeSeconds": 1600000000,
+            }]
+        from platforms.codeforces import _HANDLE_PATTERN
+
+        async def mock_get_user_info(handle):
+            if not _HANDLE_PATTERN.match(handle):
+                from platforms.codeforces import HandleError
+                raise HandleError(f"Invalid characters in handle: '{handle}'")
+            return {"handle": "tourist", "rating": 1500, "rank": "specialist"}
+
+        stub = AsyncMock()
+        stub.get_user_info = mock_get_user_info
+        stub.get_submissions = one_sub
+        monkeypatch.setattr("routes.analyze.CFClient", lambda: stub)
+
+        class LegacyModel:
+            def __init__(self):
+                self.n_calls = 0
+
+            def predict_mastery(self, sequence, topic_graph):
+                self.n_calls += 1
+                return {t: 0.5 for t in topic_graph.TOPICS}
+
+        fake = LegacyModel()
+        app.state.graph_dkt_model = fake
+        try:
+            r = client.get("/api/analyze/tourist?platform=cf&mode=quick")
+            assert r.status_code == 200, r.json()
+            data = r.json()
+            assert data["model_used"] == "graph_dkt"
+            assert fake.n_calls == 1
+            assert data["mastery_history"] is None
         finally:
             app.state.graph_dkt_model = None
