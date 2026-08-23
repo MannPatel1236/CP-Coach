@@ -11,7 +11,7 @@ import {
 } from "../lib/topicGraphLayout.js";
 
 export default function SkillFrontier() {
-  const { masteryScoresRef, weakTags, activeWeakTag, modelUsed } = useAnalysisContext();
+  const { masteryScoresRef, weakTags, activeWeakTag, modelUsed, selectWeakTag } = useAnalysisContext();
   const { graphData, layout, depths } = useGraphLayout();
   const [selected, setSelected] = useState(null);     // click → reveal prereq chain
   const [hovered, setHovered] = useState(null);
@@ -162,9 +162,16 @@ export default function SkillFrontier() {
 
         {/* Chain readout — text sibling to the SVG (also readable by AT) */}
         {selected && (
-          <div data-testid="chain-readout" style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: 12, color: "var(--on-surface-variant)", fontFamily: "var(--font-mono)" }}>
-            <span style={{ color: "var(--color-accent-text)" }}>Prereq chain · {labelOf(selected)} (depth {depths[selected] != null ? depths[selected] : 0}):</span>{" "}
-            {chain.map((t, i) => (<span key={t}>{i > 0 && <span style={{ color: "var(--text-muted)" }}> → </span>}{labelOf(t)}</span>))}
+          <div data-testid="chain-readout" style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: 12, color: "var(--on-surface-variant)", fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ flex: "1 1 auto" }}>
+              <span style={{ color: "var(--color-accent-text)" }}>Prereq chain · {labelOf(selected)} (depth {depths[selected] != null ? depths[selected] : 0}):</span>{" "}
+              {chain.map((t, i) => (<span key={t}>{i > 0 && <span style={{ color: "var(--text-muted)" }}> → </span>}{labelOf(t)}</span>))}
+            </span>
+            {/* Frontier → rec-engine bridge: same selectWeakTag path as the
+                WeakAreas chips (sets activeWeakTag + refetches recommendations). */}
+            <button data-testid="frontier-focus" className="btn-primary" onClick={() => selectWeakTag(selected)} style={{ padding: "5px 12px", fontSize: 11, fontFamily: "var(--font-mono)", flexShrink: 0 }}>
+              {activeWeakTag === selected ? "Refocus recommendations" : "Focus recommendations"}
+            </button>
           </div>
         )}
       </div>

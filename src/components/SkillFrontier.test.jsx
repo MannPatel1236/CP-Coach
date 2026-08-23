@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import SkillFrontier from "./SkillFrontier.jsx";
 import { renderInContext } from "../__fixtures__/analysisContext.jsx";
@@ -57,6 +57,26 @@ describe("SkillFrontier — render", () => {
     const ev = fireEvent.keyDown(nt, { key: " " });
     expect(ev).toBe(false);                 // preventDefault was called → Space didn't scroll
     expect(getByTestId("chain-readout").textContent).toContain("number theory");
+  });
+
+  it("frontier-focus bridges the selected topic into the rec engine (selectWeakTag)", async () => {
+    const selectWeakTag = vi.fn();
+    const { container, getByTestId } = renderInContext(<SkillFrontier />, { selectWeakTag });
+    await nodesMounted(container);
+
+    const dp = container.querySelector('g[aria-label^="dp mastery"]');
+    fireEvent.click(dp);
+    expect(() => getByTestId("frontier-focus")).not.toThrow();
+
+    // Not yet the active focus → plain label; click routes through the same
+    // selectWeakTag path as the WeakAreas chips.
+    expect(getByTestId("frontier-focus").textContent).toContain("Focus recommendations");
+    fireEvent.click(getByTestId("frontier-focus"));
+    expect(selectWeakTag).toHaveBeenCalledWith("dp");
+
+    // Already-focused selection flips the affordance to a refocus label.
+    fireEvent.click(container.querySelector('g[aria-label^="binary search mastery"]'));
+    expect(getByTestId("frontier-focus").textContent).toContain("Refocus recommendations");
   });
 });
 
