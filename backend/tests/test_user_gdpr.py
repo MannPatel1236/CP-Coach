@@ -93,3 +93,24 @@ class TestGdprErasure:
         assert "lower(users.cf_handle) = 'a_b'" in where
         assert "lower(users.lc_handle) = 'a_b'" in where
         assert "LIKE" not in where.upper()
+
+    def test_delete_invalidates_memory_derived_caches(self, fake_db):
+        """Erasure must reach the process-memory tiers too — progress/trajectory
+        would otherwise keep serving the erased handle's aggregates for up to
+        their TTLs after the 200."""
+        import time
+
+        from routes import progress as prog_mod
+        from routes import trajectory as traj_mod
+
+        prog_mod._progress_cache["cf:x"] = (time.time(), {"2026-W01": {}}, {})
+        prog_mod._progress_cache["lc:x"] = (time.time(), {}, {})
+        traj_mod._cache["cf:x"] = (time.time(), [])
+
+        session = fake_db(_FakeSession(rowcount=1))
+        r = client.delete("/api/user/x")
+        assert r.status_code == 200
+        assert session.commits == 1
+        assert "cf:x" not in prog_mod._progress_cache
+        assert "lc:x" not in prog_mod._progress_cache
+        assert "cf:x" not in traj_mod._cache

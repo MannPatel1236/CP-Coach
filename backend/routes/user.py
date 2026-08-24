@@ -9,6 +9,8 @@ from rate_limiter import limiter
 from sqlalchemy.exc import SQLAlchemyError
 
 from db.connection import AsyncSessionLocal, delete_users_by_handle
+from routes.progress import invalidate_progress_cache
+from routes.trajectory import invalidate_trajectory_cache
 from routes.schemas import DeleteUserResponse
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,11 @@ async def delete_user(
             if not deleted:
                 raise HTTPException(404, detail=f"User '{handle}' not found.")
             await session.commit()
+            # Right-to-erasure covers derived in-memory tiers too — otherwise
+            # progress/trajectory keep serving this handle's aggregates from
+            # process memory for up to their TTLs after the 200.
+            invalidate_progress_cache(handle)
+            invalidate_trajectory_cache(handle)
             logger.info("Deleted user data for handle: %s (%d row(s))", handle, deleted)
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
             return {"message": f"All data for '{handle}' has been deleted."}

@@ -13,7 +13,7 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
@@ -41,6 +41,11 @@ def _get_cached(key: str):
     return None
 
 
+def invalidate_trajectory_cache(handle: str):
+    """Drop the handle's memory tier (GDPR erasure support)."""
+    _cache.pop(f"cf:{handle.lower()}", None)
+
+
 def _set_cached(key: str, value: list[RatingPoint]):
     if len(_cache) >= _MAX_CACHED_KEYS and key not in _cache:
         oldest = min(_cache, key=lambda k: _cache[k][0])
@@ -56,8 +61,15 @@ async def _load_pg_cache(handle: str) -> list[RatingPoint] | None:
     """Second-tier cache: Postgres row with fetched_at TTL check. None on any failure."""
     try:
         async with AsyncSessionLocal() as session:
-            stmt = select(RatingTrajectory).join(User, User.id == RatingTrajectory.user_id).where(
-                user_handle_condition(handle)
+            # Same deterministic preference as find_user_by_handle: legacy DBs
+            # may hold dual-identity rows ({cf_handle:X} + {lc_handle:X}) —
+            # unordered .first() could serve the wrong half's cached points.
+            prefer_cf = case((func.lower(User.cf_handle) == handle.lower(), 0), else_=1)
+            stmt = (
+                select(RatingTrajectory)
+                .join(User, User.id == RatingTrajectory.user_id)
+                .where(user_handle_condition(handle))
+                .order_by(prefer_cf, User.id)
             )
             row = (await session.execute(stmt)).scalars().first()
             if row is None or row.fetched_at is None:

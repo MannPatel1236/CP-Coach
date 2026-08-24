@@ -58,6 +58,13 @@ def _set_progress_cached(key: str, activity_response: dict, topic_progress: dict
     _progress_cache[key] = (time.time(), activity_response, topic_progress)
 
 
+def invalidate_progress_cache(handle: str):
+    """Drop both platform tiers for this handle (GDPR erasure support)."""
+    h = handle.lower()
+    _progress_cache.pop(f"cf:{h}", None)
+    _progress_cache.pop(f"lc:{h}", None)
+
+
 async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
     """Fetch normalized submissions for the given platform."""
     if platform == "lc":
