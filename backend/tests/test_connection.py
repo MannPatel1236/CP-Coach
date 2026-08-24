@@ -7,7 +7,11 @@ CF-handle char and a LIKE wildcard), scoped to the requested platform column.
 
 import pytest
 
-from db.connection import User, find_user_by_handle, get_or_create_user, utcnow_naive
+from typing import Any
+
+from db.connection import (
+    User, delete_users_by_handle, find_user_by_handle, get_or_create_user, utcnow_naive,
+)
 
 
 class _FakeResult:
@@ -17,13 +21,19 @@ class _FakeResult:
     def scalar_one_or_none(self):
         return self._value
 
+    def scalars(self):
+        return self
+
+    def first(self):
+        return self._value
+
 
 class _FakeSession:
     """Captures the SELECT find_user_by_handle builds; records add()/flush()."""
 
     def __init__(self, lookup_value=None):
         self.lookup_value = lookup_value
-        self.captured_stmt = None
+        self.captured_stmt: Any = None
         self.added = []
 
     async def execute(self, stmt):
@@ -86,6 +96,41 @@ class TestFindUserByHandleSql:
         expected = User(id=7, cf_handle="x")
         session = _FakeSession(lookup_value=expected)
         assert await find_user_by_handle(session, "x") is expected
+
+    @pytest.mark.asyncio
+    async def test_either_column_lookup_is_deterministic_preferring_cf_row(self):
+        """Dual-platform users can hold two rows for one handle string; the
+        unscoped lookup must ORDER BY deterministically (cf-match first) instead
+        of scalar_one_or_none() → MultipleResultsFound on every plans route."""
+        session = _FakeSession()
+        await find_user_by_handle(session, "tourist")
+        sql = str(session.captured_stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+        assert "ORDER BY" in sql
+        assert "CASE" in sql  # prefer the cf_handle-matching row
+
+
+class TestDeleteUsersByHandle:
+    class _ExecResult:
+        rowcount = 2
+
+    class _DeleteSession:
+        def __init__(self):
+            self.captured_stmt: Any = None
+
+        async def execute(self, stmt):
+            self.captured_stmt = stmt
+            return TestDeleteUsersByHandle._ExecResult()
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_matches_both_columns_never_like(self):
+        session = TestDeleteUsersByHandle._DeleteSession()
+        deleted = await delete_users_by_handle(session, "a_b")
+        assert deleted == 2
+        sql = str(session.captured_stmt.compile(compile_kwargs={"literal_binds": True}))
+        where = sql.split("WHERE", 1)[1]
+        assert "lower(users.cf_handle) = 'a_b'" in where
+        assert "lower(users.lc_handle) = 'a_b'" in where
+        assert "LIKE" not in where.upper(), "'_' must stay a literal char, not a wildcard"
 
 
 class TestGetOrCreateUser:

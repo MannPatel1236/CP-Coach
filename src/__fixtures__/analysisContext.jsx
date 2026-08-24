@@ -12,6 +12,10 @@ export const baseContext = {
   setCfHandle: () => {},
   lcHandle: "",
   setLcHandle: () => {},
+  // Primary-identity resolver (App.jsx computes these; fixture mirrors the
+  // handles-first precedence so panel tests exercise realistic values).
+  primaryHandle: "mannpatel",
+  primaryPlatform: "cf",
   loading: false,
   loadingStep: 0,
   error: "",
@@ -68,5 +72,13 @@ export const baseContext = {
 
 export function renderInContext(ui, overrides = {}) {
   const value = { ...baseContext, ...overrides };
+  // Derive the primary-identity resolver from the FINAL merged context so
+  // handle overrides ({ cfHandle: "", lcHandle: "lcuser" }) flow through,
+  // mirroring App.jsx's handles-first precedence. Tests may still pin an
+  // explicit primaryHandle/primaryPlatform via overrides.
+  if (overrides.primaryHandle === undefined) {
+    value.primaryHandle = value.cfHandle || value.lcHandle || (value.user && value.user.handle) || "";
+    value.primaryPlatform = value.cfHandle ? "cf" : "lc";
+  }
   return render(createElement(AnalysisContext.Provider, { value }, ui));
 }

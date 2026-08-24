@@ -222,24 +222,6 @@ else:
             history = {topic_graph.idx_to_topic[j]: checkpoints[j] for j in range(self.num_topics)}
             return mastery, history
 
-        def predict_mastery(self, sequence: list[dict], topic_graph, device="cpu") -> dict[str, float]:
-            """Run inference on a single sequence."""
-            return self.predict_mastery_full(sequence, topic_graph, n_checkpoints=1, device=device)[0]
-
-        def predict_mastery_history(self, sequence: list[dict], topic_graph, n_checkpoints: int = 8, device="cpu") -> dict[str, list[dict]]:
-            """Gather K temporal mastery checkpoints from the same forward pass.
-
-            Greenhouse Phase 4b: ``mastery_t`` rows are sampled at ``n_checkpoints``
-            evenly spaced row indices (last index = current mastery, matching
-            ``predict_mastery``), each dated by the sequence row's ``timestamp``
-            (added to sequence rows by the preprocessor — additive key).
-
-            Returns ``{topic: [{"ts": ms, "p": float}, ...]}`` — 29 topics × K.
-            """
-            if not sequence:
-                return {topic: [] for topic in topic_graph.TOPICS}
-            return self.predict_mastery_full(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)[1]
-
         def get_graph_influence(self, topic: str, topic_graph) -> dict[str, float]:
             """Approximate prerequisite influence via degree-normalized adjacency."""
             prereqs = topic_graph.get_prerequisites(topic)

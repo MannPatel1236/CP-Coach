@@ -98,4 +98,48 @@ describe("ActivityHeatmap + Streaks — §5.2 #7", () => {
     const url = String(globalThis.fetch.mock.calls[0][0]);
     expect(url).toContain("/api/progress/mannpatel?platform=cf");
   });
+
+  it("slices to exactly 12 cells and computes streaks from the RENDERED window only", async () => {
+    // 14 weeks: W18–W21 hold a 4-active-run OUTSIDE the 12-week window; inside
+    // the window only W32/W33 are active. The caption claims "last N weeks",
+    // so longest/current must never count the out-of-window run.
+    const activity = {};
+    for (let w = 18; w <= 33; w += 1) {
+      activity[`2026-W${w}`] = { solved: 0, total: 0, active_days: 0 };
+    }
+    for (let w = 18; w <= 21; w += 1) activity[`2026-W${w}`] = { solved: 2, total: 2, active_days: 2 };
+    activity["2026-W32"] = { solved: 3, total: 3, active_days: 1 };
+    activity["2026-W33"] = { solved: 4, total: 4, active_days: 2 };
+
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", topic_progress: {}, activity }),
+    });
+    const { container, getByTestId } = renderInContext(<ActivityHeatmap />);
+    await gridMounted(container);
+    const cells = container.querySelectorAll("[data-testid='heat-cell']");
+    expect(cells.length).toBe(12);
+    expect(cells[0].getAttribute("data-week")).toBe("2026-W22"); // oldest dropped
+    const summary = getByTestId("heat-summary").textContent;
+    expect(summary).toContain("longest streak 2");
+    expect(summary).toContain("current streak 2");
+  });
+
+  it("zero-filled trailing inactive week renders current streak 0 (not a phantom)", async () => {
+    // Latest week inactive → current streak must be 0 even though W28–W29 ran.
+    const activity = {
+      "2026-W27": { solved: 2, total: 2, active_days: 1 },
+      "2026-W28": { solved: 3, total: 3, active_days: 2 },
+      "2026-W29": { solved: 0, total: 0, active_days: 0 },
+    };
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", topic_progress: {}, activity }),
+    });
+    const { getByTestId } = renderInContext(<ActivityHeatmap />);
+    await waitFor(() => {
+      expect(getByTestId("heat-summary").textContent).toContain("current streak 0");
+    });
+    expect(getByTestId("heat-summary").textContent).toContain("longest streak 2");
+  });
 });

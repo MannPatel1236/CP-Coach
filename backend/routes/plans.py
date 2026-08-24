@@ -19,7 +19,7 @@ from rate_limiter import limiter
 from db.connection import (
     AsyncSessionLocal, Plan, find_user_by_handle, get_or_create_user, utcnow_naive,
 )
-from routes.schemas import PlanIn, PlanOut
+from routes.schemas import PlanDeleteResponse, PlanIn, PlanOut
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,13 @@ async def create_plan(
     )
     try:
         async with AsyncSessionLocal() as session:
-            user = await get_or_create_user(session, handle)
+            # Resolve identity symmetric to the readers: either-column first so
+            # an LC-keyed row for this handle is reused instead of minting a
+            # duplicate {cf_handle:X} twin that would make every later
+            # either-column lookup ambiguous (MultipleResultsFound).
+            user = await find_user_by_handle(session, handle)
+            if not user:
+                user = await get_or_create_user(session, handle)
             plan = Plan(user_id=user.id, name=body.name, payload=body.payload)  # pyright: ignore[reportAttributeAccessIssue]
             session.add(plan)
             await session.commit()
@@ -129,7 +135,7 @@ async def update_plan(
         raise HTTPException(502, detail="Plans storage unavailable.")
 
 
-@router.delete("/plans/{handle}/{plan_id}")
+@router.delete("/plans/{handle}/{plan_id}", response_model=PlanDeleteResponse)
 @limiter.limit("30/minute")
 async def delete_plan(
     request: Request,

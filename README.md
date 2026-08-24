@@ -295,7 +295,7 @@ CP-Coach/
 ├── api/                        # Vercel serverless functions
 │   └── cf.js                   # CORS proxy for Codeforces
 ├── backend/
-│   ├── main.py                 # FastAPI entry point, CORS, lifespan, mastery-history route
+│   ├── main.py                 # FastAPI entry point, CORS, lifespan (DB init + model preload)
 │   ├── auth.py                 # HMAC-signed request auth
 │   ├── rate_limiter.py         # slowapi with trusted-proxy-aware IP
 │   ├── Dockerfile
@@ -306,9 +306,10 @@ CP-Coach/
 │   │   ├── schemas.py          # Pydantic response models
 │   │   ├── analyze.py          # GET /api/analyze (+ mastery checkpoints)
 │   │   ├── recommend.py        # GET/POST /api/recommend (+ per-item provenance)
-│   │   ├── progress.py         # GET /api/progress (topics + weekly activity)
-│   │   ├── trajectory.py       # GET /api/rating-trajectory (TTL-cached snapshots)
-│   │   ├── plans.py            # Workbook plans CRUD (ownership-scoped writes)
+│   │   ├── progress.py         # GET /api/progress (topics + weekly activity, memory TTL cache)
+│   │   ├── trajectory.py       # GET /api/rating-trajectory (two-tier TTL-cached snapshots)
+│   │   ├── mastery_history.py  # GET /api/mastery-history (O(read) checkpoint snapshot)
+│   │   ├── plans.py            # Workbook plans CRUD (per-handle ownership; opt-in HMAC like siblings)
 │   │   ├── graph.py            # GET /api/graph
 │   │   └── user.py             # DELETE /api/user (GDPR erasure)
 │   ├── platforms/

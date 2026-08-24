@@ -124,6 +124,43 @@ describe("Workbook — §5.2 #9", () => {
     expect(local.find((p) => p.id === 1).payload.items[0].done).toBe(true);
   });
 
+  it("rename PUTs the new name + payload and syncs localStorage", async () => {
+    mockApi(PLANS);
+    const { container } = renderInContext(<Workbook />);
+    await loaded(container);
+
+    // Enter edit mode on plan 1, change the name, commit via Save.
+    fireEvent.click(container.querySelectorAll("[data-testid='wb-rename']")[0]);
+    const input = container.querySelector("[data-testid='wb-rename-input']");
+    expect(input).toBeTruthy();
+    fireEvent.change(input, { target: { value: "Renamed plan" } });
+    fireEvent.click(container.querySelector("[data-testid='wb-rename-save']"));
+
+    await waitFor(() => {
+      const put = globalThis.fetch.mock.calls.find(([, o]) => (o?.method || "GET") === "PUT");
+      expect(put).toBeTruthy();
+    });
+    const put = globalThis.fetch.mock.calls.find(([, o]) => (o?.method || "GET") === "PUT");
+    expect(put[0]).toContain("/api/plans/mannpatel/1");
+    const body = JSON.parse(put[1].body);
+    expect(body.name).toBe("Renamed plan");
+    // Rename shares updatePlan with toggleDone — the payload must ride along.
+    expect(body.payload.items.length).toBe(1);
+    expect(loadLocalPlans("mannpatel").find((p) => p.id === 1).name).toBe("Renamed plan");
+  });
+
+  it("rename with an unchanged name does not fire a PUT", async () => {
+    mockApi(PLANS);
+    const { container } = renderInContext(<Workbook />);
+    await loaded(container);
+
+    fireEvent.click(container.querySelectorAll("[data-testid='wb-rename']")[0]);
+    fireEvent.click(container.querySelector("[data-testid='wb-rename-save']"));
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(globalThis.fetch.mock.calls.some(([, o]) => (o?.method || "GET") === "PUT")).toBe(false);
+  });
+
   it("delete removes the plan from the list and calls DELETE", async () => {
     mockApi(PLANS);
     const { container } = renderInContext(<Workbook />);

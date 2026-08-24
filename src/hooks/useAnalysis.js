@@ -12,7 +12,14 @@ import { analyzeHandle, getRecommendations, getRecommendationsWithMastery } from
 
 // Analysis snapshot persistence: a refresh restores the dashboard instead of the
 // landing page. Best-effort — storage-full/private-mode failures are swallowed.
+// Envelope: `v` gates schema reshapes (mismatched/absent-version payloads from
+// a future release are discarded instead of half-restored through || default
+// coercions); `savedAt` bounds staleness so a months-old dashboard never
+// masquerades as current. Legacy snapshots without either key stay readable —
+// they were written by this same code path before the envelope existed.
 const SNAPSHOT_KEY = "cpcoach.analysis";
+const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 let cachedSnapshot = null;
 const getSnapshot = () => {
   if (cachedSnapshot) return cachedSnapshot;
@@ -20,8 +27,12 @@ const getSnapshot = () => {
   try {
     const raw = window.localStorage.getItem(SNAPSHOT_KEY);
     if (!raw) return null;
-    cachedSnapshot = JSON.parse(raw);
-    return cachedSnapshot && cachedSnapshot.user ? cachedSnapshot : null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.user) return null;
+    if (parsed.v !== undefined && parsed.v !== SNAPSHOT_VERSION) return null;
+    if (parsed.savedAt && Date.now() - parsed.savedAt > SNAPSHOT_MAX_AGE_MS) return null;
+    cachedSnapshot = parsed;
+    return cachedSnapshot;
   } catch {
     return null;
   }
@@ -83,7 +94,17 @@ export default function useAnalysis() {
     const analyzedIds = [cfHandle, lcHandle, ...(user.handle || "").split(" / ")]
       .map((h) => (h || "").trim().toLowerCase()).filter(Boolean);
     if (q && analyzedIds.length > 0 && !analyzedIds.includes(q)) return;
+    // Platform-input guard: edits typed into the combined-mode CF/LC inputs
+    // that no longer match the analyzed profile handles would pair the old
+    // profile data with the new names on restore — skip the write, same rule
+    // as the search-query guard above.
+    const cfAnalyzed = ((cfUser && cfUser.handle) || "").trim().toLowerCase();
+    const lcAnalyzed = ((lcUser && lcUser.handle) || "").trim().toLowerCase();
+    if (cfAnalyzed && cfHandle.trim().toLowerCase() !== cfAnalyzed) return;
+    if (lcAnalyzed && lcHandle.trim().toLowerCase() !== lcAnalyzed) return;
     const snapshot = {
+      v: SNAPSHOT_VERSION,
+      savedAt: Date.now(),
       handle, cfHandle, lcHandle,
       user, cfUser, lcUser,
       tagProfile, weakTags, suggestedTopics,

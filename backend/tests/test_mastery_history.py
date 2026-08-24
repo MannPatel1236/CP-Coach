@@ -23,12 +23,15 @@ def _make_sequence(n_rows: int = 30) -> list[dict]:
 
 
 class TestPredictMasteryHistory:
+    # The legacy predict_mastery / predict_mastery_history wrappers were deleted
+    # (zero production callers after the single-forward fix); these pin the
+    # predict_mastery_full contract they used to slice.
     def test_returns_29_topics_with_8_checkpoints(self):
         pytest.importorskip("torch")
         from models.graph_dkt import GraphDKTModel
         tg = CPTopicGraph()
         model = GraphDKTModel(num_topics=tg.num_topics, topic_graph=tg)
-        history = model.predict_mastery_history(_make_sequence(), tg, n_checkpoints=8)
+        history = model.predict_mastery_full(_make_sequence(), tg, n_checkpoints=8)[1]
         assert set(history.keys()) == set(tg.TOPICS)
         for topic, cps in history.items():
             assert len(cps) == 8
@@ -43,7 +46,7 @@ class TestPredictMasteryHistory:
         from models.graph_dkt import GraphDKTModel
         tg = CPTopicGraph()
         model = GraphDKTModel(num_topics=tg.num_topics, topic_graph=tg)
-        history = model.predict_mastery_history(_make_sequence(n_rows=3), tg, n_checkpoints=8)
+        history = model.predict_mastery_full(_make_sequence(n_rows=3), tg, n_checkpoints=8)[1]
         assert len(history["implementation"]) == 3  # deduped — no repeated rows
 
     def test_single_checkpoint_takes_last_row(self):
@@ -52,7 +55,7 @@ class TestPredictMasteryHistory:
         tg = CPTopicGraph()
         model = GraphDKTModel(num_topics=tg.num_topics, topic_graph=tg)
         seq = _make_sequence(n_rows=10)
-        history = model.predict_mastery_history(seq, tg, n_checkpoints=1)
+        history = model.predict_mastery_full(seq, tg, n_checkpoints=1)[1]
         assert len(history["implementation"]) == 1
         assert history["implementation"][0]["ts"] == seq[-1]["timestamp"]
 
@@ -66,14 +69,29 @@ client = TestClient(app)
 
 
 class TestMasteryHistoryRoute:
-    def test_get_returns_null_with_note_when_no_snapshot(self):
+    def test_get_returns_null_with_outage_note_when_db_read_raises(self):
         # DATABASE_URL is unset in tests → _read_mastery_history raises → caught →
-        # null + note. The contract: never an error (spec §5.2 #6).
+        # null + outage note. The contract: never an error (spec §5.2 #6).
         r = client.get("/api/mastery-history/tourist?platform=cf")
         assert r.status_code == 200
         data = r.json()
         assert data["mastery_history"] is None
-        assert data["note"]
+        # Verbatim: this is the OUTAGE branch — distinct from the empty-snapshot
+        # note below. The two strings are user-visible and must not be swapped.
+        assert data["note"] == "Mastery history is temporarily unavailable."
+
+    def test_get_returns_null_with_empty_snapshot_note_when_no_rows(self, monkeypatch):
+        """The genuine no-snapshot branch (user resolved, zero checkpoint rows):
+        'No mastery history yet' — NOT the outage twin. Pinned verbatim so the
+        catch-all except can never silently conflate the two captions."""
+        async def empty_snapshot(handle, platform):
+            return None
+        monkeypatch.setattr("routes.mastery_history._read_mastery_history", empty_snapshot)
+        r = client.get("/api/mastery-history/tourist?platform=cf")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["mastery_history"] is None
+        assert data["note"] == "No mastery history yet — run a deep analyze while Graph-DKT is loaded."
 
     def test_analyze_inlines_history_when_graph_dkt_model_runs(self, monkeypatch):
         # Need a CF submission so the sequence is non-empty (model only runs then)

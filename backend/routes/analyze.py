@@ -1,10 +1,10 @@
 """Analyze route — GET /api/analyze/{handle}"""
 
+import asyncio
 import os
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
@@ -16,9 +16,9 @@ from data.preprocessor import Preprocessor
 from data.topic_graph import CPTopicGraph
 from db.connection import (
     AsyncSessionLocal, KTState, MasteryHistory,
-    find_user_by_handle, get_or_create_user, utcnow_naive,
+    get_or_create_user, utcnow_naive,
 )
-from routes.schemas import AnalyzeResponse, MasteryHistoryResponse, TopicProfileEntry
+from routes.schemas import AnalyzeResponse, TopicProfileEntry
 
 logger = logging.getLogger(__name__)
 
@@ -189,23 +189,6 @@ async def _persist_mastery_history(handle: str, platform: str, history: dict):
         logger.warning("Failed to persist mastery_history for %s: %s", handle, e)
 
 
-async def _read_mastery_history(handle: str, platform: str) -> dict | None:
-    """O(read) snapshot read — never a model rollout (spec §7 item 2)."""
-    async with AsyncSessionLocal() as session:
-        user = await find_user_by_handle(session, handle, platform)
-        if not user:
-            return None
-        rows = (await session.execute(
-            select(MasteryHistory).where(MasteryHistory.user_id == user.id)
-        )).scalars().all()
-        if len(rows) == 0:  # pyright: ignore[reportGeneralTypeIssues]
-            return None
-        history = {}
-        for r in sorted(rows, key=lambda r: (r.topic, r.checkpoint_idx)):
-            history.setdefault(r.topic, []).append({"ts": r.ts or 0, "p": r.p_mastery})  # pyright: ignore[reportGeneralTypeIssues]
-        return history
-
-
 @router.get("/analyze/{handle}", response_model=AnalyzeResponse)
 @limiter.limit("30/minute")
 async def analyze(request: Request, handle: str, platform: str = Query("cf"), mode: str = Query("quick"), _auth: None = Depends(verify_hmac)):
@@ -233,10 +216,13 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         topic_profile = [TopicProfileEntry.model_validate(t) for t in raw_profile]
         weak_areas = _preprocessor.detect_weak_areas(raw_profile)
 
-        # 3. Mastery scores + Phase-4b checkpoints — one forward pass per fold
+        # 3. Mastery scores + Phase-4b checkpoints — one forward pass per fold.
+        # Offloaded to a worker thread: the 5-fold LSTM+GCN forward is sync CPU
+        # work taking seconds in deep mode; running it inline would freeze the
+        # event loop (all concurrent requests + Render health probes stall).
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
-        mastery_scores, model_used, mastery_history = _compute_mastery(
-            sequence, normalized_subs, preloaded_model=preloaded,
+        mastery_scores, model_used, mastery_history = await asyncio.to_thread(
+            _compute_mastery, sequence, normalized_subs, preloaded,
         )
 
         user_rating = profile.get("rating") if isinstance(profile, dict) else None
@@ -277,35 +263,7 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         raise HTTPException(status_code=502, detail=str(e))
 
 
-@router.get("/mastery-history/{handle}", response_model=MasteryHistoryResponse)
-@limiter.limit("30/minute")
-async def mastery_history(
-    request: Request,
-    handle: str,
-    platform: str = Query("cf"),
-    _auth: None = Depends(verify_hmac),
-):
-    """Read the persisted checkpoint snapshot — O(read), never a model rollout.
+# GET /api/mastery-history/{handle} lives in routes/mastery_history.py —
+# one-route-module-per-endpoint convention (it reads the snapshot persisted
+# above by _persist_mastery_history).
 
-    Empty snapshot → mastery_history: null + note (never an error; the frontend
-    renders a caption per spec §5.2 #6).
-    """
-    verify_handle_signature(
-        handle=handle,
-        authorization=request.headers.get("Authorization"),
-        x_timestamp=request.headers.get("X-Timestamp"),
-    )
-    try:
-        history = await _read_mastery_history(handle, platform)
-        if history is None:
-            return MasteryHistoryResponse(
-                handle=handle, platform=platform, mastery_history=None,
-                note="No mastery history yet — run a deep analyze while Graph-DKT is loaded.",
-            )
-        return MasteryHistoryResponse(handle=handle, platform=platform, mastery_history=history)
-    except Exception as e:
-        logger.warning("Mastery history read failed for %s: %s", handle, e)
-        return MasteryHistoryResponse(
-            handle=handle, platform=platform, mastery_history=None,
-            note="Mastery history is temporarily unavailable.",
-        )

@@ -71,6 +71,13 @@ CSV format: `user_id, topic, solved, difficulty, timestamp_delta, weight`
 | GET | `/api/graph` | Topic prerequisite graph |
 | DELETE | `/api/user/{handle}` | GDPR erasure (requires HMAC auth) |
 
+> **Accepted security posture (plans):** plans are keyed by public handle and,
+> when `CP_API_SECRET` is unset (the documented default), anyone who knows a
+> handle can read or modify its saved checklists. This is an intentional,
+> accepted trade-off for a stateless public research tool — plan ids are still
+> ownership-scoped (a foreign handle's plan id returns 404). Set
+> `CP_API_SECRET` to require HMAC signatures on every plans call.
+
 ### Environment Variables
 
 See `.env.example` for all required variables.

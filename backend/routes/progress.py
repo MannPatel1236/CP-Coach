@@ -1,6 +1,7 @@
 """Progress route — GET /api/progress/{handle} (per-week activity buckets, Phase 4c)"""
 
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -20,6 +21,41 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["progress"])
 
 _normalizer = Normalizer()
+
+
+def _iso_week_key(dt: datetime) -> str:
+    """ISO-8601 week key 'YYYY-Www' — year-aware Mon–Sun weeks.
+
+    strftime('%Y-W%W') splits one real week across New Year ('2025-W52' /
+    '2026-W00' are the SAME calendar week) and emits partial W00 buckets;
+    isocalendar() keys keep every bucket a true Mon–Sun week and sort
+    chronologically as strings.
+    """
+    iso = dt.isocalendar()
+    return f"{iso.year}-W{iso.week:02d}"
+
+
+# Two-tier cache mirroring routes/trajectory.py: an in-memory TTL tier in front
+# of the ≤8000-submission CF fetch + PG upsert each call would otherwise do.
+# Activity heatmaps move slowly — 10-minute staleness is invisible there, and
+# it keeps us far under the CF ~5 req/s budget when a dashboard tab remounts.
+_PROGRESS_TTL = 600  # seconds
+_MAX_PROGRESS_KEYS = 32
+_progress_cache: dict[str, tuple[float, dict, dict]] = {}
+
+
+def _get_progress_cached(key: str):
+    entry = _progress_cache.get(key)
+    if entry and (time.time() - entry[0]) < _PROGRESS_TTL:
+        return entry[1], entry[2]
+    return None
+
+
+def _set_progress_cached(key: str, activity_response: dict, topic_progress: dict):
+    if len(_progress_cache) >= _MAX_PROGRESS_KEYS and key not in _progress_cache:
+        oldest = min(_progress_cache, key=lambda k: _progress_cache[k][0])
+        del _progress_cache[oldest]
+    _progress_cache[key] = (time.time(), activity_response, topic_progress)
 
 
 async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
@@ -67,6 +103,18 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
         authorization=request.headers.get("Authorization"),
         x_timestamp=request.headers.get("X-Timestamp"),
     )
+
+    cache_key = f"{platform}:{handle.lower()}"
+    cached = _get_progress_cached(cache_key)
+    if cached is not None:
+        activity_response, topic_progress = cached
+        return ProgressResponse(
+            handle=handle,
+            platform=platform,
+            topic_progress=topic_progress,
+            activity=activity_response,
+        )
+
     try:
         normalized = await _fetch_normalized_subs(handle, platform)
     except ValueError as e:
@@ -85,7 +133,7 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
         if ts <= 0:
             continue
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        week_key = dt.strftime("%Y-W%W")
+        week_key = _iso_week_key(dt)
 
         activity[week_key]["total"] += 1
         if sub.get("verdict") == "OK":
@@ -110,7 +158,7 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
         end = datetime.now(timezone.utc)
         cursor = max(datetime.fromtimestamp(min(stamps), tz=timezone.utc), end - timedelta(weeks=16))
         while cursor <= end:
-            week_key = cursor.strftime("%Y-W%W")
+            week_key = _iso_week_key(cursor)
             if week_key not in activity:
                 activity[week_key] = {"solved": 0, "total": 0, "active_days": 0}
             cursor += timedelta(days=7)
@@ -132,9 +180,11 @@ async def progress(request: Request, handle: str, platform: str = Query("cf"), _
         for week, a in sorted(activity.items())
     }
 
-    return ProgressResponse(
+    response = ProgressResponse(
         handle=handle,
         platform=platform,
         topic_progress=topic_progress,
         activity=activity_response,
     )
+    _set_progress_cached(cache_key, activity_response, topic_progress)
+    return response

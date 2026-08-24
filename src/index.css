@@ -470,67 +470,15 @@ body {
   .ldag-frame .ld-edge { stroke-dashoffset: 0; opacity: .42; }
 }
 
-/* Greenhouse Phase 4a — RatingTrajectory (spec §5.2 #5) */
-.dash-traj .btn-primary {
-  background: var(--primary-container);
-  color: var(--on-primary);
-  border: 1px solid var(--primary-bright);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: filter 180ms var(--ease-out-expo);
-}
-.dash-traj .btn-primary:hover { filter: brightness(1.12); }
-.dash-traj .btn-primary:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-/* Greenhouse Phase 4b — MasteryHistory (spec §5.2 #6) */
-.dash-mastery .btn-primary {
-  background: var(--primary-container);
-  color: var(--on-primary);
-  border: 1px solid var(--primary-bright);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: filter 180ms var(--ease-out-expo);
-}
-.dash-mastery .btn-primary:hover { filter: brightness(1.12); }
-.dash-mastery .btn-primary:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-/* Greenhouse Phase 4c — ActivityHeatmap + Streaks (spec §5.2 #7) */
-.dash-heat .btn-primary {
-  background: var(--primary-container);
-  color: var(--on-primary);
-  border: 1px solid var(--primary-bright);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: filter 180ms var(--ease-out-expo);
-}
-.dash-heat .btn-primary:hover { filter: brightness(1.12); }
-.dash-heat .btn-primary:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-/* Greenhouse Phase 5a — CompareHandles (spec §5.2 #8) */
-.dash-compare .btn-primary {
-  background: var(--primary-container);
-  color: var(--on-primary);
-  border: 1px solid var(--primary-bright);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: filter 180ms var(--ease-out-expo);
-}
-.dash-compare .btn-primary:hover { filter: brightness(1.12); }
-.dash-compare .btn-primary:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-/* Greenhouse Phase 5b — Workbook (spec §5.2 #9) */
+/* Greenhouse Phases 4a–5b — flat section-button variant shared by the five
+   dashboard cards (.dash-traj/.dash-mastery/.dash-heat/.dash-compare/.dash-workbook).
+   Deliberately scoped per-card via a comma list, NOT `.dash-panel .btn-primary`:
+   the practice panel also hosts SkillFrontier/TopicPicker buttons that must keep
+   the global gradient .btn-primary (index.css ~180). Single source — edit here. */
+.dash-traj .btn-primary,
+.dash-mastery .btn-primary,
+.dash-heat .btn-primary,
+.dash-compare .btn-primary,
 .dash-workbook .btn-primary {
   background: var(--primary-container);
   color: var(--on-primary);
@@ -539,7 +487,15 @@ body {
   cursor: pointer;
   transition: filter 180ms var(--ease-out-expo);
 }
+.dash-traj .btn-primary:hover,
+.dash-mastery .btn-primary:hover,
+.dash-heat .btn-primary:hover,
+.dash-compare .btn-primary:hover,
 .dash-workbook .btn-primary:hover { filter: brightness(1.12); }
+.dash-traj .btn-primary:focus-visible,
+.dash-mastery .btn-primary:focus-visible,
+.dash-heat .btn-primary:focus-visible,
+.dash-compare .btn-primary:focus-visible,
 .dash-workbook .btn-primary:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;

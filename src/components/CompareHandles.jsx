@@ -99,6 +99,27 @@ export default function CompareHandles() {
     if (e.key === "Enter") runCompare();
   };
 
+  // Identical in both-mode and single-mode branches — defined once so the
+  // selector options and button can't drift apart again (the text inputs
+  // above already did, which is why these were hoisted).
+  const platformSelect = (
+    <select
+      data-testid="compare-platform"
+      value={platform}
+      onChange={(e) => setPlatform(e.target.value)}
+      style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
+    >
+      <option value="cf">cf</option>
+      <option value="lc">lc</option>
+      <option value="both">cf+lc</option>
+    </select>
+  );
+  const compareButton = (
+    <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
+      Compare
+    </button>
+  );
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={panelTransition}>
       <div className="card dash-compare" style={{ padding: 24 }}>
@@ -144,19 +165,8 @@ export default function CompareHandles() {
                   placeholder="LC handle (optional)"
                   style={inputStyle}
                 />
-                <select
-                  data-testid="compare-platform"
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value)}
-                  style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
-                >
-                  <option value="cf">cf</option>
-                  <option value="lc">lc</option>
-                  <option value="both">cf+lc</option>
-                </select>
-                <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
-                  Compare
-                </button>
+                {platformSelect}
+                {compareButton}
               </div>
             </>
           ) : (
@@ -171,19 +181,8 @@ export default function CompareHandles() {
                 placeholder="second handle"
                 style={{ flex: "1 1 160px", minWidth: 120, padding: "7px 10px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
               />
-              <select
-                data-testid="compare-platform"
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                style={{ padding: "7px 8px", fontSize: 12, fontFamily: "var(--font-mono)", background: "var(--surface-1)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", color: "var(--on-surface)" }}
-              >
-                <option value="cf">cf</option>
-                <option value="lc">lc</option>
-                <option value="both">cf+lc</option>
-              </select>
-              <button className="btn-primary" data-testid="compare-analyze" onClick={runCompare} style={{ padding: "7px 16px", fontSize: 13 }}>
-                Compare
-              </button>
+              {platformSelect}
+              {compareButton}
             </>
           )}
         </div>
@@ -209,18 +208,27 @@ export default function CompareHandles() {
           </div>
         )}
 
-        {result && (
-          <DiffPanel
-            // eslint-disable-next-line react-hooks/refs -- ref-tainted via primarySide (see primaryMastery note)
-            primaryLabel={primarySide.handle}
-            // eslint-disable-next-line react-hooks/refs
-            primaryMastery={primarySide.mastery}
-            // eslint-disable-next-line react-hooks/refs
-            primarySolved={primarySide.solvedSet}
-            secondary={result}
-            estimate={isEstimate}
-          />
-        )}
+        {(() => {
+          if (!result) return null;
+          // Self-compare: identical handle on both sides would waste a fetch
+          // and render a misleading "no shared mastery data" panel — call it
+          // out explicitly instead of diffing a profile against itself.
+          // eslint-disable-next-line react-hooks/refs -- ref-tainted via primarySide, same intentional pattern as the DiffPanel props below
+          const isSelfCompare = (result.handle || "").trim().toLowerCase() === (primarySide.handle || "").trim().toLowerCase();
+          return (
+            <DiffPanel
+              // eslint-disable-next-line react-hooks/refs -- ref-tainted via primarySide (see primaryMastery note)
+              primaryLabel={primarySide.handle}
+              // eslint-disable-next-line react-hooks/refs
+              primaryMastery={primarySide.mastery}
+              // eslint-disable-next-line react-hooks/refs
+              primarySolved={primarySide.solvedSet}
+              secondary={result}
+              estimate={isEstimate && !isSelfCompare}
+              selfCompare={isSelfCompare}
+            />
+          );
+        })()}
       </div>
     </motion.div>
   );
@@ -237,7 +245,18 @@ function CompareHeader() {
   );
 }
 
-function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, estimate }) {
+function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, estimate, selfCompare }) {
+  const aLabel = primaryLabel || "A";
+  const bLabel = secondary.handle || "B";
+
+  if (selfCompare) {
+    return (
+      <p data-testid="compare-self" style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, margin: 0 }}>
+        That&apos;s the same handle as {aLabel} — enter a different opponent to diff.
+      </p>
+    );
+  }
+
   const topics = new Set([...Object.keys(primaryMastery), ...Object.keys(secondary.mastery)]);
   const deltas = [];
   for (const t of topics) {
@@ -254,8 +273,6 @@ function DiffPanel({ primaryLabel, primaryMastery, primarySolved, secondary, est
   const onlyA = [...primarySolved].filter((id) => !secondary.solvedSet.has(id));
   const onlyB = [...secondary.solvedSet].filter((id) => !primarySolved.has(id));
 
-  const aLabel = primaryLabel || "A";
-  const bLabel = secondary.handle || "B";
   const leadsA = deltas.filter((d) => d.delta >= LEAD_DELTA).length;
   const leadsB = deltas.filter((d) => d.delta <= -LEAD_DELTA).length;
 

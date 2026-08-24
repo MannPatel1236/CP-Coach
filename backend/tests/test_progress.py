@@ -25,7 +25,7 @@ def mock_cf_submissions(monkeypatch):
             raise HandleError(f"Invalid characters in handle: '{handle}'")
         # Week A (Tue 2020-09-08): two submissions on two different days
         # (active_days=2, solved=1). Week B (+7 days): one (active_days=1, solved=0).
-        # %W weeks start Monday — Tue/Wed stay in one week, +7d lands in the next.
+        # ISO weeks start Monday — Tue/Wed stay in one week, +7d lands in the next.
         base_a = 1_599_523_200
         return [
             {"problem": {"contestId": 1, "index": "A", "rating": 1500, "tags": ["implementation"]},
@@ -71,15 +71,19 @@ class TestProgressActivity:
         r = client.get("/api/progress/tourist?platform=cf")
         activity = r.json()["activity"]
         weeks = list(activity.keys())
-        current_key = datetime.now(timezone.utc).strftime("%Y-W%W")
+        # ISO week key helper mirroring routes.progress._iso_week_key
+        def iso_key(dt):
+            iso = dt.isocalendar()
+            return f"{iso.year}-W{iso.week:02d}"
+        current_key = iso_key(datetime.now(timezone.utc))
         assert weeks[-1] == current_key, f"latest bucket {weeks[-1]} != current week {current_key}"
         assert activity[current_key] == {"solved": 0, "total": 0, "active_days": 0}
-        # No gaps in the trailing window: every %W label from 16w ago through
-        # now is present.
+        # No gaps in the trailing window: every ISO week label from 16w ago
+        # through now is present.
         expected = set()
         cursor = datetime.now(timezone.utc) - timedelta(weeks=16)
         while cursor <= datetime.now(timezone.utc):
-            expected.add(cursor.strftime("%Y-W%W"))
+            expected.add(iso_key(cursor))
             cursor += timedelta(days=7)
         assert set(weeks) >= expected
         # The bound holds: zero-filled buckets can only come from the fill, and
@@ -133,3 +137,80 @@ class TestProgressMalformedInputs:
         # ts<=0 is skipped by the bucket loop AND the zero-fill stamp filter —
         # epoch-week phantom buckets must never appear.
         assert r.json()["activity"] == {}
+
+
+@pytest.fixture(autouse=True)
+def clear_progress_cache():
+    """In-memory progress cache must not leak between tests."""
+    from routes import progress as prog
+    prog._progress_cache.clear()
+    yield
+    prog._progress_cache.clear()
+
+
+class TestProgressCache:
+    """Memory TTL tier in front of the CF fetch — second dashboard visit must
+    not refetch ≤8000 submissions, and an expired entry must fall through."""
+
+    @staticmethod
+    def _counting(mock):
+        """The autouse fixture wires plain functions — wrap for call counting."""
+        from unittest.mock import AsyncMock
+        mock.get_all_submissions = AsyncMock(side_effect=mock.get_all_submissions)
+        return mock
+
+    def test_second_call_hits_memory_cache_not_cf(self, mock_cf_submissions):
+        self._counting(mock_cf_submissions)
+        client.get("/api/progress/tourist?platform=cf")
+        assert mock_cf_submissions.get_all_submissions.call_count == 1
+
+        r = client.get("/api/progress/tourist?platform=cf")
+        assert r.status_code == 200
+        assert r.json()["activity"]
+        # Served from cache — no second upstream fetch, no re-persist.
+        assert mock_cf_submissions.get_all_submissions.call_count == 1
+
+    def test_expired_entry_refetches(self, mock_cf_submissions):
+        from routes import progress as prog
+        self._counting(mock_cf_submissions)
+
+        client.get("/api/progress/tourist?platform=cf")
+        assert mock_cf_submissions.get_all_submissions.call_count == 1
+
+        key = next(iter(prog._progress_cache))
+        ts, activity, topic_progress = prog._progress_cache[key]
+        prog._progress_cache[key] = (ts - (prog._PROGRESS_TTL + 1), activity, topic_progress)
+
+        client.get("/api/progress/tourist?platform=cf")
+        assert mock_cf_submissions.get_all_submissions.call_count == 2
+
+
+class TestIsoWeekKeys:
+    """Gate fix: %Y-W%W split one real week across New Year ('2025-W52' /
+    '2026-W00' are the same Mon–Sun week). Keys must be ISO year-weeks."""
+
+    def test_new_year_week_is_one_bucket_not_two(self, mock_cf_submissions):
+        from datetime import datetime as dt_mod
+
+        async def straddle(handle, **kwargs):
+            mon = int(dt_mod(2025, 12, 29, tzinfo=timezone.utc).timestamp())
+            sun = int(dt_mod(2026, 1, 4, tzinfo=timezone.utc).timestamp())
+            return [
+                {"problem": {"contestId": 1, "index": "A", "rating": 1500, "tags": ["math"]},
+                 "verdict": "OK", "creationTimeSeconds": mon},
+                {"problem": {"contestId": 1, "index": "B", "rating": 1500, "tags": ["math"]},
+                 "verdict": "OK", "creationTimeSeconds": sun},
+            ]
+
+        mock_cf_submissions.get_submissions = straddle
+        mock_cf_submissions.get_all_submissions = straddle
+
+        r = client.get("/api/progress/tourist?platform=cf")
+        activity = r.json()["activity"]
+        # Mon Dec 29 2025 and Sun Jan 4 2026 share ISO week 2026-W01.
+        assert set(activity.keys()) >= {"2026-W01"}
+        assert activity["2026-W01"]["total"] == 2
+        assert activity["2026-W01"]["active_days"] == 2
+        # The %W split must never reappear.
+        assert "2025-W52" not in activity
+        assert "2026-W00" not in activity

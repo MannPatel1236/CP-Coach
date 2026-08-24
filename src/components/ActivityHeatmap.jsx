@@ -16,10 +16,10 @@ import { panelTransition } from "../lib/motion.js";
 const N_WEEKS = 12;
 
 export default function ActivityHeatmap() {
-  const { cfHandle, lcHandle, user } = useAnalysisContext();
+  const { primaryHandle, primaryPlatform } = useAnalysisContext();
 
-  const handle = cfHandle || lcHandle || (user && user.handle) || "";
-  const platform = cfHandle ? "cf" : "lc";
+  const handle = primaryHandle;
+  const platform = primaryPlatform;
 
   const fetcher = useCallback(async (signal) => {
     const data = await getProgress(handle.trim(), signal, platform);
@@ -63,15 +63,18 @@ function HeatGrid({ activity }) {
   const solvedOf = (w) => activity[w]?.solved ?? 0;
   const activeWeeks = recent.filter((w) => solvedOf(w) > 0).length;
 
+  // Streaks are computed over the SAME window the grid renders (recent), so
+  // the caption's "last N weeks" claim matches the numbers it reports — weeks
+  // outside the 12-week slice never inflate longest/current.
   const streakRuns = [];
   let run = 0;
-  for (const w of weeks) {
+  for (const w of recent) {
     if (solvedOf(w) > 0) { run += 1; } else { if (run > 0) streakRuns.push(run); run = 0; }
   }
   if (run > 0) streakRuns.push(run);
   const longest = streakRuns.length ? Math.max(...streakRuns) : 0;
   // Current streak ends at the latest week — an inactive latest week breaks it.
-  const current = solvedOf(weeks[weeks.length - 1]) > 0 ? (streakRuns[streakRuns.length - 1] || 0) : 0;
+  const current = solvedOf(recent[recent.length - 1]) > 0 ? (streakRuns[streakRuns.length - 1] || 0) : 0;
 
   return (
     <div>

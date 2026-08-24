@@ -60,6 +60,9 @@ class FakeResult:
     def scalars(self):
         return self
 
+    def first(self):
+        return self._value
+
     def all(self):
         return self._value
 

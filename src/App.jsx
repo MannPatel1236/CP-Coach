@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import useAnalysis from "./hooks/useAnalysis.js";
 import useRecommendations from "./hooks/useRecommendations.js";
 import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts.js";
@@ -116,6 +116,13 @@ export default function App() {
     disabled: !user,
   });
 
+  // Single source of truth for the "primary identity" the Phase-4/5 panels
+  // query with: handles-first precedence (cf wins), falling back to the
+  // analyzed profile. Extracted so the next identity edge case is a one-place
+  // fix — both gate fix-batches churned these exact derivations per component.
+  const primaryHandle = cfHandle || lcHandle || (user && user.handle) || "";
+  const primaryPlatform = cfHandle ? "cf" : "lc";
+
   const contextValue = useMemo(() => ({
     handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle,
     loading, loadingStep, error,
@@ -125,10 +132,15 @@ export default function App() {
     combinedPlatform, setCombinedPlatform, analyze, clearAll,
     selectedTopics, fetchingRecs, recommendations,
     activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
-  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, modelUsed, masteryScoresRef, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, toggleTopic, fetchForSelectedTopics]);
+    primaryHandle, primaryPlatform,
+  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, modelUsed, masteryScoresRef, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, toggleTopic, fetchForSelectedTopics, primaryHandle, primaryPlatform]);
 
   return (
     <AnalysisContext.Provider value={contextValue}>
+    {/* Honor the OS prefers-reduced-motion setting for JS-driven framer-motion
+        animations (nav pill slide, panel entrances) — the CSS reduced-motion
+        media queries only cover CSS transitions. */}
+    <MotionConfig reducedMotion="user">
     <div style={{ minHeight: "100vh", background: "var(--surface-base)", color: "var(--on-surface)", overflowX: "hidden", width: "100%" }}>
       <a
         href="#main-content"
@@ -273,6 +285,7 @@ export default function App() {
       )}
       <PrivacyPolicy />
     </div>
+    </MotionConfig>
     </AnalysisContext.Provider>
   );
 }

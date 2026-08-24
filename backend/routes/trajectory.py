@@ -13,14 +13,15 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from platforms.codeforces import CFClient
 from db.connection import (
-    AsyncSessionLocal, User, RatingTrajectory, get_or_create_user, utcnow_naive,
+    AsyncSessionLocal, User, RatingTrajectory, get_or_create_user,
+    user_handle_condition, utcnow_naive,
 )
 from routes.schemas import RatingPoint, RatingTrajectoryResponse
 
@@ -56,8 +57,7 @@ async def _load_pg_cache(handle: str) -> list[RatingPoint] | None:
     try:
         async with AsyncSessionLocal() as session:
             stmt = select(RatingTrajectory).join(User, User.id == RatingTrajectory.user_id).where(
-                (func.lower(User.cf_handle) == handle.lower())
-                | (func.lower(User.lc_handle) == handle.lower())
+                user_handle_condition(handle)
             )
             row = (await session.execute(stmt)).scalars().first()
             if row is None or row.fetched_at is None:
@@ -78,7 +78,9 @@ async def _save_pg_cache(handle: str, payload: list[RatingPoint]):
     """Upsert the per-handle trajectory row (non-fatal on failure)."""
     try:
         async with AsyncSessionLocal() as session:
-            user = await get_or_create_user(session, handle)
+            # CF-only route: the trajectory row belongs to a cf_handle-keyed
+            # identity (explicit platform — never rely on the default).
+            user = await get_or_create_user(session, handle, "cf")
             stmt = pg_insert(RatingTrajectory).values(
                 user_id=user.id, platform="cf", payload=[p.model_dump() for p in payload],
                 fetched_at=utcnow_naive(),

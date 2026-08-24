@@ -184,6 +184,34 @@ class TestPgCacheTier:
     def test_missing_row_falls_through_to_live_fetch(self, monkeypatch, mock_cf_rating_history):
         self._install(monkeypatch, None)
         r = client.get("/api/rating-trajectory/tourist?platform=cf")
-        assert r.status_code == 200, r.json()
+        assert r.status_code == 200
         assert len(r.json()["points"]) == 2
         assert mock_cf_rating_history.get_rating_history.call_count == 1
+
+
+class TestMemoryCacheTtl:
+    """The memory tier's own expiry branch: an entry older than _CACHE_TTL must
+    fall through to PG/live fetch, never serve frozen-forever points."""
+
+    def test_expired_memory_entry_refetches_from_cf(self, mock_cf_rating_history):
+        from routes import trajectory as traj
+
+        r = client.get("/api/rating-trajectory/tourist?platform=cf")
+        assert r.status_code == 200
+        assert mock_cf_rating_history.get_rating_history.call_count == 1  # live fetch populated the cache
+
+        # Backdate the memory entry past the 1h TTL
+        key = next(iter(traj._cache))
+        ts, value = traj._cache[key]
+        traj._cache[key] = (ts - (traj._CACHE_TTL + 1), value)
+
+        r = client.get("/api/rating-trajectory/tourist?platform=cf")
+        assert r.status_code == 200
+        # Expired memory entry must NOT be served — live fetch runs again.
+        assert mock_cf_rating_history.get_rating_history.call_count == 2
+
+    def test_fresh_memory_entry_is_served_without_refetch(self, mock_cf_rating_history):
+        client.get("/api/rating-trajectory/tourist?platform=cf")
+        assert mock_cf_rating_history.get_rating_history.call_count == 1
+        client.get("/api/rating-trajectory/tourist?platform=cf")
+        assert mock_cf_rating_history.get_rating_history.call_count == 1  # memory hit

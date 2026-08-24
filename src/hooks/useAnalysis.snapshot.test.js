@@ -101,6 +101,38 @@ describe("useAnalysis snapshot persistence — behavioral", () => {
     expect(result.current.user).toBeNull();
   });
 
+  it("rejects a snapshot with a future schema version instead of half-restoring it", async () => {
+    window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+      v: 999, handle: "mannpatel", cfHandle: "mannpatel", lcHandle: "",
+      user: { handle: "mannpatel", platform: "cf" }, cfUser: { handle: "mannpatel" },
+      lcUser: null, tagProfile: [], weakTags: [], solvedSet: [], suggestedTopics: [],
+      analysisMode: "quick", platform: "cf", combinedPlatform: false, modelUsed: null,
+      masteryScores: {}, analysisRecommendations: [], analysisSelectedTopics: [],
+      analysisActiveWeakTag: null,
+    }));
+    const useAnalysis = await loadHook();
+    const { result } = renderHook(() => useAnalysis());
+
+    expect(result.current.user).toBeNull();
+  });
+
+  it("rejects a snapshot older than the 30-day staleness bound", async () => {
+    const stale = Date.now() - 31 * 24 * 60 * 60 * 1000;
+    window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+      v: 1, savedAt: stale, handle: "mannpatel", cfHandle: "mannpatel", lcHandle: "",
+      user: { handle: "mannpatel", platform: "cf" }, cfUser: { handle: "mannpatel" },
+      lcUser: null, tagProfile: [], weakTags: [], solvedSet: [], suggestedTopics: [],
+      analysisMode: "quick", platform: "cf", combinedPlatform: false, modelUsed: null,
+      masteryScores: {}, analysisRecommendations: [], analysisSelectedTopics: [],
+      analysisActiveWeakTag: null,
+    }));
+    const useAnalysis = await loadHook();
+    const { result } = renderHook(() => useAnalysis());
+
+    // Months-old data must fall back to the landing page, not pose as current.
+    expect(result.current.user).toBeNull();
+  });
+
   it("clearAll removes the key and resets state to the landing page", async () => {
     const useAnalysis = await loadHook();
     const { result } = renderHook(() => useAnalysis());
@@ -145,5 +177,49 @@ describe("useAnalysis snapshot persistence — behavioral", () => {
 
     expect(result.current.error).toContain("CF API down");
     expect(window.localStorage.getItem(SNAPSHOT_KEY)).toBeNull();
+  });
+
+  it("LC analysis clears cfHandle/cfUser (handle symmetry, fix-batch-2)", async () => {
+    const { analyzeHandle, getRecommendationsWithMastery } = await import("../api/backendClient.js");
+    const lcPayload = { ...BACKEND_ANALYSIS, handle: "lcuser", platform: "lc" };
+    const recs = Promise.resolve({ recommendations: [] });
+    getRecommendationsWithMastery.mockImplementation(() => recs);
+    const useAnalysis = await loadHook();
+    const { result } = renderHook(() => useAnalysis());
+    await analyzeMannpatel(result); // CF side first: populates cfHandle/cfUser
+    // analyzeMannpatel installed a flat mockResolvedValue — restore the
+    // platform-aware implementation for the LC pass under test.
+    analyzeHandle.mockImplementation((_h, platform) =>
+      Promise.resolve(platform === "lc" ? lcPayload : BACKEND_ANALYSIS));
+
+    act(() => { result.current.setPlatform("lc"); });
+    act(() => { result.current.setHandle("lcuser"); });
+    await act(async () => { await result.current.analyze(); });
+
+    expect(result.current.lcUser?.handle).toBe("lcuser");
+    expect(result.current.lcHandle).toBe("lcuser");
+    // The regression this pins: retaining cfHandle after an LC analysis made
+    // Phase-4 sections fetch the STALE prior CF handle at cf endpoints.
+    expect(result.current.cfHandle).toBe("");
+    expect(result.current.cfUser).toBeNull();
+
+    const snap = stored();
+    expect(snap.cfHandle).toBe("");
+    expect(snap.cfUser).toBeNull();
+    expect(snap.lcHandle).toBe("lcuser");
+  });
+
+  it("platform-input guard: editing combined-mode handles without re-analyzing does not rewrite the snapshot", async () => {
+    const useAnalysis = await loadHook();
+    const { result } = renderHook(() => useAnalysis());
+    await analyzeMannpatel(result);
+    const before = stored();
+
+    // 'mannpatel' is still in analyzedIds, so the search-query guard passes —
+    // but pairing A's profile with a new CF input name would corrupt restore.
+    act(() => { result.current.setCfHandle("someoneelse"); });
+
+    expect(stored()).toEqual(before);
+    expect(stored().cfHandle).toBe("mannpatel");
   });
 });

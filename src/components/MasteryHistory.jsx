@@ -19,10 +19,10 @@ const SPARK_H = 30;
 const MAX_ROWS = 8;
 
 export default function MasteryHistory() {
-  const { modelUsed, cfHandle, lcHandle, user } = useAnalysisContext();
+  const { modelUsed, primaryHandle, primaryPlatform } = useAnalysisContext();
 
-  const handle = cfHandle || lcHandle || (user && user.handle) || "";
-  const platform = cfHandle ? "cf" : "lc";
+  const handle = primaryHandle;
+  const platform = primaryPlatform;
   const graphDkt = modelUsed === "graph_dkt";
 
   const fetcher = useCallback(async (signal) => {

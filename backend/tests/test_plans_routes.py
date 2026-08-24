@@ -2,6 +2,11 @@
 
 Uses a fake AsyncSessionLocal so the read-failure→[] / write-failure→502 /
 missing-plan→404 contracts are pinned without a live database.
+
+NOTE: cross-user (IDOR) ownership regressions are pinned in test_plans.py
+(TestPlansOwnership) — the statement-blind fakes in THIS file structurally
+cannot detect a dropped ownership predicate, only failure-shape contracts.
+Don't delete one file thinking the other covers it.
 """
 
 from types import SimpleNamespace
@@ -28,6 +33,9 @@ class _FakeResult:
 
     def scalars(self):
         return self
+
+    def first(self):
+        return self._value
 
     def all(self):
         return self._rows
@@ -105,7 +113,9 @@ class TestPlansContracts:
         assert r.json() == []
 
     def test_post_creates_plan_and_assigns_server_id(self, fake_db):
-        fake_db(_FakeResult(None))  # user lookup → no user yet
+        # Identity resolution runs either-column find_user_by_handle first,
+        # then get_or_create_user when absent → two lookups, then the insert.
+        fake_db(_FakeResult(None), _FakeResult(None))
         r = client.post("/api/plans/mannpatel", json=PLAN_BODY)
         assert r.status_code == 201, r.json()
         body = r.json()
@@ -148,6 +158,24 @@ class TestPlansContracts:
         assert r.status_code == 502
 
 
+class TestPlanInValidation:
+    """name is bounded to the VARCHAR(120) column — over/under-sized names are
+    a 422 validation error, never a swallowed-then-502 DB write failure."""
+
+    def test_empty_name_rejected_422(self):
+        r = client.post("/api/plans/mannpatel", json={"name": "", "payload": {}})
+        assert r.status_code == 422
+
+    def test_overlong_name_rejected_422(self):
+        r = client.post("/api/plans/mannpatel", json={"name": "x" * 121, "payload": {}})
+        assert r.status_code == 422
+
+    def test_name_at_column_limit_accepted(self, fake_db):
+        fake_db(_FakeResult(None), _FakeResult(None))
+        r = client.post("/api/plans/mannpatel", json={"name": "x" * 120, "payload": {}})
+        assert r.status_code == 201
+
+
 class TestPlansBodyLimitAndAuth:
     """MaxBodySizeMiddleware covers PUT too; HMAC opt-in locks plans when set."""
 
@@ -165,7 +193,7 @@ class TestPlansBodyLimitAndAuth:
         assert r.status_code == 413
 
     def test_normal_size_post_passes_middleware(self, fake_db):
-        fake_db(_FakeResult(None))
+        fake_db(_FakeResult(None), _FakeResult(None))
         r = client.post("/api/plans/mannpatel", json=PLAN_BODY)
         assert r.status_code == 201
 
@@ -185,7 +213,7 @@ class TestPlansBodyLimitAndAuth:
     def test_signed_post_passes_and_creates_plan(self, fake_db, monkeypatch):
         import auth as auth_mod
         monkeypatch.setattr(auth_mod, "_API_SECRET", "test-secret")
-        fake_db(_FakeResult(None))
+        fake_db(_FakeResult(None), _FakeResult(None))
         r = client.post("/api/plans/mannpatel", json=PLAN_BODY,
                         headers=self._hmac_headers("mannpatel"))
         assert r.status_code == 201, r.json()

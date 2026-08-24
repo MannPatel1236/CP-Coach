@@ -176,7 +176,9 @@ class DeleteUserResponse(BaseModel):
 
 
 class PlanIn(BaseModel):
-    name: str
+    # Bounded to the plans.name VARCHAR(120) column so an over-long name is a
+    # 422 validation error, not a 502 from a swallowed DB write failure.
+    name: str = Field(min_length=1, max_length=120)
     payload: dict = Field(default_factory=dict)
 
 
@@ -188,6 +190,10 @@ class PlanOut(BaseModel):
     updated_at: str | None = None
 
 
+class PlanDeleteResponse(BaseModel):
+    deleted: bool
+
+
 # ── Health ──────────────────────────────────────────────────────────────────
 
 
@@ -196,6 +202,10 @@ class HealthResponse(BaseModel):
     version: str
     platforms: list[str]
     model_loaded: bool = False
+    # False = the lifespan DB init failed (tables missing) — new features
+    # degrade (plans → [], writes 502, mastery-history 'unavailable') while
+    # /health still says ok. Surfaced so ops can detect that state.
+    database: bool = False
 
 
 class DeepHealthDownstream(BaseModel):

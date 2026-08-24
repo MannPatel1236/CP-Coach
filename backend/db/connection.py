@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sqlalchemy import (
     Column, Integer, String, Float, BigInteger, ForeignKey, TIMESTAMP, ARRAY, Text,
-    func, select,
+    case, delete, func, select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -183,6 +183,18 @@ def utcnow_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def user_handle_condition(handle: str):
+    """Single source of truth for wildcard-safe either-column handle matching.
+
+    lower()== equality, NOT ilike() — '_' is legal in CF handles and is a LIKE
+    wildcard, so ilike('a_b') would resolve to stranger 'aXb'. Shared by every
+    unscoped (either-column) consumer: find_user_by_handle, delete_users_by_handle,
+    and the trajectory PG cache join.
+    """
+    h = handle.lower()
+    return (func.lower(User.cf_handle) == h) | (func.lower(User.lc_handle) == h)
+
+
 async def find_user_by_handle(session, handle: str, platform: str | None = None) -> User | None:
     """Exact case-insensitive user lookup, else None.
 
@@ -193,16 +205,38 @@ async def find_user_by_handle(session, handle: str, platform: str | None = None)
     `platform` so an LC analysis can never resolve onto a stranger's CF row
     whose handle string happens to collide. Callers with no platform context
     (plans CRUD keyed by either handle) omit it and get either-column matching.
+
+    Dual-platform users can legitimately hold TWO rows for one string
+    ({cf_handle:X} + {lc_handle:X}) — the platform-scoped identity model. The
+    either-column read is therefore deterministic instead of strict: prefer the
+    cf-matching row (plans have historically been cf-keyed), then lowest id.
+    scalar_one_or_none() would raise MultipleResultsFound and 500/[]-out every
+    route for exactly those dual-platform users.
     """
     h = handle.lower()
     if platform == "cf":
         cond = func.lower(User.cf_handle) == h
+        stmt = select(User).where(cond).order_by(User.id)
     elif platform == "lc":
         cond = func.lower(User.lc_handle) == h
+        stmt = select(User).where(cond).order_by(User.id)
     else:
-        cond = (func.lower(User.cf_handle) == h) | (func.lower(User.lc_handle) == h)
-    stmt = select(User).where(cond)
-    return (await session.execute(stmt)).scalar_one_or_none()
+        prefer_cf = case((func.lower(User.cf_handle) == h, 0), else_=1)
+        stmt = select(User).where(user_handle_condition(handle)).order_by(prefer_cf, User.id)
+    return (await session.execute(stmt)).scalars().first()
+
+
+async def delete_users_by_handle(session, handle: str) -> int:
+    """GDPR erasure — bulk-delete EVERY user row whose cf_handle OR lc_handle
+    equals `handle` (case-insensitive). Returns the number of rows deleted.
+
+    lower()== equality, NOT ilike(): '_' is a legal CF-handle char AND a LIKE
+    wildcard, so an ilike('a_b') would erase stranger 'aXb'. Deleting all
+    matches (not just one) erases both halves of a dual-platform identity;
+     DB-level ON DELETE CASCADE removes their children.
+    """
+    result = await session.execute(delete(User).where(user_handle_condition(handle)))
+    return result.rowcount or 0
 
 
 async def get_or_create_user(session, handle: str, platform: str = "cf") -> User:
@@ -226,8 +260,14 @@ async def create_tables():
     # Split on semicolons — asyncpg doesn't allow multi-statement in one exec
     statements = [s.strip() for s in sql.split(";") if s.strip()]
     async with engine.connect() as conn:
-        for stmt in statements:
-            await conn.exec_driver_sql(stmt)
+        for i, stmt in enumerate(statements):
+            try:
+                await conn.exec_driver_sql(stmt)
+            except Exception as e:
+                # Name the failing statement — a bare error hides WHICH DDL
+                # aborted (and every statement after it never ran).
+                head = " ".join(stmt.split())[:120]
+                raise RuntimeError(f"schema.sql statement {i + 1}/{len(statements)} failed: {head} — {e}") from e
         await conn.commit()
 
 

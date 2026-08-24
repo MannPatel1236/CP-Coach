@@ -70,6 +70,22 @@ describe("CompareHandles — §5.2 #8", () => {
     expect(queryByTestId("compare-estimate-badge")).toBeNull(); // both graph_dkt
   });
 
+  it("self-compare renders an explicit same-handle message, not a misleading no-overlap panel", async () => {
+    // Comparing the primary against itself: identical mastery would previously
+    // fall into the deltas.length===0 branch ("No shared mastery data to diff —
+    // different platforms or empty profiles"), which is factually wrong here.
+    globalThis.fetch.mockResolvedValue(okResponse({ ...SECONDARY, handle: "mannpatel" }));
+    const { container, getByTestId } = renderInContext(<CompareHandles />);
+    await typeAndCompare(getByTestId, "mannpatel");
+
+    await waitFor(() => {
+      expect(getByTestId("compare-self")).toBeTruthy();
+    });
+    expect(getByTestId("compare-self").textContent).toContain("same handle");
+    expect(container.querySelector("[data-testid='compare-no-overlap']")).toBeNull();
+    expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBe(0);
+  });
+
   it("renders negative deltas with a true minus sign (U+2212), not hyphen-minus", async () => {
     globalThis.fetch.mockResolvedValue(okResponse(SECONDARY));
     const { container, getByTestId } = renderInContext(<CompareHandles />);

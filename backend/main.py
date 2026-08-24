@@ -17,7 +17,7 @@ load_dotenv()
 
 from rate_limiter import limiter  # noqa: E402
 from models.errors import handle_http_exception, handle_catchall  # noqa: E402
-from routes import analyze, recommend, progress, graph, user, trajectory, plans  # noqa: E402
+from routes import analyze, recommend, progress, graph, user, trajectory, plans, mastery_history  # noqa: E402
 from routes.schemas import HealthResponse, HealthDeepResponse  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -63,8 +63,10 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
     try:
         await create_tables()
+        app.state.db_ready = True
         logger.info("Database tables verified/created.")
     except Exception as e:
+        app.state.db_ready = False
         logger.error(f"Failed to initialize database: {e}")
 
     # Pre-load Graph-DKT model once at startup (prefer 5-fold 10k ensemble)
@@ -155,37 +157,49 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
 
     PUT is included: PlanIn.payload is an untyped dict, so an uncapped PUT
     reopens the same hole this middleware closes for POST. DELETE carries no body.
+
+    Only a verifiable Content-Length ≤ MAX_SIZE passes. A chunked
+    transfer-encoding (or a missing/garbage length) gives the middleware no size
+    contract, yet Starlette still buffers the whole body in memory before
+    validation — so those requests are rejected outright rather than trusted.
+    Browsers always send Content-Length on these JSON writes; only streaming
+    clients (curl -T) hit this branch.
     """
     MAX_SIZE = 1_000_000  # 1 MB
+
+    def _too_large(self, request, reason: str):
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(
+            status_code=413,
+            content={"detail": f"{reason} Max {self.MAX_SIZE} bytes."},
+        )
+        # Ensure security headers and request ID on the early-return path.
+        # RequestIDMiddleware is inner (registered first → innermost), so
+        # on this outermost early-return it has not yet set request.state.request_id;
+        # generate inline, matching what it would have produced.
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        rid = request.state.request_id if hasattr(request.state, "request_id") else None
+        if rid is None:
+            rid = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+            request.state.request_id = rid
+        response.headers["X-Request-ID"] = rid
+        return response
 
     async def dispatch(self, request, call_next):
         if request.method in ("POST", "PUT") and request.url.path.startswith(("/api/recommend", "/api/plans")):
             content_length = request.headers.get("content-length")
-            if content_length:
-                try:
-                    size = int(content_length)
-                except (ValueError, TypeError):
-                    size = 0
-                if size > self.MAX_SIZE:
-                    from fastapi.responses import JSONResponse
-                    response = JSONResponse(
-                        status_code=413,
-                        content={"detail": f"Request body too large. Max {self.MAX_SIZE} bytes."},
-                    )
-                    # Ensure security headers and request ID on the early-return path.
-                    # RequestIDMiddleware is inner (registered first → innermost), so
-                    # on this outermost early-return it has not yet set request.state.request_id;
-                    # generate inline, matching what it would have produced.
-                    response.headers["X-Frame-Options"] = "DENY"
-                    response.headers["X-Content-Type-Options"] = "nosniff"
-                    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-                    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
-                    rid = request.state.request_id if hasattr(request.state, "request_id") else None
-                    if rid is None:
-                        rid = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-                        request.state.request_id = rid
-                    response.headers["X-Request-ID"] = rid
-                    return response
+            transfer_encoding = (request.headers.get("transfer-encoding") or "").lower()
+            if not content_length or "chunked" in transfer_encoding:
+                return self._too_large(request, "Body size unverifiable (chunked or missing length).")
+            try:
+                size = int(content_length)
+            except (ValueError, TypeError):
+                return self._too_large(request, "Unparseable Content-Length.")
+            if size > self.MAX_SIZE:
+                return self._too_large(request, "Request body too large.")
         return await call_next(request)
 
 app.add_middleware(MaxBodySizeMiddleware)
@@ -208,6 +222,7 @@ app.include_router(analyze.router)
 app.include_router(recommend.router)
 app.include_router(progress.router)
 app.include_router(trajectory.router)
+app.include_router(mastery_history.router)
 app.include_router(graph.router)
 app.include_router(user.router)
 app.include_router(plans.router)
@@ -221,6 +236,7 @@ async def health(request: Request):
         "version": "2.0",
         "platforms": ["cf", "lc"],
         "model_loaded": model is not None,
+        "database": bool(getattr(request.app.state, "db_ready", False)),
     }
 
 

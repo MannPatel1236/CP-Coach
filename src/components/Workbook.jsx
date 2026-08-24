@@ -3,7 +3,7 @@
 // program), localStorage-first: DB rows → fallback localStorage seed → blank
 // checklist state, never an error. "Save current recommendations" snapshots the
 // active recs + weak focus + mastery snapshot as a reproducible plan (§5b lock #7).
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { BookIcon } from "./Icons";
 import { showToast } from "./ToastContainer.jsx";
@@ -15,12 +15,11 @@ import { panelTransition } from "../lib/motion.js";
 const nextId = (() => { let n = 0; return () => `local-${Date.now()}-${n++}`; })();
 
 export default function Workbook() {
-  const { cfHandle, lcHandle, user, recommendations, weakTags, masteryScoresRef } = useAnalysisContext();
-  const handle = cfHandle || lcHandle || (user && user.handle) || "";
+  const { primaryHandle, recommendations, weakTags, masteryScoresRef } = useAnalysisContext();
+  const handle = primaryHandle;
   const [plans, setPlans] = useState(null);       // null = not loaded yet
   const [error, setError] = useState("");
   const [localOnly, setLocalOnly] = useState(false);
-  const abortRef = useRef(null);
 
   const run = useCallback(async (controller) => {
     setError("");
@@ -52,7 +51,6 @@ export default function Workbook() {
     if (!handle) return;
     let cancelled = false;
     const controller = new AbortController();
-    abortRef.current = controller;
     (async () => { await run(controller); if (cancelled) setPlans((p) => (p === null ? [] : p)); })();
     return () => { cancelled = true; controller.abort(); };
   }, [handle, run]);
