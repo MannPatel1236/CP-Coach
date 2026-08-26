@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { waitFor } from "@testing-library/react";
+import { waitFor, act } from "@testing-library/react";
 import MasteryHistory from "./MasteryHistory.jsx";
 import { renderInContext } from "../__fixtures__/analysisContext.jsx";
 
@@ -61,7 +61,7 @@ describe("MasteryHistory — §5.2 #6", () => {
       ok: true,
       json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", mastery_history: HISTORY, note: null }),
     });
-    getByTestId("mastery-retry").click();
+    act(() => { getByTestId("mastery-retry").click(); });
     await rowsMounted(container);
     expect(container.querySelectorAll("[data-testid='mastery-row']").length).toBe(4);
   });

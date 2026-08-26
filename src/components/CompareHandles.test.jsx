@@ -48,7 +48,7 @@ const PRIMARY_CF = {
 
 async function typeAndCompare(getByTestId, value) {
   fireEvent.change(getByTestId("compare-input"), { target: { value } });
-  getByTestId("compare-analyze").click();
+  fireEvent.click(getByTestId("compare-analyze"));
 }
 
 describe("CompareHandles — §5.2 #8", () => {
@@ -202,7 +202,7 @@ describe("CompareHandles — §5.2 #8", () => {
 
   it("does not fetch until a second handle is typed", async () => {
     const { getByTestId } = renderInContext(<CompareHandles />);
-    getByTestId("compare-analyze").click();
+    fireEvent.click(getByTestId("compare-analyze"));
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

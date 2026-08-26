@@ -65,6 +65,13 @@ describe("AppTabs — Phase 6 Step 4 (zero-refetch proof)", () => {
       expect(panel.getAttribute("inert")).toBe("");
       expect(panel.getAttribute("aria-labelledby")).toBe(`tab-${panel.id.replace("panel-", "")}`);
     }
+
+    // Settle SkillFrontier's async dagre layout (useGraphLayout) before the
+    // test ends — otherwise its post-await setLayout lands outside act() and
+    // emits a flaky not-wrapped-in-act warning (~1 in 6 runs).
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='frontier-summary']")).toBeTruthy();
+    });
   });
 });
 

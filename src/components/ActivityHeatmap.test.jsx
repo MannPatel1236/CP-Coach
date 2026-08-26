@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { waitFor } from "@testing-library/react";
+import { waitFor, act } from "@testing-library/react";
 import ActivityHeatmap from "./ActivityHeatmap.jsx";
 import { renderInContext } from "../__fixtures__/analysisContext.jsx";
 
@@ -63,7 +63,7 @@ describe("ActivityHeatmap + Streaks — §5.2 #7", () => {
       ok: true,
       json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", topic_progress: {}, activity: ACTIVITY }),
     });
-    getByTestId("heat-retry").click();
+    act(() => { getByTestId("heat-retry").click(); });
     await gridMounted(container);
     expect(container.querySelectorAll("[data-testid='heat-cell']").length).toBeGreaterThan(0);
   });

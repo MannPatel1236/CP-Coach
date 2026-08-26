@@ -82,7 +82,7 @@ describe("Workbook — §5.2 #9", () => {
     mockApi([]);
     const { getByTestId } = renderInContext(<Workbook />);
     await waitFor(() => { expect(getByTestId("wb-blank")).toBeTruthy(); });
-    getByTestId("wb-save").click();
+    fireEvent.click(getByTestId("wb-save"));
     await waitFor(() => {
       const post = globalThis.fetch.mock.calls.find(([, o]) => (o?.method || "GET") === "POST");
       expect(post).toBeTruthy();

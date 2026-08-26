@@ -30,7 +30,7 @@ describe("DashboardNav — Phase 6 Step 2", () => {
 
   it("clicking a tab fires onSelectTab with the tab id", () => {
     const { getByRole, onSelectTab } = setup("practice");
-    getByRole("tab", { name: /workbook/i }).click();
+    fireEvent.click(getByRole("tab", { name: /workbook/i }));
     expect(onSelectTab).toHaveBeenCalledWith("workbook");
   });
 

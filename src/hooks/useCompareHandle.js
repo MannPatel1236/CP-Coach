@@ -90,6 +90,9 @@ export default function useCompareHandle() {
       setResult(build(data, platform));
     } catch (err) {
       if (err.name === "AbortError") return;
+      // Aborted runs can reject with non-AbortError shapes (e.g. a TypeError
+      // from fetch teardown) — never surface those as errors either.
+      if (controller.signal.aborted) return;
       setError(err.message || "Failed to analyze the second handle.");
     } finally {
       if (!controller.signal.aborted) setLoading(false);

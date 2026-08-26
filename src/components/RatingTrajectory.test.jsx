@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { waitFor } from "@testing-library/react";
+import { waitFor, act } from "@testing-library/react";
 import RatingTrajectory from "./RatingTrajectory.jsx";
 import { renderInContext } from "../__fixtures__/analysisContext.jsx";
 
@@ -52,7 +52,7 @@ describe("RatingTrajectory — §5.2 #5", () => {
       ok: true,
       json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", points: POINTS }),
     });
-    retry.click();
+    act(() => { retry.click(); });
     await chartMounted(container);
     expect(container.querySelector("svg[data-testid='traj-chart']")).toBeTruthy();
   });

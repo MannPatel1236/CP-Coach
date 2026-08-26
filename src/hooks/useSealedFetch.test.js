@@ -51,14 +51,38 @@ describe("useSealedFetch", () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 
-  it("does not setState after unmount mid-flight (cancelled flag owns the race)", async () => {
+  // NOTE on falsifiability: teardown races are asserted while MOUNTED (via an
+  // enabled=false rerender, whose cleanup aborts through the same controller
+  // ref slot as unmount). Post-unmount result.current is frozen in React 18 —
+  // assertions made after unmount() pass even against the pre-guard buggy
+  // hook, so they can't catch a regression.
+  it("does not commit a stale resolve when disabled mid-flight (aborted run dropped)", async () => {
     let resolveLate;
     const fetcher = vi.fn().mockReturnValue(new Promise((r) => { resolveLate = r; }));
-    const { unmount } = renderHook(() => useSealedFetch(fetcher, true));
+    const { result, rerender } = renderHook(({ enabled }) => useSealedFetch(fetcher, enabled), {
+      initialProps: { enabled: true },
+    });
     await waitFor(() => { expect(fetcher).toHaveBeenCalledTimes(1); });
-    unmount();
-    // Resolving after unmount must not throw React's setState-on-unmounted warning
-    expect(() => resolveLate({ data: 2 })).not.toThrow();
+    rerender({ enabled: false });
+    // Derived loading flips false instantly with the disable — no reset
+    // setState needed (ActivityHeatmap has no disabled branch to hide behind).
+    expect(result.current.loading).toBe(false);
+    resolveLate({ data: "stale" });
+    await act(async () => {});
+    expect(result.current.data).toBeNull();
+  });
+
+  it("does not surface a non-AbortError rejection when disabled mid-flight", async () => {
+    let rejectLate;
+    const fetcher = vi.fn().mockReturnValue(new Promise((_, rej) => { rejectLate = rej; }));
+    const { result, rerender } = renderHook(({ enabled }) => useSealedFetch(fetcher, enabled), {
+      initialProps: { enabled: true },
+    });
+    await waitFor(() => { expect(fetcher).toHaveBeenCalledTimes(1); });
+    rerender({ enabled: false });
+    rejectLate(new TypeError("Failed to fetch"));
+    await act(async () => {});
+    expect(result.current.error).toBe("");
   });
 
   it("retry issues a fresh controller per attempt", async () => {
