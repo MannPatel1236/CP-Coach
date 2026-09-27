@@ -67,7 +67,7 @@ export const baseContext = {
       url: "https://codeforces.com/problemset/problem/1234/B",
     },
   ],
-  toggleTopic: () => {}, fetchForSelectedTopics: () => {}, recError: "",
+  clearFocus: () => {}, toggleTopic: () => {}, fetchForSelectedTopics: () => {}, recError: "",
 };
 
 export function renderInContext(ui, overrides = {}) {

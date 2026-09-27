@@ -56,7 +56,7 @@ export default function App() {
 
   const {
     selectedTopics, fetchingRecs, recs: recommendations,
-    activeWeakTag, selectWeakTag,
+    activeWeakTag, selectWeakTag, clearFocus,
     toggleTopic, fetchForSelectedTopics, error: recError,
   } = recs;
 
@@ -131,9 +131,9 @@ export default function App() {
     analysisMode, setAnalysisMode, platform, setPlatform,
     combinedPlatform, setCombinedPlatform, analyze, clearAll,
     selectedTopics, fetchingRecs, recommendations,
-    activeWeakTag, selectWeakTag, toggleTopic, fetchForSelectedTopics, recError,
+    activeWeakTag, selectWeakTag, clearFocus, toggleTopic, fetchForSelectedTopics, recError,
     primaryHandle, primaryPlatform,
-  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, modelUsed, masteryScoresRef, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, toggleTopic, fetchForSelectedTopics, primaryHandle, primaryPlatform]);
+  }), [handle, setHandle, cfHandle, setCfHandle, lcHandle, setLcHandle, loading, loadingStep, error, modelUsed, masteryScoresRef, user, cfUser, lcUser, tagProfile, weakTags, solvedSet, suggestedTopics, analysisMode, setAnalysisMode, platform, setPlatform, combinedPlatform, setCombinedPlatform, analyze, clearAll, selectedTopics, fetchingRecs, recommendations, activeWeakTag, recError, selectWeakTag, clearFocus, toggleTopic, fetchForSelectedTopics, primaryHandle, primaryPlatform]);
 
   return (
     <AnalysisContext.Provider value={contextValue}>
@@ -229,6 +229,7 @@ export default function App() {
                     recs={recommendations}
                     userRating={cfUser?.rating || lcUser?.rating || user?.rating || 800}
                     selectedTopics={selectedTopics}
+                    onClearFocus={clearFocus}
                   />
                 )}
               </AnimatePresence>

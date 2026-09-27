@@ -147,6 +147,14 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     await fetchRecommendations([tag]);
   }, [fetchRecommendations]);
 
+  // Restore the initial recommendation set from analyze() (or empty if none).
+  const clearFocus = useCallback(() => {
+    setActiveWeakTag(analysisActiveWeakTagRef.current);
+    setSelectedTopics(analysisSelectedTopicsRef.current);
+    setRecs(analysisRecommendationsRef.current);
+    setError(null);
+  }, [analysisActiveWeakTagRef, analysisSelectedTopicsRef, analysisRecommendationsRef]);
+
   const toggleTopic = useCallback((tag) => {
     setSelectedTopics((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
@@ -167,6 +175,7 @@ export default function useRecommendations({ solvedSet, user, abortRef, resetAbo
     activeWeakTag,
     setActiveWeakTag,
     selectWeakTag,
+    clearFocus,
     toggleTopic,
     fetchForSelectedTopics,
     error,

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { diffColor } from "../utils.js";
-import { ExternalLinkIcon, BookIcon } from "./Icons";
+import { ExternalLinkIcon, BookIcon, CloseIcon } from "./Icons";
 import { bandFor } from "../lib/recBand.js";
 import { panelTransition } from "../lib/motion.js";
 
@@ -48,12 +48,12 @@ function normalizeRec(p) {
   };
 }
 
-function Recommendations({ recs, userRating, selectedTopics }) {
+function Recommendations({ recs, userRating, selectedTopics, onClearFocus }) {
   if (!recs.length) return null;
 
   const { lo, hi } = bandFor(userRating);
   const isStretchMode = recs.every((r) => r.isStretch);
-  const firstTag = recs[0]?.matchedTags?.[0];
+  const firstTag = normalizeRec(recs[0]).matchedTags?.[0];
 
   return (
     <motion.div
@@ -83,13 +83,38 @@ function Recommendations({ recs, userRating, selectedTopics }) {
 
         <div style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
           {selectedTopics?.length > 0 ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              Focus:
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <span>Focused on:</span>
               {selectedTopics.map((t, i) => (
                 <span key={t} style={{ color: "var(--primary-bright)", fontWeight: 700 }}>
                   {t}{i < selectedTopics.length - 1 ? "," : ""}
                 </span>
               ))}
+              {onClearFocus && (
+                <button
+                  type="button"
+                  data-testid="clear-focus"
+                  onClick={onClearFocus}
+                  aria-label="Clear recommendation focus"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginLeft: 4,
+                    padding: "2px 8px",
+                    fontSize: 11,
+                    color: "var(--on-surface-variant)",
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--outline-variant)",
+                    borderRadius: "var(--radius-full)",
+                    cursor: "pointer",
+                  }}
+                  className="focus-clear"
+                >
+                  <CloseIcon size={12} />
+                  Clear
+                </button>
+              )}
             </div>
           ) : (
             <div>Focus: <span style={{ color: "var(--primary-bright)", fontWeight: 700 }}>{firstTag}</span></div>

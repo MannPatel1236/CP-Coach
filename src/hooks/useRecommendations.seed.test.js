@@ -3,7 +3,7 @@
 // mount, found empty refs, and never re-ran when analyze() filled them. `user`
 // is now a dep; this pins the seed-on-first-analysis behavior.
 import { describe, it, expect, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import useRecommendations from "./useRecommendations.js";
 
 vi.mock("../api.js", () => ({
@@ -67,5 +67,33 @@ describe("useRecommendations auto-seed from analyze()", () => {
 
     expect(result.current.recs).toEqual([]);
     expect(result.current.selectedTopics).toEqual([]);
+  });
+});
+
+describe("useRecommendations clearFocus", () => {
+  it("restores the initial recommendation set and selected topics from analyze()", () => {
+    const refs = {
+      analysisRecommendationsRef: { current: RECS },
+      analysisSelectedTopicsRef: { current: ["dp"] },
+      analysisActiveWeakTagRef: { current: "dp" },
+    };
+    const { result } = renderHook((p) => useRecommendations(p), {
+      initialProps: makeProps({ handle: "mannpatel", platform: "cf" }, refs),
+    });
+
+    // Simulate a user-driven focus change away from the seeded state.
+    act(() => {
+      result.current.setSelectedTopics(["graphs"]);
+      result.current.setActiveWeakTag("graphs");
+      result.current.setRecs([]);
+    });
+
+    act(() => {
+      result.current.clearFocus();
+    });
+
+    expect(result.current.recs).toEqual(RECS);
+    expect(result.current.selectedTopics).toEqual(["dp"]);
+    expect(result.current.activeWeakTag).toBe("dp");
   });
 });

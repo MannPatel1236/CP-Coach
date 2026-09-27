@@ -1,5 +1,6 @@
 /* global process */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Recommendations from "./Recommendations.jsx";
@@ -51,5 +52,36 @@ describe("Recommendations — render", () => {
     expect(getByText(/1900/)).toBeTruthy();
     expect(container.textContent).toContain("Binary Search Walk");
     expect(container.textContent).toContain("Bitmask Count");
+  });
+
+  it("shows 'Focused on' state and a Clear button when selectedTopics are provided", () => {
+    const onClearFocus = vi.fn();
+    const { getByTestId, container } = renderInContext(
+      <Recommendations
+        recs={recsForRender()}
+        userRating={1500}
+        selectedTopics={["binary_search"]}
+        onClearFocus={onClearFocus}
+      />
+    );
+    expect(container.textContent).toContain("Focused on:");
+    const clearBtn = getByTestId("clear-focus");
+    expect(clearBtn).toBeTruthy();
+    expect(clearBtn.textContent).toContain("Clear");
+    fireEvent.click(clearBtn);
+    expect(onClearFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the first matched tag when no selectedTopics are provided", () => {
+    const { queryByTestId, container } = renderInContext(
+      <Recommendations
+        recs={recsForRender()}
+        userRating={1500}
+        selectedTopics={[]}
+      />
+    );
+    expect(container.textContent).toContain("Focus:");
+    expect(container.textContent).toContain("binary_search");
+    expect(queryByTestId("clear-focus")).toBeNull();
   });
 });
