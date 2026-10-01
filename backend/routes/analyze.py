@@ -100,17 +100,19 @@ async def _analyze_lc(handle: str, mode: str, _controller):
 
 
 def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
-    """Compute mastery scores + Phase-4b checkpoints — try Graph-DKT, fallback rule-based.
+    """Compute mastery scores + Phase-4b checkpoints + weekly buckets — try Graph-DKT, fallback rule-based.
 
-    Returns (mastery_scores, model_used, mastery_history). Both outputs come
-    from a single forward pass per fold via predict_mastery_full (running
-    predict_mastery + predict_mastery_history separately re-collates and
+    Returns (mastery_scores, model_used, mastery_history, mastery_weekly). Both
+    outputs come from a single forward pass per fold via predict_mastery_full
+    (running predict_mastery + predict_mastery_history separately re-collates and
     re-runs the full LSTM+GCN twice per fold — 10 forwards for the 5-fold
-    ensemble). History is None on the rule-based path — the UI renders the
-    disabled caption. Never raises: prediction failures degrade to fallback.
+    ensemble). History and weekly are None on the rule-based path — the UI
+    renders the disabled caption. Never raises: prediction failures degrade to
+    fallback.
     """
     model_used = "rule_based"
     mastery_history = None
+    mastery_weekly = None
     mastery_scores = {t["topic"]: t["solve_rate"] for t in _preprocessor.build_topic_profile(normalized_subs)}
 
     model = preloaded_model
@@ -126,7 +128,7 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
 
     if model is not None and sequence:
         try:
-            mastery_scores, mastery_history = model.predict_mastery_full(sequence, _topic_graph)
+            mastery_scores, mastery_history, mastery_weekly = model.predict_mastery_full(sequence, _topic_graph)
             model_used = "graph_dkt"
         except Exception as e:
             logger.warning("Graph-DKT prediction failed: %s", e)
@@ -140,7 +142,7 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     canonical = set(_topic_graph.TOPICS)
     mastery_scores = {k: v for k, v in mastery_scores.items() if k in canonical}
 
-    return mastery_scores, model_used, mastery_history
+    return mastery_scores, model_used, mastery_history, mastery_weekly
 
 
 async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[str, float]):
@@ -221,7 +223,7 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         # work taking seconds in deep mode; running it inline would freeze the
         # event loop (all concurrent requests + Render health probes stall).
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
-        mastery_scores, model_used, mastery_history = await asyncio.to_thread(
+        mastery_scores, model_used, mastery_history, mastery_weekly = await asyncio.to_thread(
             _compute_mastery, sequence, normalized_subs, preloaded,
         )
 
@@ -256,6 +258,7 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
             model_used=model_used,
             total_submissions=len(subs),
             mastery_history=mastery_history,
+            mastery_weekly=mastery_weekly,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

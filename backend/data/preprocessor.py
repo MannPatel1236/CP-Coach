@@ -1,6 +1,7 @@
 """Feature engineering and recency decay preprocessing."""
 
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from data.topic_graph import CPTopicGraph
 
@@ -8,6 +9,77 @@ from data.topic_graph import CPTopicGraph
 def _recency_weight(idx: int, total: int) -> float:
     """Recency decay: weight=1.0 at idx=0 (most recent), weight=0.2 at oldest."""
     return 1.0 - (0.8 * idx) / max(total - 1, 1)
+
+
+def _iso_week_key(dt: datetime) -> str:
+    """ISO week label ('YYYY-Www') in UTC — same convention as routes/progress.py."""
+    year, week, _ = dt.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def _week_start_keys(n_weeks: int, now: datetime) -> list[str]:
+    """ISO labels for the n_weeks weeks ending with now's week (oldest first)."""
+    monday = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return [_iso_week_key(monday - timedelta(weeks=n_weeks - 1 - i)) for i in range(n_weeks)]
+
+
+def build_weekly_mastery(
+    sequence: list[dict],
+    per_timestep: list[list[float]],
+    topics: list[str],
+    n_weeks: int = 12,
+    now: datetime | None = None,
+) -> dict[str, list[dict | None]]:
+    """Bucket per-timestep fused mastery into the last n_weeks ISO weeks (UTC).
+
+    Weeks before a topic's first-ever estimate are None; from the first
+    estimate onward the last known value is carried forward. Topics with no
+    estimate at all are omitted. Entries with missing/zero timestamps are
+    ignored. ``now`` is injectable for deterministic tests.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    week_keys = _week_start_keys(n_weeks, now)
+    week_pos = {k: i for i, k in enumerate(week_keys)}
+    monday = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    window_start = monday - timedelta(weeks=n_weeks - 1)
+
+    num_topics = len(topics)
+    pre_window: list[float | None] = [None] * num_topics
+    week_last: list[dict[int, float]] = [{} for _ in range(num_topics)]
+
+    for i, entry in enumerate(sequence):
+        if i >= len(per_timestep):
+            break
+        ts_ms = entry.get("timestamp") or 0
+        if ts_ms <= 0:
+            continue
+        when = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
+        pos = week_pos.get(_iso_week_key(when))
+        row = per_timestep[i]
+        for j in range(num_topics):
+            if pos is not None:
+                week_last[j][pos] = row[j]
+            elif when < window_start:
+                pre_window[j] = row[j]
+
+    result: dict[str, list[dict | None]] = {}
+    for j, topic in enumerate(topics):
+        observed = week_last[j]
+        if not observed and pre_window[j] is None:
+            continue
+        series: list[dict | None] = []
+        last = pre_window[j]
+        for i in range(n_weeks):
+            if i in observed:
+                last = observed[i]
+            series.append({"week": week_keys[i], "p": round(last, 4)} if last is not None else None)
+        result[topic] = series
+    return result
 
 
 # Lazy: import-on-first-use to keep the module importable without torch.

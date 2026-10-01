@@ -32,6 +32,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.dkt import DKTModel, collate_fn  # noqa: F401 — re-export collate_fn
+from data.preprocessor import build_weekly_mastery
 
 logger = logging.getLogger(__name__)
 
@@ -187,12 +188,13 @@ else:
             return hc.gather(2, idx).squeeze(2)                          # (B,K,gcn_hidden)
 
         def predict_mastery_full(self, sequence: list[dict], topic_graph, n_checkpoints: int = 8, device="cpu"):
-            """ONE forward pass → (current mastery per topic, temporal checkpoints).
+            """ONE forward pass → (current mastery per topic, temporal checkpoints, weekly buckets).
 
             Phase 4b perf: callers need both outputs; running predict_mastery +
             predict_mastery_history separately re-collates and re-runs the full
             LSTM+GCN twice per model. Returns
-            ``({topic: p}, {topic: [{"ts": ms, "p": float}, ...]})``.
+            ``({topic: p}, {topic: [{"ts": ms, "p": float}, ...]},
+            {topic: [{"week": "YYYY-Www", "p": float} | None] * 12})``.
             """
             self.eval()
             self.to(device)
@@ -220,7 +222,12 @@ else:
                 for j in range(self.num_topics):
                     checkpoints[j].append({"ts": ts, "p": row[j].item()})
             history = {topic_graph.idx_to_topic[j]: checkpoints[j] for j in range(self.num_topics)}
-            return mastery, history
+            weekly = build_weekly_mastery(
+                sequence,
+                predictions[0].tolist(),
+                [topic_graph.idx_to_topic[i] for i in range(self.num_topics)],
+            )
+            return mastery, history, weekly
 
         def get_graph_influence(self, topic: str, topic_graph) -> dict[str, float]:
             """Approximate prerequisite influence via degree-normalized adjacency."""

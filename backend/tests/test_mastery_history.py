@@ -60,6 +60,26 @@ class TestPredictMasteryHistory:
         assert history["implementation"][0]["ts"] == seq[-1]["timestamp"]
 
 
+class TestWeeklyMasteryModel:
+    def test_predict_mastery_full_returns_weekly_buckets(self):
+        pytest.importorskip("torch")
+        from models.graph_dkt import GraphDKTModel
+        tg = CPTopicGraph()
+        model = GraphDKTModel(num_topics=tg.num_topics, topic_graph=tg)
+        seq = _make_sequence(n_rows=20)  # all timestamps far in the past
+        mastery, history, weekly = model.predict_mastery_full(seq, tg)
+
+        assert set(weekly.keys()) == set(tg.TOPICS)
+        for topic, series in weekly.items():
+            assert len(series) == 12
+            last = series[-1]
+            assert last is not None
+            assert last["week"].startswith("20")
+            assert 0.0 <= last["p"] <= 1.0
+            # Carried last value == current fused mastery for every topic
+            assert abs(last["p"] - mastery[topic]) < 1e-3
+
+
 # ── Route contracts (no DB in CI — tests the never-404 / null-and-note paths) ─
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -125,7 +145,11 @@ class TestMasteryHistoryRoute:
                     t: [{"ts": 1_600_000_000_000 + i * 1000, "p": 0.4 + 0.1 * (i / 7)} for i in range(8)]
                     for t in topic_graph.TOPICS
                 }
-                return mastery, history
+                weekly = {
+                    t: [{"week": "2026-W40", "p": 0.5}]
+                    for t in topic_graph.TOPICS
+                }
+                return mastery, history, weekly
 
         fake = FakeModel()
         app.state.graph_dkt_model = fake
@@ -138,6 +162,8 @@ class TestMasteryHistoryRoute:
             assert data["mastery_history"] is not None
             assert len(data["mastery_history"]) == 29
             assert len(data["mastery_history"]["implementation"]) == 8
+            assert data["mastery_weekly"] is not None
+            assert data["mastery_weekly"]["implementation"][0] == {"week": "2026-W40", "p": 0.5}
         finally:
             app.state.graph_dkt_model = None
 
@@ -182,8 +208,37 @@ class TestMasteryHistoryRoute:
             assert data["model_used"] == "rule_based"
             assert fake.n_calls == 0, "legacy model is never called — full API only"
             assert data["mastery_history"] is None
+            assert data["mastery_weekly"] is None
         finally:
             app.state.graph_dkt_model = None
+
+    def test_analyze_weekly_is_null_without_model(self, monkeypatch):
+        from unittest.mock import AsyncMock
+
+        async def one_sub(handle, **kwargs):
+            return [{
+                "problem": {"contestId": 1, "index": "A", "rating": 1500, "tags": ["implementation"]},
+                "verdict": "OK", "creationTimeSeconds": 1600000000,
+            }]
+        from platforms.codeforces import _HANDLE_PATTERN
+
+        async def mock_get_user_info(handle):
+            if not _HANDLE_PATTERN.match(handle):
+                from platforms.codeforces import HandleError
+                raise HandleError(f"Invalid characters in handle: '{handle}'")
+            return {"handle": "tourist", "rating": 1500, "rank": "specialist"}
+
+        stub = AsyncMock()
+        stub.get_user_info = mock_get_user_info
+        stub.get_submissions = one_sub
+        monkeypatch.setattr("routes.analyze.CFClient", lambda: stub)
+
+        app.state.graph_dkt_model = None
+        r = client.get("/api/analyze/tourist?platform=cf&mode=quick")
+        assert r.status_code == 200, r.json()
+        data = r.json()
+        assert data["model_used"] == "rule_based"
+        assert data["mastery_weekly"] is None
 
 
 class TestEnsembleMerge:
@@ -197,7 +252,11 @@ class TestEnsembleMerge:
                     t: [{"ts": 1_700_000_000_000 + i, "p": p_values[i]} for i in range(len(p_values))]
                     for t in topic_graph.TOPICS
                 }
-                return mastery, history
+                weekly = {
+                    t: [{"week": "2026-W40", "p": p_values[0]}]
+                    for t in topic_graph.TOPICS
+                }
+                return mastery, history, weekly
 
         return _Fold()
 
@@ -208,8 +267,8 @@ class TestEnsembleMerge:
         calls = []
 
         class CountingFold:
-            def __init__(self, m, ps):
-                self._m, self._ps = m, ps
+            def __init__(self, m, ps, wp):
+                self._m, self._ps, self._wp = m, ps, wp
 
             def predict_mastery_full(self, sequence, topic_graph, n_checkpoints=8, device="cpu"):
                 calls.append(n_checkpoints)
@@ -217,26 +276,35 @@ class TestEnsembleMerge:
                     t: [{"ts": 1_700_000_000_000 + i, "p": self._ps[i]} for i in range(len(self._ps))]
                     for t in topic_graph.TOPICS
                 }
-                return {t: self._m for t in topic_graph.TOPICS}, history
+                weekly = {t: [{"week": "2026-W40", "p": self._wp}] for t in topic_graph.TOPICS}
+                return {t: self._m for t in topic_graph.TOPICS}, history, weekly
 
-        ens = _GraphDKTEnsemble([CountingFold(0.2, [0.1, 0.3]), CountingFold(0.6, [0.5, 0.7])])
+        ens = _GraphDKTEnsemble([
+            CountingFold(0.2, [0.1, 0.3], 0.2),
+            CountingFold(0.6, [0.5, 0.7], 0.5),
+        ])
         seq = _make_sequence(n_rows=4)
-        mastery, merged = ens.predict_mastery_full(seq, tg, n_checkpoints=2)
+        mastery, merged, weekly = ens.predict_mastery_full(seq, tg, n_checkpoints=2)
 
         assert calls == [2, 2], "exactly one forward per fold"
         assert all(abs(v - 0.4) < 1e-9 for v in mastery.values())
+        assert weekly is not None
         for cps in merged.values():
             assert len(cps) == 2
-            # ts comes from fold 0; p is the cross-fold mean at each checkpoint
             assert cps[0]["ts"] == 1_700_000_000_000
             assert abs(cps[0]["p"] - 0.3) < 1e-9
             assert abs(cps[1]["p"] - 0.5) < 1e-9
+        for series in weekly.values():
+            assert series[0]["week"] == "2026-W40"
+            assert abs(series[0]["p"] - 0.35) < 1e-9  # (0.2 + 0.5) / 2
 
     def test_empty_sequence_returns_zero_mastery_and_empty_history(self):
         from main import _GraphDKTEnsemble
 
         tg = CPTopicGraph()
         ens = _GraphDKTEnsemble([self._fold(tg, 0.9, [0.5])])
-        mastery, merged = ens.predict_mastery_full([], tg)
+        mastery, merged, weekly = ens.predict_mastery_full([], tg)
         assert all(v == 0.9 for v in mastery.values())
         assert set(merged.keys()) == set(tg.TOPICS)
+        assert weekly is not None
+        assert set(weekly.keys()) == set(tg.TOPICS)
