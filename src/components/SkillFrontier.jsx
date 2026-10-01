@@ -4,6 +4,7 @@ import { InfoIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
 import useGraphLayout from "../hooks/useGraphLayout.js";
 import { panelTransition } from "../lib/motion.js";
+import TopicWeeklyChart from "./TopicWeeklyChart.jsx";
 import {
   prereqPath,
   pillWidth, getEdgeEndpoints, bezierPathD, labelOf,
@@ -11,7 +12,7 @@ import {
 } from "../lib/topicGraphLayout.js";
 
 export default function SkillFrontier() {
-  const { masteryScoresRef, weakTags, activeWeakTag, modelUsed, selectWeakTag } = useAnalysisContext();
+  const { masteryScoresRef, masteryWeekly, weakTags, activeWeakTag, modelUsed, selectWeakTag } = useAnalysisContext();
   const { graphData, layout, depths } = useGraphLayout();
   const [selected, setSelected] = useState(null);     // click → reveal prereq chain
   const [hovered, setHovered] = useState(null);
@@ -34,6 +35,24 @@ export default function SkillFrontier() {
     for (let i = 0; i < chain.length - 1; i++) s.add(chain[i] + "::" + chain[i + 1]);
     return s;
   }, [chain]);
+
+  // Weekly curve series for the selected topic — both platforms when present.
+  const weekly = masteryWeekly || null;
+  const weeklySeries = useMemo(() => {
+    if (!selected || !weekly) return [];
+    const out = [];
+    for (const [label, key] of [["CF", "cf"], ["LC", "lc"]]) {
+      const pts = weekly[key] && weekly[key][selected];
+      if (pts && pts.length) {
+        out.push({
+          label,
+          points: pts.map((p) => (p ? p.p : null)),
+          weeks: pts.map((p) => (p ? p.week : null)),
+        });
+      }
+    }
+    return out;
+  }, [selected, weekly]);
 
   if (!graphData) return null;
 
@@ -162,16 +181,31 @@ export default function SkillFrontier() {
 
         {/* Chain readout — text sibling to the SVG (also readable by AT) */}
         {selected && (
-          <div data-testid="chain-readout" style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: 12, color: "var(--on-surface-variant)", fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ flex: "1 1 auto" }}>
-              <span style={{ color: "var(--color-accent-text)" }}>Prereq chain · {labelOf(selected)} (depth {depths[selected] != null ? depths[selected] : 0}):</span>{" "}
-              {chain.map((t, i) => (<span key={t}>{i > 0 && <span style={{ color: "var(--text-muted)" }}> → </span>}{labelOf(t)}</span>))}
-            </span>
-            {/* Frontier → rec-engine bridge: same selectWeakTag path as the
-                WeakAreas chips (sets activeWeakTag + refetches recommendations). */}
-            <button data-testid="frontier-focus" className="btn-primary" onClick={() => selectWeakTag(selected)} style={{ padding: "5px 12px", fontSize: 11, fontFamily: "var(--font-mono)", flexShrink: 0 }}>
-              {activeWeakTag === selected ? "Refocus recommendations" : "Focus recommendations"}
-            </button>
+          <div>
+            <div data-testid="chain-readout" style={{ marginTop: 12, padding: "10px 14px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: 12, color: "var(--on-surface-variant)", fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ flex: "1 1 auto" }}>
+                <span style={{ color: "var(--color-accent-text)" }}>Prereq chain · {labelOf(selected)} (depth {depths[selected] != null ? depths[selected] : 0}):</span>{" "}
+                {chain.map((t, i) => (<span key={t}>{i > 0 && <span style={{ color: "var(--text-muted)" }}> → </span>}{labelOf(t)}</span>))}
+              </span>
+              {/* Frontier → rec-engine bridge: same selectWeakTag path as the
+                  WeakAreas chips (sets activeWeakTag + refetches recommendations). */}
+              <button data-testid="frontier-focus" className="btn-primary" onClick={() => selectWeakTag(selected)} style={{ padding: "5px 12px", fontSize: 11, fontFamily: "var(--font-mono)", flexShrink: 0 }}>
+                {activeWeakTag === selected ? "Refocus recommendations" : "Focus recommendations"}
+              </button>
+            </div>
+            <div data-testid="weekly-panel" style={{ marginTop: 12 }}>
+              {isEstimate || !weekly ? (
+                <p data-testid="weekly-disabled" style={{ fontSize: 12, color: "var(--on-surface-variant)", margin: 0 }}>
+                  Weekly tracking requires the Graph-DKT model.
+                </p>
+              ) : (
+                <TopicWeeklyChart
+                  topic={selected}
+                  weeks={weeklySeries[0]?.weeks || []}
+                  series={weeklySeries}
+                />
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -33,6 +33,17 @@ export const baseContext = {
       backtracking: 0.45, string_algorithms: 0.50, matrices: 0.63,
     },
   },
+  // Weekly fused-mastery series (cf.dp only) for the SkillFrontier weekly chart.
+  masteryWeekly: {
+    cf: {
+      dp: [
+        null, null, null, null, null, null, null, null, null, null,
+        { week: "2026-W39", p: 0.4 },
+        { week: "2026-W40", p: 0.5 },
+      ],
+    },
+    lc: null,
+  },
   // §9 sibling-summary seed: the example trio from the spec ("binary_search 0.48,
   // bitmasks 0.52, geometry 0.55" — AC-rate %; mastery is the reciprocal-flavored 0.x).
   weakTags: [
