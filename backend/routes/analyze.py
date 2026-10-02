@@ -18,7 +18,7 @@ from db.connection import (
     AsyncSessionLocal, KTState, MasteryHistory,
     get_or_create_user, utcnow_naive,
 )
-from routes.schemas import AnalyzeResponse, TopicProfileEntry
+from routes.schemas import AnalyzeResponse, TopicProfileEntry, MasteryCheckpoint, WeeklyMasteryPoint
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,14 @@ async def _analyze_lc(handle: str, mode: str, _controller):
     return profile, normalized_subs, easy_solved
 
 
-def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
+def _compute_mastery(
+    sequence, normalized_subs, preloaded_model=None,
+) -> tuple[
+    dict[str, float],
+    str,
+    dict[str, list[MasteryCheckpoint]] | None,
+    dict[str, list[WeeklyMasteryPoint | None]] | None,
+]:
     """Compute mastery scores + Phase-4b checkpoints + weekly buckets — try Graph-DKT, fallback rule-based.
 
     Returns (mastery_scores, model_used, mastery_history, mastery_weekly). Both
@@ -142,7 +149,16 @@ def _compute_mastery(sequence, normalized_subs, preloaded_model=None):
     canonical = set(_topic_graph.TOPICS)
     mastery_scores = {k: v for k, v in mastery_scores.items() if k in canonical}
 
-    return mastery_scores, model_used, mastery_history, mastery_weekly
+    typed_weekly = (
+        {
+            topic: [WeeklyMasteryPoint(**pt) if pt is not None else None for pt in series]
+            for topic, series in mastery_weekly.items()
+        }
+        if mastery_weekly is not None
+        else None
+    )
+
+    return mastery_scores, model_used, mastery_history, typed_weekly
 
 
 async def _persist_kt_states(handle: str, platform: str, mastery_scores: dict[str, float]):
