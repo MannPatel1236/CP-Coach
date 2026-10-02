@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import TopicWeeklyChart from "./TopicWeeklyChart.jsx";
 
 const WEEKS = Array.from({ length: 12 }, (_, i) => `2026-W${String(29 + i).padStart(2, "0")}`);
@@ -49,5 +49,28 @@ describe("TopicWeeklyChart", () => {
     );
     expect(getByTestId("weekly-empty")).toBeTruthy();
     expect(queryByTestId("weekly-chart")).toBeNull();
+  });
+
+  it("shows a hover tooltip with the week and score when interactive", () => {
+    const points = [null, 0.1, 0.2, 0.3, 0.35, 0.35, 0.4, 0.4, 0.45, 0.5, 0.55, 0.62];
+    const series = [{ label: "CF", points, weeks: WEEKS }];
+    const { getByTestId, queryByTestId, container } = render(
+      <TopicWeeklyChart topic="dp" weeks={WEEKS} series={series} interactive />
+    );
+    expect(queryByTestId("weekly-tooltip")).toBeNull();
+    const hit = container.querySelector('[data-testid="weekly-hit-11"]');
+    expect(hit).toBeTruthy();
+    fireEvent.mouseEnter(hit);
+    const tip = getByTestId("weekly-tooltip").textContent;
+    expect(tip).toContain("2026-W40");
+    expect(tip).toContain("62%");
+    fireEvent.mouseLeave(hit);
+    expect(queryByTestId("weekly-tooltip")).toBeNull();
+  });
+
+  it("does not render hover hit areas when not interactive", () => {
+    const series = [{ label: "CF", points: WEEKS.map(() => 0.5), weeks: WEEKS }];
+    const { container } = render(<TopicWeeklyChart topic="dp" weeks={WEEKS} series={series} />);
+    expect(container.querySelector('[data-testid="weekly-hit-11"]')).toBeNull();
   });
 });

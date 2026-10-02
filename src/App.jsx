@@ -26,7 +26,7 @@ import LandingPage from "./components/LandingPage.jsx";
 import LoadingState from "./components/LoadingState.jsx";
 import ErrorState from "./components/ErrorState.jsx";
 import SuccessBanner from "./components/SuccessBanner.jsx";
-import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
+import DataNotice from "./components/DataNotice.jsx";
 
 // Single source of truth for the dashboard tabs lives in DashboardNav (DASH_TABS)
 const DASH_PANEL_IDS = DASH_TABS.map((t) => t.id);
@@ -284,7 +284,7 @@ export default function App() {
           </section>
         </main>
       )}
-      <PrivacyPolicy />
+      <DataNotice />
     </div>
     </MotionConfig>
     </AnalysisContext.Provider>

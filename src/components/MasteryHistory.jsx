@@ -1,37 +1,54 @@
 // Greenhouse Phase 4b — MasteryHistory dashboard section (spec §5.2 #6).
 // Graph-DKT only: rule_based paths render a disabled card with a caption (§8 —
-// rule-based mastery must never be presented as Graph-DKT output). Hand-built
-// SVG sparklines (spec §13.3), self-fetching with sealed empty-state + retry.
-// Reduced-motion is CSS-only in this repo — no JS matchMedia needed (§8).
-// Platform is threaded explicitly so the read route resolves the user by the
-// SAME handle column the analyze wrote to.
-import { useCallback } from "react";
+// rule-based mastery must never be presented as Graph-DKT output).
+// Body is the retroactive weekly fused-mastery curve (from the analyze payload,
+// no DB read): topic dropdown + interactive hover tooltips.
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ZapIcon } from "./Icons";
 import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
-import { useSealedFetch } from "../hooks/useSealedFetch.js";
-import { getMasteryHistory } from "../api/backendClient.js";
 import { panelTransition } from "../lib/motion.js";
-import { labelOf } from "../lib/topicGraphLayout.js";
-
-const SPARK_W = 140;
-const SPARK_H = 30;
-const MAX_ROWS = 8;
+import { labelOf, FALLBACK_GRAPH } from "../lib/topicGraphLayout.js";
+import TopicWeeklyChart from "./TopicWeeklyChart.jsx";
 
 export default function MasteryHistory() {
-  const { modelUsed, primaryHandle, primaryPlatform } = useAnalysisContext();
-
-  const handle = primaryHandle;
-  const platform = primaryPlatform;
+  const { modelUsed, weakTags, masteryWeekly } = useAnalysisContext();
   const graphDkt = modelUsed === "graph_dkt";
 
-  const fetcher = useCallback(async (signal) => {
-    const data = await getMasteryHistory(handle.trim(), signal, platform);
-    return { data: data.mastery_history || null, note: data.note || "" };
-  }, [handle, platform]);
+  // Selection is stamped with the weekly payload identity so a new analysis
+  // resets it without an effect (old selection never leaks across analyses).
+  const [selection, setSelection] = useState({ weekly: null, topic: null });
 
-  // Skipped entirely when the rule-based badge applies.
-  const { data: history, note, error, loading, retry } = useSealedFetch(fetcher, graphDkt && !!handle);
+  const topics = useMemo(
+    () => FALLBACK_GRAPH.nodes.map((node) => node.id).sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
+    []
+  );
+
+  const defaultTopic = useMemo(() => {
+    if (!masteryWeekly) return null;
+    const hasData = (topic) => ["cf", "lc"].some((key) => (masteryWeekly[key]?.[topic]?.length ?? 0) > 0);
+    const weakWithData = (weakTags || []).map((t) => t.tag).find(hasData);
+    if (weakWithData) return weakWithData;
+    return topics.find(hasData) || null;
+  }, [masteryWeekly, weakTags, topics]);
+
+  const selected = (selection.weekly === masteryWeekly ? selection.topic : null) ?? defaultTopic;
+
+  const series = useMemo(() => {
+    if (!masteryWeekly || !selected) return [];
+    const out = [];
+    for (const [label, key] of [["CF", "cf"], ["LC", "lc"]]) {
+      const pts = masteryWeekly[key]?.[selected];
+      if (pts && pts.length) {
+        out.push({
+          label,
+          points: pts.map((p) => (p ? p.p : null)),
+          weeks: pts.map((p) => (p ? p.week : null)),
+        });
+      }
+    }
+    return out;
+  }, [masteryWeekly, selected]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={panelTransition}>
@@ -50,84 +67,39 @@ export default function MasteryHistory() {
 
         {!graphDkt ? (
           <p data-testid="mastery-disabled" style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, margin: 0 }}>
-            Mastery history requires the Graph-DKT model — the rule-based estimate has no per-timestep checkpoints.
+            Mastery history requires the Graph-DKT model — the rule-based estimate has no weekly curve.
           </p>
-        ) : loading && !history && !error ? (
-          <div data-testid="mastery-loading" style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>Loading mastery history…</div>
-        ) : error ? (
-          <div data-testid="mastery-error" style={{ padding: "18px 0", textAlign: "center" }}>
-            <p style={{ fontSize: 13, color: "var(--on-surface-variant)", margin: "0 0 12px" }}>{error}</p>
-            <button className="btn-primary" data-testid="mastery-retry" onClick={retry} style={{ padding: "8px 18px", fontSize: 13 }}>
-              Retry
-            </button>
-          </div>
-        ) : !history ? (
+        ) : !masteryWeekly ? (
           <p data-testid="mastery-note" style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, margin: 0 }}>
-            {note || "No mastery history yet — run a deep analyze while Graph-DKT is loaded."}
+            No weekly mastery data yet — run an analysis while Graph-DKT is loaded.
           </p>
         ) : (
-          <MasterySparklines history={history} />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <label htmlFor="mastery-topic" style={{ fontSize: 12, color: "var(--on-surface-variant)", fontFamily: "var(--font-mono)" }}>
+                Topic
+              </label>
+              <select
+                id="mastery-topic"
+                data-testid="mastery-topic-select"
+                value={selected || ""}
+                onChange={(e) => setSelection({ weekly: masteryWeekly, topic: e.target.value })}
+                style={{ background: "var(--surface-2)", color: "var(--on-surface)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: 12, fontFamily: "var(--font-mono)" }}
+              >
+                {topics.map((topic) => (
+                  <option key={topic} value={topic}>{labelOf(topic)}</option>
+                ))}
+              </select>
+            </div>
+            <TopicWeeklyChart
+              topic={selected}
+              weeks={series[0]?.weeks || []}
+              series={series}
+              interactive
+            />
+          </div>
         )}
       </div>
     </motion.div>
-  );
-}
-
-function MasterySparklines({ history }) {
-  const entries = Object.entries(history).filter(([, cps]) => cps && cps.length > 1);
-  // Top rows by variance (range of p) — topics that actually moved across time
-  const ranked = entries
-    .sort((a, b) => spanOf(b[1]) - spanOf(a[1]))
-    .slice(0, MAX_ROWS);
-
-  const strongest = ranked[0]?.[0] ?? null;
-  const weakest = ranked[ranked.length - 1]?.[0] ?? null;
-  const nTopics = Object.keys(history).length;
-  const nCps = ranked[0]?.[1].length ?? 0;
-
-  if (ranked.length === 0) {
-    return <p data-testid="mastery-note" style={{ fontSize: 13, color: "var(--on-surface-variant)", margin: 0 }}>No topic curves yet — run a deep analyze while Graph-DKT is loaded.</p>;
-  }
-
-  return (
-    <div>
-      {/* §9 sibling summary — nothing image-only */}
-      <p data-testid="mastery-summary" style={{ fontSize: 13, color: "var(--on-surface-variant)", lineHeight: 1.6, margin: "0 0 12px" }}>
-        Mastery trajectory across <strong style={{ color: "var(--on-surface)" }}>{nCps}</strong> checkpoints for{" "}
-        <strong style={{ color: "var(--on-surface)" }}>{nTopics}</strong> topics — top movers:
-        strongest <strong style={{ color: "var(--color-accent-text)" }}>{labelOf(strongest)}</strong>, weakest{" "}
-        <strong style={{ color: "var(--color-accent-text)" }}>{labelOf(weakest)}</strong>.
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {ranked.map(([topic, cps]) => (
-          <div key={topic} data-testid="mastery-row" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ width: 170, flexShrink: 0, fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--on-surface-variant)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{labelOf(topic)}</span>
-            <Sparkline cps={cps} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function spanOf(cps) {
-  const ps = cps.map((c) => c.p);
-  return Math.max(...ps) - Math.min(...ps);
-}
-
-function Sparkline({ cps }) {
-  const ps = cps.map((c) => c.p);
-  const min = Math.min(...ps);
-  const span = Math.max(Math.max(...ps) - min, 0.0001);
-  const n = ps.length;
-  const xOf = (i) => (i * (SPARK_W - 2)) / Math.max(n - 1, 1);
-  const yOf = (p) => 2 + (1 - (p - min) / span) * (SPARK_H - 4);
-  const line = ps.map((p, i) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(p).toFixed(1)}`).join(" ");
-  const lastP = ps[n - 1];
-  return (
-    <svg data-testid="mastery-sparkline" viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} style={{ width: "100%", maxWidth: SPARK_W, height: SPARK_H, display: "block", flexShrink: 0 }}>
-      <path d={line} fill="none" stroke="var(--color-accent)" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={xOf(n - 1)} cy={yOf(lastP)} r={2.4} fill="var(--color-accent)" stroke="var(--surface-base)" strokeWidth={1} />
-    </svg>
   );
 }

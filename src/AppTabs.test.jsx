@@ -41,9 +41,11 @@ describe("AppTabs — Phase 6 Step 4 (zero-refetch proof)", () => {
   it("tab switching never re-fetches (all panels permanently mounted)", async () => {
     const { getByTestId, container } = render(<App />);
 
-    // Baseline: the 5 self-fetching sections fire exactly once on mount.
+    // Baseline: the 4 self-fetching sections fire exactly once on mount.
+    // (Mastery history is no longer one of them — it renders the weekly curve
+    // straight from the analyze payload.)
     await waitFor(() => {
-      expect(globalThis.fetch.mock.calls.length).toBe(5);
+      expect(globalThis.fetch.mock.calls.length).toBe(4);
     });
     const baseline = globalThis.fetch.mock.calls.length;
 

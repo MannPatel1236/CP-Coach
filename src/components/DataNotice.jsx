@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function PrivacyPolicy() {
+export default function DataNotice() {
   const [open, setOpen] = useState(false);
 
   return (
