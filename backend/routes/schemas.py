@@ -137,6 +137,14 @@ class MasteryHistoryResponse(BaseModel):
     note: str | None = None
 
 
+# ── Weekly mastery (retroactive fused-head buckets) ──────────────────────────
+
+
+class WeeklyMasteryPoint(BaseModel):
+    week: str   # ISO "YYYY-Www" (UTC, Monday-based)
+    p: float    # 0..1 fused mastery estimate
+
+
 # ── Analyze (CF, LC normal) ──────────────────────────────────────────────────
 
 
@@ -161,6 +169,9 @@ class AnalyzeResponse(BaseModel):
     total_submissions: int = 0
     # Phase 4b: temporal checkpoints when Graph-DKT ran; null on rule-based paths
     mastery_history: dict[str, list[MasteryCheckpoint]] | None = None
+    # Retroactive weekly fused-mastery curve (12 ISO weeks, oldest first);
+    # null on rule-based / stats_only paths
+    mastery_weekly: dict[str, list[WeeklyMasteryPoint | None]] | None = None
     # Stats-only fields (unused for CF, present for LC stats_only variant)
     note: str | None = None
 

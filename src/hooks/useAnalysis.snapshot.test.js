@@ -32,6 +32,7 @@ const BACKEND_ANALYSIS = {
     solved_problems: ["cf-1A", "cf-1B"],
   }],
   weak_areas: ["dp"], mastery_scores: { dp: 0.4 }, model_used: "graph_dkt",
+  mastery_weekly: { dp: [{ week: "2026-W40", p: 0.4 }] },
 };
 
 const loadHook = async () => {
@@ -72,6 +73,7 @@ describe("useAnalysis snapshot persistence — behavioral", () => {
     expect(snap.cfUser.handle).toBe("mannpatel");
     expect(snap.modelUsed).toBe("graph_dkt");
     expect(snap.masteryScores).toEqual({ dp: 0.4 });
+    expect(snap.masteryWeekly).toEqual({ cf: { dp: [{ week: "2026-W40", p: 0.4 }] }, lc: null });
     expect(snap.analysisRecommendations).toEqual([{ problem_id: "cf-1023A" }]);
     expect(snap.solvedSet).toEqual(["cf-1A", "cf-1B"]);
   });
@@ -144,6 +146,7 @@ describe("useAnalysis snapshot persistence — behavioral", () => {
     expect(result.current.user).toBeNull();
     expect(result.current.handle).toBe("");
     expect(window.localStorage.getItem(SNAPSHOT_KEY)).toBeNull();
+    expect(result.current.masteryWeekly).toBeNull();
   });
 
   it("identity guard: typing a new query over a displayed analysis does not rewrite the snapshot", async () => {
@@ -221,5 +224,32 @@ describe("useAnalysis snapshot persistence — behavioral", () => {
 
     expect(stored()).toEqual(before);
     expect(stored().cfHandle).toBe("mannpatel");
+  });
+
+  it("restores masteryWeekly from the snapshot", async () => {
+    window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+      handle: "mannpatel", cfHandle: "mannpatel", lcHandle: "",
+      user: { handle: "mannpatel", platform: "cf" }, cfUser: { handle: "mannpatel", platform: "cf" },
+      lcUser: null, tagProfile: [], weakTags: [], solvedSet: [], suggestedTopics: [],
+      analysisMode: "quick", platform: "cf", combinedPlatform: false, modelUsed: "graph_dkt",
+      masteryScores: {}, masteryWeekly: { cf: { dp: [{ week: "2026-W40", p: 0.4 }] }, lc: null },
+      analysisRecommendations: [], analysisSelectedTopics: [], analysisActiveWeakTag: null,
+    }));
+    const useAnalysis = await loadHook();
+    const { result } = renderHook(() => useAnalysis());
+
+    expect(result.current.masteryWeekly).toEqual({
+      cf: { dp: [{ week: "2026-W40", p: 0.4 }] }, lc: null,
+    });
+  });
+
+  it("clearAll resets masteryWeekly", async () => {
+    const useAnalysis = await loadHook();
+    const { result } = renderHook(() => useAnalysis());
+    await analyzeMannpatel(result);
+    expect(result.current.masteryWeekly).not.toBeNull();
+
+    act(() => { result.current.clearAll(); });
+    expect(result.current.masteryWeekly).toBeNull();
   });
 });
