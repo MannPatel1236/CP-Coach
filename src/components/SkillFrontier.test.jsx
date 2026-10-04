@@ -115,3 +115,30 @@ describe("SkillFrontier — §9 sibling text summary", () => {
     expect(summary).toContain("geometry");
   });
 });
+
+describe("SkillFrontier — weekly mastery chart", () => {
+  it("shows the weekly chart for the selected topic when Graph-DKT data exists", async () => {
+    const { container, getByTestId } = renderInContext(<SkillFrontier />);
+    await nodesMounted(container);
+    fireEvent.click(container.querySelector('g[aria-label^="dp mastery"]'));
+    expect(getByTestId("weekly-chart")).toBeTruthy();
+    expect(container.querySelector('[data-testid="weekly-line-CF"]')).toBeTruthy();
+    const summary = getByTestId("weekly-summary").textContent;
+    expect(summary).toContain("50%");
+    expect(summary).toContain("+10 pts");
+  });
+
+  it("shows the disabled caption when modelUsed is not graph_dkt", async () => {
+    const { container, getByTestId } = renderInContext(<SkillFrontier />, { modelUsed: "rule_based" });
+    await nodesMounted(container);
+    fireEvent.click(container.querySelector('g[aria-label^="dp mastery"]'));
+    expect(getByTestId("weekly-disabled")).toBeTruthy();
+  });
+
+  it("shows the empty caption for a topic with no weekly data", async () => {
+    const { container, getByTestId } = renderInContext(<SkillFrontier />);
+    await nodesMounted(container);
+    fireEvent.click(container.querySelector('g[aria-label^="implementation mastery"]'));
+    expect(getByTestId("weekly-empty")).toBeTruthy();
+  });
+});

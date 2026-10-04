@@ -34,18 +34,20 @@ class _GraphDKTEnsemble:
         self.folds = folds
 
     def predict_mastery_full(self, sequence, topic_graph, n_checkpoints: int = 8, device="cpu"):
-        """ONE forward per fold → (per-topic mean mastery, per-checkpoint mean history).
+        """ONE forward per fold → (per-topic mean mastery, per-checkpoint mean history, weekly means).
 
         Phase 4b perf: analyze() needs both outputs; calling predict_mastery and
         predict_mastery_history separately runs the whole ensemble twice.
         """
         acc = {t: 0.0 for t in topic_graph.TOPICS}
         hists = []
+        weeklies = []
         for f in self.folds:
-            m, h = f.predict_mastery_full(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)
+            m, h, w = f.predict_mastery_full(sequence, topic_graph, n_checkpoints=n_checkpoints, device=device)
             for k, v in m.items():
                 acc[k] = acc.get(k, 0.0) + v
             hists.append(h)
+            weeklies.append(w)
         mastery = {k: v / len(self.folds) for k, v in acc.items()}
         merged = {}
         for k in topic_graph.TOPICS:
@@ -55,7 +57,29 @@ class _GraphDKTEnsemble:
                 {"ts": per_fold[0][i]["ts"], "p": sum(f[i]["p"] for f in per_fold) / len(per_fold)}
                 for i in range(n)
             ]
-        return mastery, merged
+        weekly = None
+        for w in weeklies:
+            if w:
+                weekly = w
+                break
+        if weekly is not None:
+            merged_weekly = {}
+            for topic, series in weekly.items():
+                merged_weekly[topic] = []
+                for i, point in enumerate(series):
+                    values = [
+                        w[topic][i]["p"]
+                        for w in weeklies
+                        if w and w.get(topic) and w[topic][i] is not None
+                    ]
+                    if point is None or not values:
+                        merged_weekly[topic].append(None)
+                    else:
+                        merged_weekly[topic].append(
+                            {"week": point["week"], "p": sum(values) / len(values)}
+                        )
+            weekly = merged_weekly
+        return mastery, merged, weekly
 
 
 @asynccontextmanager

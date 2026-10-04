@@ -67,6 +67,7 @@ export default function useAnalysis() {
   const analysisSelectedTopicsRef = useRef(snap?.analysisSelectedTopics || []);
   const analysisActiveWeakTagRef = useRef(snap?.analysisActiveWeakTag || null);
   const masteryScoresRef = useRef(snap?.masteryScores || {});
+  const [masteryWeekly, setMasteryWeekly] = useState(() => snap?.masteryWeekly || null);
 
   const resetAbort = useCallback(() => {
     if (abortRef.current) {
@@ -111,6 +112,7 @@ export default function useAnalysis() {
       solvedSet: [...solvedSet],
       analysisMode, platform, combinedPlatform, modelUsed,
       masteryScores: masteryScoresRef.current,
+      masteryWeekly,
       analysisRecommendations: analysisRecommendationsRef.current,
       analysisSelectedTopics: analysisSelectedTopicsRef.current,
       analysisActiveWeakTag: analysisActiveWeakTagRef.current,
@@ -120,7 +122,7 @@ export default function useAnalysis() {
     } catch {
       // persistence is best-effort
     }
-  }, [user, handle, cfHandle, lcHandle, cfUser, lcUser, tagProfile, weakTags, suggestedTopics, solvedSet, analysisMode, platform, combinedPlatform, modelUsed]);
+  }, [user, handle, cfHandle, lcHandle, cfUser, lcUser, tagProfile, weakTags, suggestedTopics, solvedSet, analysisMode, platform, combinedPlatform, modelUsed, masteryWeekly]);
 
   const clearAll = useCallback(() => {
     resetAbort();
@@ -144,6 +146,7 @@ export default function useAnalysis() {
     analysisSelectedTopicsRef.current = [];
     analysisActiveWeakTagRef.current = null;
     masteryScoresRef.current = {};
+    setMasteryWeekly(null);
     setModelUsed(null);
   }, [resetAbort]);
 
@@ -256,8 +259,13 @@ export default function useAnalysis() {
 
     const mergedMastery = { ...cfData?.mastery_scores, ...lcData?.mastery_scores };
     masteryScoresRef.current = mergedMastery;
+    const weeklyByPlatform = {
+      cf: cfData?.mastery_weekly || null,
+      lc: lcData?.mastery_weekly || null,
+    };
     const presentModels = [cfData?.model_used, lcData?.model_used].filter(Boolean);
     const allAgree = presentModels.length > 0 && presentModels.every(m => m === presentModels[0]);
+    setMasteryWeekly((weeklyByPlatform.cf || weeklyByPlatform.lc) ? weeklyByPlatform : null);
     setModelUsed(allAgree ? presentModels[0] : "rule_based");
 
     setLoadingStep(3);
@@ -314,6 +322,7 @@ export default function useAnalysis() {
     setTimeout(() => setLoadingStep(4), 0);
     const weakTopicList = weak.map(w => w.tag).join(",");
     masteryScoresRef.current = data.mastery_scores || {};
+    setMasteryWeekly(data.mastery_weekly ? { cf: null, lc: data.mastery_weekly } : null);
     setModelUsed(data.model_used || "rule_based");
 
     let recsData;
@@ -384,6 +393,7 @@ export default function useAnalysis() {
           return { tag, acRate: tp ? tp.acRate : 0, solved: tp ? tp.solved : 0, attempts: tp ? tp.attempts : 0 };
         });
         masteryScoresRef.current = data.mastery_scores || {};
+        setMasteryWeekly(data.mastery_weekly ? { cf: data.mastery_weekly, lc: null } : null);
         setModelUsed(data.model_used || "rule_based");
         solved = new Set();
         for (const t of data.topic_profile || []) {
@@ -421,6 +431,7 @@ export default function useAnalysis() {
         scores[t.tag] = t.acRate / 100;
       }
       masteryScoresRef.current = scores;
+      setMasteryWeekly(null);
       setModelUsed("rule_based");  // §8: client fallback mastery (acRate/100) is a linear heuristic → badge as estimate
     }
 
@@ -544,6 +555,6 @@ export default function useAnalysis() {
     analyze, clearAll,
     // Shared
     abortRef, resetAbort,
-    analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, masteryScoresRef,
+    analysisRecommendationsRef, analysisSelectedTopicsRef, analysisActiveWeakTagRef, masteryScoresRef, masteryWeekly,
   };
 }
