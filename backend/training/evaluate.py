@@ -121,7 +121,8 @@ def _compute_ranking_metrics(predictions, topic_ids, mask, K_list=None):
     return result
 
 
-def evaluate_model(model, dataloader, topic_graph, device="cpu"):
+def evaluate_model(model, dataloader, topic_graph, device="cpu",
+                    return_per_user=False, user_ids=None, blind_difficulty=False):
     """Evaluate model on a dataloader.
 
     Returns:
@@ -132,6 +133,18 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
             loss             — mean BCELoss
             precision_at_k   — dict {K: hit-rate} for K in [1, 3, 5, 10]
             ndcg_at_k        — dict {K: NDCG} for K in [1, 3, 5, 10]
+            per_user         — only when return_per_user=True: list of
+                               {"user_id", "n_valid", "precision_at_k", "ndcg_at_k"}
+                               in dataloader order (requires shuffle=False).
+                               user_ids optionally labels each row; otherwise
+                               the row offset is used.
+
+    return_per_user adds one extra single-row _compute_ranking_metrics call
+    per user (negligible next to the forward pass).  Default False: the
+    default code path is unchanged.
+
+    blind_difficulty forwards to collate_fn (difficulty-blinded experiment).
+    Default False: unchanged behavior.
     """
     model.eval()
     model.to(device)
@@ -146,10 +159,12 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
     _rank_sum = {k: 0.0 for k in RANKING_K_VALUES}
     _ndcg_sum = {k: 0.0 for k in RANKING_K_VALUES}
     _rank_total = 0
+    _per_user = []  # only populated when return_per_user=True
+    _row_offset = 0
 
     with torch.no_grad():
         for batch_seqs in dataloader:
-            batch = collate_fn(batch_seqs, topic_graph)
+            batch = collate_fn(batch_seqs, topic_graph, blind_difficulty=blind_difficulty)
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
             predictions, _ = model(batch)  # (B, T, num_topics)
@@ -196,6 +211,24 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
                 _ndcg_sum[k] += batch_rank["ndcg_at_k"][k] * n_valid
             _rank_total += n_valid
 
+            # Opt-in per-user ranking rows (same helper, single-row slices).
+            # Dataloader order must be deterministic (shuffle=False) so rows
+            # map to user_ids in order.
+            if return_per_user:
+                n_rows = predictions.shape[0]
+                for b in range(n_rows):
+                    row_rank = _compute_ranking_metrics(
+                        predictions[b:b + 1], topic_ids[b:b + 1], batch_mask[b:b + 1])
+                    row_valid = int(batch_mask[b, 1:].sum().item()) if predictions.shape[1] > 1 else 0
+                    uid = user_ids[_row_offset + b] if user_ids is not None else _row_offset + b
+                    _per_user.append({
+                        "user_id": uid,
+                        "n_valid": row_valid,
+                        "precision_at_k": dict(row_rank["precision_at_k"]),
+                        "ndcg_at_k": dict(row_rank["ndcg_at_k"]),
+                    })
+                _row_offset += n_rows
+
     # Compute metrics
     result = {
         "auc": 0.0,
@@ -230,6 +263,9 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
     if _rank_total > 0:
         result["precision_at_k"] = {k: _rank_sum[k] / _rank_total for k in RANKING_K_VALUES}
         result["ndcg_at_k"] = {k: _ndcg_sum[k] / _rank_total for k in RANKING_K_VALUES}
+
+    if return_per_user:
+        result["per_user"] = _per_user
 
     return result
 

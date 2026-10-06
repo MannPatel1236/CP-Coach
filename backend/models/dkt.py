@@ -93,7 +93,14 @@ class DKTModel(nn.Module):
         return model
 
 
-def collate_fn(batch: list[list[dict]], topic_graph=None, canonical_only: bool = False) -> dict:
+# Constant used when difficulty is blinded (--no-difficulty): same value as
+# the pre-existing missing-data default below, so a blinded channel is
+# indistinguishable from "difficulty unknown everywhere".
+DIFFICULTY_BLIND_VALUE = 0.375
+
+
+def collate_fn(batch: list[list[dict]], topic_graph=None, canonical_only: bool = False,
+               blind_difficulty: bool = False) -> dict:
     """Pad variable-length sequences to max length in batch.
 
     Args:
@@ -101,6 +108,9 @@ def collate_fn(batch: list[list[dict]], topic_graph=None, canonical_only: bool =
         topic_graph: optional CPTopicGraph for topic-name → idx lookup.
         canonical_only: if True, drop rows where the topic name is not in
             topic_graph.topic_to_idx. Default False (silent fallback to idx 0).
+        blind_difficulty: if True, fill the difficulty channel with the
+            constant DIFFICULTY_BLIND_VALUE (difficulty-blinded experiment).
+            Default False (existing behavior, byte-identical).
     """
     B = len(batch)
     T = max(len(seq) for seq in batch) if batch else 1
@@ -131,7 +141,8 @@ def collate_fn(batch: list[list[dict]], topic_graph=None, canonical_only: bool =
 
             topic_ids[b, t] = tid
             solved[b, t, 0] = float(step.get("solved", 0))
-            difficulty[b, t, 0] = float(step.get("difficulty", 0.375))
+            difficulty[b, t, 0] = (DIFFICULTY_BLIND_VALUE if blind_difficulty
+                                   else float(step.get("difficulty", DIFFICULTY_BLIND_VALUE)))
             ts_delta[b, t, 0] = float(step.get("timestamp_delta", 0.0))
             weight[b, t, 0] = float(step.get("weight", 1.0))
             mask[b, t] = True
