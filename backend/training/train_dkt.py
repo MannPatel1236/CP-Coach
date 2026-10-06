@@ -1,4 +1,4 @@
-"""CLI training script for DKT / Graph-DKT."""
+"""CLI training script for DKT / Graph-DKT / SAKT-style / DKVMN-style."""
 
 import argparse
 import logging
@@ -176,6 +176,7 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
     val_loader = DataLoader(val_dataset, batch_sampler=val_sampler, collate_fn=lambda x: x)
 
     # Model
+    model_cls = DKTModel
     if args.model == "graph_dkt":
         if args.adjacency_mode != "directed":
             from models.graph_dkt import AblationGraphDKTModel
@@ -184,12 +185,28 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
                 topic_graph=topic_graph,
                 adjacency_mode=args.adjacency_mode,
             )
+            model_cls = AblationGraphDKTModel
             logger.info("Adjacency mode: %s (ablation)", args.adjacency_mode)
         else:
             model = GraphDKTModel(num_topics=topic_graph.num_topics, topic_graph=topic_graph)
+            model_cls = GraphDKTModel
+    elif args.model == "sakt":
+        from models.sakt import SAKTStyleModel
+        model = SAKTStyleModel(num_topics=topic_graph.num_topics, attn=args.attn)
+        model_cls = SAKTStyleModel
+        logger.info("SAKT-style (topic-level adaptation): attn=%s", args.attn)
+    elif args.model == "dkvmn":
+        from models.dkvmn import DKVMNStyleModel
+        model = DKVMNStyleModel(num_topics=topic_graph.num_topics)
+        model_cls = DKVMNStyleModel
+        logger.info("DKVMN-style (topic-level adaptation): slots=20, d_k=64, d_v=128")
     else:
         model = DKTModel(num_topics=topic_graph.num_topics)
+    # Record run config in the checkpoint (all model types).
+    model.config["max_seq_len"] = args.max_seq_len
+    model.config["difficulty"] = "blinded" if args.no_difficulty else "active"
     model.to(device)
+    logger.info("difficulty: %s", "BLINDED" if args.no_difficulty else "ACTIVE")
     logger.info("Model: %s | Params: %d", args.model, sum(p.numel() for p in model.parameters()))
 
     optimizer = Adam(model.parameters(), lr=args.lr)
@@ -206,8 +223,10 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
 
     for epoch in range(1, args.epochs + 1):
         t0 = _time.time()
-        train_loss = train_epoch(model, train_loader, optimizer, criterion, topic_graph, device)
-        val_metrics = evaluate_model(model, val_loader, topic_graph, device)
+        train_loss = train_epoch(model, train_loader, optimizer, criterion, topic_graph, device,
+                                 blind_difficulty=args.no_difficulty)
+        val_metrics = evaluate_model(model, val_loader, topic_graph, device,
+                                     blind_difficulty=args.no_difficulty)
         elapsed = _time.time() - t0
 
         print(f"{epoch:>5d} {train_loss:>12.4f} {val_metrics['loss']:>10.4f} {val_metrics['auc']:>10.4f} {elapsed:>7.0f}s", flush=True)
@@ -220,10 +239,7 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
             best_auc = val_metrics["auc"]
             patience_counter = 0
             # Save best
-            if args.model == "graph_dkt":
-                GraphDKTModel.save(model, out_path)
-            else:
-                DKTModel.save(model, out_path)
+            model_cls.save(model, out_path)
             logger.info("Saved best model (AUC=%.4f) → %s", best_auc, out_path)
         else:
             patience_counter += 1
@@ -234,13 +250,14 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
     return best_auc
 
 
-def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device):
+def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device,
+                blind_difficulty=False):
     model.train()
     total_loss = 0.0
     total_steps = 0
 
     for batch_seqs in dataloader:
-        batch = collate_fn(batch_seqs, topic_graph)
+        batch = collate_fn(batch_seqs, topic_graph, blind_difficulty=blind_difficulty)
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         predictions, _ = model(batch)  # (B, T, num_topics)
@@ -276,7 +293,12 @@ def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device):
 def main():
     parser = argparse.ArgumentParser(description="Train DKT / Graph-DKT model")
     parser.add_argument("--data", required=True, help="Path to training CSV")
-    parser.add_argument("--model", choices=["dkt", "graph_dkt"], default="graph_dkt")
+    parser.add_argument("--model", choices=["dkt", "graph_dkt", "sakt", "dkvmn"], default="graph_dkt")
+    parser.add_argument("--attn", choices=["sdpa", "naive"], default="sdpa",
+                        help="Attention backend for --model sakt (default: sdpa)")
+    parser.add_argument("--no-difficulty", action="store_true",
+                        help="Blind the difficulty input channel (constant value) in "
+                             "both training and evaluation. Default OFF.")
     parser.add_argument(
         "--adjacency-mode",
         choices=["directed", "undirected", "no_graph", "dense"],

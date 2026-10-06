@@ -1,0 +1,6 @@
+Alternative-architecture comparison — success criteria (written BEFORE any
+evaluation of the alternative models; do not edit afterwards).
+
+H1 holds against an alternative only if directed Graph-DKT P@5 exceeds it
+with Holm-adjusted paired p < 0.05; otherwise the result is reported as a
+tie or a loss.
