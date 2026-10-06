@@ -1,0 +1,22 @@
+sanity DKT-AUC directed vs no_graph: max|diff| = 0.000000
+sanity DKT-AUC directed vs undirected: max|diff| = 0.000000
+sanity DKT-AUC directed vs dense: max|diff| = 0.000000
+
+CROSS-VARIANT PAIRED TESTS — config 2k, ref=directed (graph side), n=5 folds, df=4
+Holm adjusted across the 8 comparisons in this table. Fold-level t-tests are anti-conservative (folds share training data).
+comparison                   metric   ref_mean   cmp_mean       diff        t      p_raw     p_holm
+directed-vs-no_graph               AUC        0.9671     0.9672    -0.0000   -0.391     0.7159     1.0000
+directed-vs-no_graph               P@5        0.1419     0.1314    +0.0105   19.317   4.23e-05     0.0003
+directed-vs-undirected             AUC        0.9671     0.9673    -0.0001   -1.314     0.2591     0.7774
+directed-vs-undirected             P@5        0.1419     0.1310    +0.0109    2.502     0.0666     0.2665
+directed-vs-dense                  AUC        0.9671     0.9673    -0.0001   -3.395     0.0274     0.1371
+directed-vs-dense                  P@5        0.1419     0.1138    +0.0281    5.596     0.0050     0.0350
+directed-vs-dkt                    AUC        0.9671     0.9674    -0.0002   -4.472     0.0111     0.0663
+directed-vs-dkt                    P@5        0.1419     0.1442    -0.0023   -0.716     0.5136     1.0000
+
+USER-LEVEL PAIRED BOOTSTRAP — P@5 directed minus comparator, 10000 resamples, 95% CI (unweighted mean over pooled users)
+comparison                    n_users  mean_diff      CI_lo      CI_hi
+directed-vs-no_graph                   1341    +0.0093    +0.0087    +0.0100
+directed-vs-undirected                 1341    +0.0105    +0.0097    +0.0112
+directed-vs-dense                      1341    +0.0267    +0.0258    +0.0277
+directed-vs-dkt                        1341    -0.0037    -0.0045    -0.0030
