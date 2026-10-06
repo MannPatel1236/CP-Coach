@@ -21,7 +21,6 @@ Usage:
   python3 training/_gen_alt_notebooks.py          # notebooks only
 """
 
-import argparse
 import json
 import os
 import sys
