@@ -106,23 +106,52 @@ JOBS = [
 ]
 
 OVERLAY_CELL = """# NEW CODE OVERLAY (local changes are NOT pushed to GitHub).
-# Dataset: private `cpcoach-alt-code` (backend/kaggle_alt_code.zip contents).
-import glob, shutil
+# Dataset: private `cpcoach-alt-code` (= backend/kaggle_alt_code.zip).
+# Kaggle keeps an uploaded .zip UNEXTRACTED, so this cell unzips first.
+import glob, os, shutil, sys, zipfile
+
+print('--- /kaggle/input contents ---')
+for _d in sorted(glob.glob('/kaggle/input/*')):
+    try:
+        print(' ', _d, '->', sorted(os.listdir(_d))[:10])
+    except OSError:
+        print(' ', _d, '-> (unlistable)')
+
+def _norm(_s): return _s.lower().replace('-', '').replace('_', '')
+
+target = None
+for _d in glob.glob('/kaggle/input/*'):
+    _n = _norm(os.path.basename(_d))
+    if 'cpcoach' in _n and 'alt' in _n and 'code' in _n:
+        target = _d
+        break
+if target is None:
+    raise FileNotFoundError('Overlay dataset not found: expected a dir like cpcoach-alt-code under /kaggle/input/ (see listing above).')
+print(f'overlay dataset dir: {target}')
+
+srcs = [target]
+_tmp = '/tmp/altcode_unzipped'
+for _z in glob.glob(os.path.join(target, '*.zip')):
+    with zipfile.ZipFile(_z) as _zf:
+        _zf.extractall(_tmp)
+    print(f'extracted {_z} -> {_tmp}')
+    srcs.append(_tmp)
+
 found = False
-for d in glob.glob('/kaggle/input/cpcoach-alt-code*'):
-    for root, _, files in __import__('os').walk(d):
-        for fn in files:
-            if fn.endswith('.py'):
-                src = __import__('os').path.join(root, fn)
-                rel = __import__('os').path.relpath(src, d)
-                dst = __import__('os').path.join('/kaggle/working/CP-Coach/backend', rel)
-                __import__('os').makedirs(__import__('os').path.dirname(dst), exist_ok=True)
-                shutil.copy(src, dst)
-                print(f'Overlaid: {rel}')
+for _src in srcs:
+    for _root, _, _files in os.walk(_src):
+        for _fn in _files:
+            if _fn.endswith('.py'):
+                _s = os.path.join(_root, _fn)
+                _rel = os.path.relpath(_s, _src)
+                _dst = os.path.join('/kaggle/working/CP-Coach/backend', _rel)
+                os.makedirs(os.path.dirname(_dst), exist_ok=True)
+                shutil.copy(_s, _dst)
+                print(f'Overlaid: {_rel}')
                 found = True
 if not found:
-    raise FileNotFoundError("Overlay dataset `cpcoach-alt-code` not found in /kaggle/input/.")
-import sys; sys.path.insert(0, '/kaggle/working/CP-Coach/backend')
+    raise FileNotFoundError('No .py files inside the overlay dataset (checked dir + any zips).')
+sys.path.insert(0, '/kaggle/working/CP-Coach/backend')
 """ + """
 # Verify the new code is importable with the new flags.
 from models.sakt import SAKTStyleModel
