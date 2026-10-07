@@ -48,15 +48,24 @@ def main():
     ap.add_argument("--results-dir", required=True)
     ap.add_argument("--config", required=True, help="'2k' or '10k' (filename infix)")
     ap.add_argument("--ref", default=REF)
+    ap.add_argument("--variants", default=",".join(VARIANTS),
+                    help="Comma-separated variant names (sidecar files "
+                         "eval_{variant}_{config}_perfolds.sidecar.json). "
+                         "Default: directed,no_graph,undirected,dense")
+    ap.add_argument("--no-dkt", action="store_true",
+                    help="Skip the DKT-side pseudo-comparator (for the "
+                         "alternative-architecture family: Holm across the "
+                         "alternatives only)")
     ap.add_argument("--resamples", type=int, default=BOOTSTRAP_RESAMPLES)
     ap.add_argument("--seed", type=int, default=BOOTSTRAP_SEED)
     args = ap.parse_args()
+    variants = [v.strip() for v in args.variants.split(",") if v.strip()]
 
-    sides = {v: load_sidecar(args.results_dir, v, args.config) for v in VARIANTS}
+    sides = {v: load_sidecar(args.results_dir, v, args.config) for v in variants}
 
-    # Sanity: DKT side must be identical across all four runs (same weights).
+    # Sanity: DKT side must be identical across all runs (same weights).
     dkt_ref = np.array(sides[args.ref]["dkt_auc"])
-    for v in VARIANTS:
+    for v in variants:
         if v == args.ref:
             continue
         d = np.array(sides[v]["dkt_auc"])
@@ -65,7 +74,9 @@ def main():
         assert maxdiff < 1e-9, f"DKT side differs between {args.ref} and {v} runs!"
 
     ref = sides[args.ref]
-    comparators = [v for v in VARIANTS if v != args.ref] + ["dkt"]
+    comparators = [v for v in variants if v != args.ref]
+    if not args.no_dkt:
+        comparators = comparators + ["dkt"]
     # "dkt" comparator uses the DKT side of the ref run (same folds, same weights).
 
     def series(variant, key):
@@ -80,7 +91,7 @@ def main():
     print()
     print(f"CROSS-VARIANT PAIRED TESTS — config {args.config}, "
           f"ref={args.ref} (graph side), n=5 folds, df=4")
-    print("Holm adjusted across the 8 comparisons in this table. "
+    print(f"Holm adjusted across the {2 * len(comparators)} comparisons in this table. "
           "Fold-level t-tests are anti-conservative (folds share training data).")
     print(f"{'comparison':<28} {'metric':<6} {'ref_mean':>10} {'cmp_mean':>10} "
           f"{'diff':>10} {'t':>8} {'p_raw':>10} {'p_holm':>10}")
@@ -106,7 +117,7 @@ def main():
     print(f"USER-LEVEL PAIRED BOOTSTRAP — P@5 {args.ref} minus comparator, "
           f"{args.resamples} resamples, 95% CI (unweighted mean over pooled users)")
     npz = {}
-    for v in VARIANTS:
+    for v in variants:
         path = os.path.join(args.results_dir, f"eval_{v}_{args.config}_perfolds.peruser.npz")
         npz[v] = dict(np.load(path, allow_pickle=True))
     # Align users by id across runs.
