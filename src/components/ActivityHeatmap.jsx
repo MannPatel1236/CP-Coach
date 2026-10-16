@@ -12,6 +12,7 @@ import { useAnalysisContext } from "../hooks/AnalysisContext.jsx";
 import { useSealedFetch } from "../hooks/useSealedFetch.js";
 import { getProgress } from "../api/backendClient.js";
 import { panelTransition } from "../lib/motion.js";
+import { weekLabel } from "../lib/weekLabel.js";
 
 const N_WEEKS = 12;
 
@@ -94,7 +95,7 @@ function HeatGrid({ activity }) {
               data-testid="heat-cell"
               data-week={w}
               data-solved={solved}
-              title={`${w}: ${solved} solved of ${activity[w]?.total ?? 0} attempts`}
+              title={`${weekLabel(w)}: ${solved} solved of ${activity[w]?.total ?? 0} attempts`}
               style={{
                 width: 30, height: 30, borderRadius: "var(--radius-sm)",
                 display: "flex", alignItems: "center", justifyContent: "center",
