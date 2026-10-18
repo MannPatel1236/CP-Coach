@@ -41,6 +41,18 @@ describe("ActivityHeatmap + Streaks — §5.2 #7", () => {
     expect(container.querySelector("[data-week='2026-W32']").getAttribute("data-solved")).toBe("5");
   });
 
+  it("labels each cell's hover title with month + week-of-month", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ handle: "mannpatel", platform: "cf", topic_progress: {}, activity: ACTIVITY }),
+    });
+    const { container } = renderInContext(<ActivityHeatmap />);
+    await gridMounted(container);
+    // W31 → Mon Jul 27 → "Jul W4"; W32 → Mon Aug 3 → "Aug W1".
+    expect(container.querySelector("[data-week='2026-W31']").getAttribute("title")).toBe("Jul W4: 3 solved of 4 attempts");
+    expect(container.querySelector("[data-week='2026-W32']").getAttribute("title")).toBe("Aug W1: 5 solved of 6 attempts");
+  });
+
   it("renders on the rule_based path too (no mastery dependency)", async () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,
