@@ -3,6 +3,7 @@
 // interactive=true adds hover hit areas + a score tooltip (Analytics card).
 import { useState } from "react";
 import { labelOf } from "../lib/topicGraphLayout.js";
+import { weekLabel } from "../lib/weekLabel.js";
 
 const CHART_W = 560;
 const CHART_H = 150;
@@ -86,7 +87,7 @@ export default function TopicWeeklyChart({ topic, weeks, series, interactive = f
           {tickIndices.map((i) => (
             labels[i] ? (
               <text key={i} x={xOf(i)} y={CHART_H - 4} fontSize={9} fill="var(--text-muted)" fontFamily="var(--font-mono)" textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>
-                {labels[i]}
+                {weekLabel(labels[i])}
               </text>
             ) : null
           ))}
@@ -130,7 +131,7 @@ export default function TopicWeeklyChart({ topic, weeks, series, interactive = f
             aria-hidden="true"
             style={{ position: "absolute", top: 0, left: `${(xOf(hover) / CHART_W) * 100}%`, transform: "translateX(-50%)", background: "var(--surface-2)", border: "1px solid var(--outline-variant)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--on-surface)", pointerEvents: "none", whiteSpace: "nowrap" }}
           >
-            <div style={{ color: "var(--text-muted)", marginBottom: 2 }}>{labels[hover]}</div>
+            <div style={{ color: "var(--text-muted)", marginBottom: 2 }}>{weekLabel(labels[hover])}</div>
             {hoverRows.map(({ label, p }) => (
               <div key={label}><span style={{ color: LINE_COLORS[label] }}>■</span> {label} {Math.round(p * 100)}%</div>
             ))}

@@ -62,10 +62,22 @@ describe("TopicWeeklyChart", () => {
     expect(hit).toBeTruthy();
     fireEvent.mouseEnter(hit);
     const tip = getByTestId("weekly-tooltip").textContent;
-    expect(tip).toContain("2026-W40");
+    expect(tip).toContain("Sep W4");
     expect(tip).toContain("62%");
     fireEvent.mouseLeave(hit);
     expect(queryByTestId("weekly-tooltip")).toBeNull();
+  });
+
+  it("renders month + week-of-month tick labels instead of raw ISO keys", () => {
+    const series = [{ label: "CF", points: WEEKS.map(() => 0.5), weeks: WEEKS }];
+    const { getByText, queryByText } = render(
+      <TopicWeeklyChart topic="dp" weeks={WEEKS} series={series} />
+    );
+    // WEEKS = 2026-W29..W40; ticks land on first/middle/last: W29, W34, W40.
+    expect(getByText("Jul W2")).toBeTruthy();
+    expect(getByText("Aug W3")).toBeTruthy();
+    expect(getByText("Sep W4")).toBeTruthy();
+    expect(queryByText("2026-W40")).toBeNull();
   });
 
   it("does not render hover hit areas when not interactive", () => {
