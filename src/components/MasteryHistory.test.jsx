@@ -55,7 +55,7 @@ describe("MasteryHistory — weekly curve (Analytics)", () => {
     expect(hit).toBeTruthy();
     fireEvent.mouseEnter(hit);
     const tip = getByTestId("weekly-tooltip").textContent;
-    expect(tip).toContain("2026-W40");
+    expect(tip).toContain("Sep W4");
     expect(tip).toContain("50%");
   });
 });
