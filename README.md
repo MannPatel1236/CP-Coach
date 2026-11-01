@@ -22,7 +22,7 @@
 
 ## Overview
 
-CP Coach is a full-stack web application that connects to your **Codeforces** and/or **LeetCode** account to analyze your submission history, identify skill gaps, and recommend personalized practice problems. It features a novel **Graph-DKT** architecture that layers a Graph Convolutional Network on top of a Deep Knowledge Tracing backbone, guided by a directed prerequisite graph over 29 canonical competitive programming topics.
+CP Coach is a full-stack web application that connects to your **Codeforces** and/or **LeetCode** account to analyze your submission history, identify skill gaps and recommend personalized practice problems. It features a novel **Graph-DKT** architecture that layers a Graph Convolutional Network on top of a Deep Knowledge Tracing backbone, guided by a directed prerequisite graph over 29 canonical competitive programming topics.
 
 ### Key Features
 
