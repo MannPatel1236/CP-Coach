@@ -2,6 +2,9 @@ weights/*.pt
 weights/*.pth
 weights/archived-buggy/
 weights/backup_2k/
+# Per-user prediction arrays from eval_folds.py --per-user-npz. Regenerable, and
+# 152 KB x 10 variants per config; see results/ARTIFACTS.md for checksums + repro.
+results/*.peruser.npz
 __pycache__/
 .env
 *.pyc
