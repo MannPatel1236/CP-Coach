@@ -1,11 +1,27 @@
 const BASE = import.meta.env.VITE_API_URL || null;
 
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 1000;
+// Retry budget sized for Render cold starts: the backend spins down when idle and
+// answers 502/503 (or drops the socket) for ~30–60s while it boots. The old 1s/2s
+// budget gave up after ~3s, fell through to the client-only rule-based path, and
+// surfaced as the "estimate · not graph-dkt" badge — so the ceiling is patience,
+// not error class. Delays escalate to a ~95s total budget; happy path is unchanged.
+const RETRY_DELAYS_MS = [5000, 15000, 30000, 45000];
+// Writes keep the original short budget: they are user-initiated and land after
+// a read already warmed the instance, so a 5xx there is a real failure — waiting
+// ~95s to report it just freezes the UI (and the save-plan contract says so).
+const WRITE_RETRY_DELAYS_MS = [1000, 2000];
 
 async function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
+
+// Fire-and-forget wake-up, called once at app boot (main.jsx): starts the
+// cold-start boot while the user is still typing a handle instead of during the
+// analyze request itself.
+export const warmUpBackend = () => {
+  if (!BASE) return;
+  return fetch(`${BASE}/health`).catch(() => {});
+};
 
 async function apiFetch(path, signal, options = {}, attempt = 0) {
   if (!BASE) throw new Error("VITE_API_URL not set");
@@ -21,12 +37,13 @@ async function apiFetch(path, signal, options = {}, attempt = 0) {
   } catch (err) {
     // Never retry abort signals — the caller explicitly cancelled
     if (err.name === "AbortError") throw err;
-    // Retry on network errors and 5xx status codes
-    if (attempt < MAX_RETRIES) {
+    // Retry on network errors and 5xx status codes (cold-start 502/503/504 included)
+    const retryDelays = options.method && options.method !== "GET" ? WRITE_RETRY_DELAYS_MS : RETRY_DELAYS_MS;
+    if (attempt < retryDelays.length) {
       const isNetworkError = !err.message?.includes("API error");
       const isServerError = err.message?.match(/API error 5/);
       if (isNetworkError || isServerError) {
-        await delay(RETRY_DELAY_MS * (attempt + 1));
+        await delay(retryDelays[attempt]);
         return apiFetch(path, signal, options, attempt + 1);
       }
     }
