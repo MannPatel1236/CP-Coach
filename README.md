@@ -265,7 +265,8 @@ weight = 1.0 - (0.8 * idx) / max(total - 1, 1)
 CP-Coach/
 ├── src/                        # React frontend (Vite)
 │   ├── api.js                  # CF API calls + data processing
-│   ├── api/backendClient.js    # FastAPI backend wrapper with retry
+│   ├── api/backendClient.js    # FastAPI backend wrapper (retry: 95s read budget for Render
+│   │                           # cold starts, 2s for writes) + warmUpBackend() boot ping
 │   ├── hooks/
 │   │   ├── AnalysisContext.jsx  # React context + useAnalysisContext()
 │   │   ├── useAnalysis.js      # Analysis state machine
