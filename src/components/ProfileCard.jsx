@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { rankColor, ratingColor } from "../utils.js";
 import { UserIcon } from "./Icons";
 
@@ -7,6 +7,12 @@ function ProfileCard({ user, tagCount, weakCount }) {
   const rc = isLeetCode ? "#28a745" : rankColor(user.rank ?? "");
   const displayRank = isLeetCode ? "LeetCode" : (user.rank || "unrated");
   const showRating = user.rating != null;
+  // Third-party avatars (userpic.codeforces.org, assets.leetcode.com) can 404 or
+  // refuse hotlinked requests. Track the URL that failed so a broken image
+  // degrades to the icon placeholder instead of an empty <img> box, and so a new
+  // handle/avatar gets a fresh attempt.
+  const [failedAvatar, setFailedAvatar] = useState(null);
+  const showAvatar = Boolean(user.avatar) && failedAvatar !== user.avatar;
 
   const stats = [];
   
@@ -50,10 +56,15 @@ function ProfileCard({ user, tagCount, weakCount }) {
 
       {/* Avatar + Name */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, marginTop: 2 }}>
-        {user.avatar ? (
+        {showAvatar ? (
           <img
             src={user.avatar}
             alt={`${user.handle} avatar`}
+            loading="lazy"
+            // Referrer-less fetch: third-party image CDNs vary in how they treat
+            // cross-origin referrers; omitting it is the safest option.
+            referrerPolicy="no-referrer"
+            onError={() => setFailedAvatar(user.avatar)}
             style={{
               width: 50, height: 50,
               borderRadius: "50%",

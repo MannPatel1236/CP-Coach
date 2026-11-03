@@ -96,6 +96,7 @@ class LeetCodeClient:
         query getUserProfile($username: String!) {
             matchedUser(username: $username) {
                 username
+                profile { userAvatar }
                 submitStats {
                     acSubmissionNum { difficulty count submissions }
                 }
@@ -108,10 +109,13 @@ class LeetCodeClient:
             raise UsernameError(f"LeetCode user '{username}' not found")
 
         stats = {s["difficulty"]: s["count"] for s in user["submitStats"]["acSubmissionNum"]}
+        # profile is nullable on LC (and userAvatar may be empty) — degrade to None.
+        avatar = (user.get("profile") or {}).get("userAvatar") or None
         return {
             "handle": username,
             "platform": "lc",
             "rating": None,
+            "avatar": avatar,
             "total_solved": stats.get("All", 0),
             "easy_solved": stats.get("Easy", 0),
             "medium_solved": stats.get("Medium", 0),

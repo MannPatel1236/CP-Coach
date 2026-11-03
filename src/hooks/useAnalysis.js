@@ -254,6 +254,7 @@ export default function useAnalysis() {
     const lcUserInfo = lcHandle?.trim() ? {
       handle: lcHandle.trim(), platform: "lc",
       rating: lcData?.rating || null, maxRating: lcData?.maxRating ?? lcData?.rating ?? null,
+      avatar: lcData?.avatar || lcData?.titlePhoto || null,
       easy_solved: lcData?.easy_solved || 0, medium_solved: lcData?.medium_solved || 0, hard_solved: lcData?.hard_solved || 0,
     } : null;
 
@@ -337,6 +338,7 @@ export default function useAnalysis() {
 
     const userInfo = {
       handle: data.handle, rating: data.rating, platform: data.platform,
+      avatar: data.avatar || null,
       easy_solved: data.easy_solved, medium_solved: data.medium_solved, hard_solved: data.hard_solved,
     };
 
@@ -383,7 +385,7 @@ export default function useAnalysis() {
         userInfo = {
           handle: data.handle, platform: data.platform || "cf",
           rating: data.rating, rank: data.rank, maxRating: data.maxRating,
-          maxRank: data.maxRank, avatar: data.avatar, country: data.country, organization: data.organization,
+          maxRank: data.maxRank, avatar: data.avatar || data.titlePhoto || null, country: data.country, organization: data.organization,
         };
         profile = (data.topic_profile || []).map((t) => ({
           tag: t.topic, attempts: t.attempts, solved: t.solved, acRate: Math.round(t.solve_rate * 100),
@@ -410,8 +412,11 @@ export default function useAnalysis() {
 
     if (!useBackend || !userInfo) {
       setLoadingStep(1);
-      userInfo = await fetchUserInfo(handle.trim(), controller?.signal);
+      const rawInfo = await fetchUserInfo(handle.trim(), controller?.signal);
       if (controller?.signal.aborted) return;
+      // CF returns both `avatar` and `titlePhoto`; either can be absent. Normalize
+      // here so ProfileCard only ever has to read `avatar`.
+      userInfo = { ...rawInfo, avatar: rawInfo.avatar || rawInfo.titlePhoto || null };
 
       setLoadingStep(2);
       const submissions = await fetchSubmissions(handle.trim(), analysisMode, controller?.signal);
