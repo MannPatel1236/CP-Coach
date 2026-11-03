@@ -40,7 +40,6 @@ def mock_cf_submissions(monkeypatch):
     mock = AsyncMock()
     mock.get_user_info = mock_get_user_info
     mock.get_submissions = mock_get_submissions
-    mock.get_all_submissions = mock_get_submissions
     monkeypatch.setattr("routes.progress.CFClient", lambda: mock)
     return mock
 
@@ -114,7 +113,6 @@ class TestProgressMalformedInputs:
         async def empty(handle, **kwargs):
             return []
         mock_cf_submissions.get_submissions = empty
-        mock_cf_submissions.get_all_submissions = empty
 
         r = client.get("/api/progress/tourist?platform=cf")
         assert r.status_code == 200
@@ -130,7 +128,6 @@ class TestProgressMalformedInputs:
                  "verdict": "OK", "creationTimeSeconds": -42},
             ]
         mock_cf_submissions.get_submissions = malformed
-        mock_cf_submissions.get_all_submissions = malformed
 
         r = client.get("/api/progress/tourist?platform=cf")
         assert r.status_code == 200
@@ -150,39 +147,39 @@ def clear_progress_cache():
 
 class TestProgressCache:
     """Memory TTL tier in front of the CF fetch — second dashboard visit must
-    not refetch ≤8000 submissions, and an expired entry must fall through."""
+    not refetch submissions, and an expired entry must fall through."""
 
     @staticmethod
     def _counting(mock):
         """The autouse fixture wires plain functions — wrap for call counting."""
         from unittest.mock import AsyncMock
-        mock.get_all_submissions = AsyncMock(side_effect=mock.get_all_submissions)
+        mock.get_submissions = AsyncMock(side_effect=mock.get_submissions)
         return mock
 
     def test_second_call_hits_memory_cache_not_cf(self, mock_cf_submissions):
         self._counting(mock_cf_submissions)
         client.get("/api/progress/tourist?platform=cf")
-        assert mock_cf_submissions.get_all_submissions.call_count == 1
+        assert mock_cf_submissions.get_submissions.call_count == 1
 
         r = client.get("/api/progress/tourist?platform=cf")
         assert r.status_code == 200
         assert r.json()["activity"]
         # Served from cache — no second upstream fetch, no re-persist.
-        assert mock_cf_submissions.get_all_submissions.call_count == 1
+        assert mock_cf_submissions.get_submissions.call_count == 1
 
     def test_expired_entry_refetches(self, mock_cf_submissions):
         from routes import progress as prog
         self._counting(mock_cf_submissions)
 
         client.get("/api/progress/tourist?platform=cf")
-        assert mock_cf_submissions.get_all_submissions.call_count == 1
+        assert mock_cf_submissions.get_submissions.call_count == 1
 
         key = next(iter(prog._progress_cache))
         ts, activity, topic_progress = prog._progress_cache[key]
         prog._progress_cache[key] = (ts - (prog._PROGRESS_TTL + 1), activity, topic_progress)
 
         client.get("/api/progress/tourist?platform=cf")
-        assert mock_cf_submissions.get_all_submissions.call_count == 2
+        assert mock_cf_submissions.get_submissions.call_count == 2
 
 
 class TestIsoWeekKeys:
@@ -203,7 +200,6 @@ class TestIsoWeekKeys:
             ]
 
         mock_cf_submissions.get_submissions = straddle
-        mock_cf_submissions.get_all_submissions = straddle
 
         r = client.get("/api/progress/tourist?platform=cf")
         activity = r.json()["activity"]

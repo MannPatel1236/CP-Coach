@@ -72,7 +72,13 @@ async def _fetch_normalized_subs(handle: str, platform: str) -> list[dict]:
         return await client.get_user_submissions(handle, limit=50)
     else:
         client = CFClient()
-        raw_subs = await client.get_all_submissions(handle, max_count=8000)
+        # 12 weekly buckets + streaks. get_all_submissions would page up to 8000
+        # (8 CF requests, 0.3s apart) for a heatmap; CF returns newest-first, so
+        # one 1000-row page covers the whole 12-week window for anyone under
+        # ~12 submissions/day, and the zero-fill loop handles gaps.
+        # shortcut: >1000 submissions inside 12 weeks clips the oldest bars of
+        # the heatmap; upgrade to paging if such users show up.
+        raw_subs = await client.get_submissions(handle, count=1000)
         return [n for n in (_normalizer.normalize_cf_submission(s) for s in raw_subs) if n]
 
 

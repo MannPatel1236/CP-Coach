@@ -90,7 +90,7 @@ export default function ModelInsight({ topicProfile }) {
           </p>
 
           <div style={{ padding: "12px 16px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", fontSize: 11, color: "var(--text-muted)", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
-            Recommendations are generated from your submission history using topic mastery scores and prerequisite gating across a directed graph of 22+ algorithmic topics. Problems are filtered by difficulty band relative to your rating.
+            Recommendations are generated from your submission history using topic mastery scores and prerequisite gating across a directed graph of 29 algorithmic topics. Problems are filtered by difficulty band relative to your rating.
           </div>
         </div>
       )}

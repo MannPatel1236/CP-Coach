@@ -5,6 +5,7 @@ import os
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import and_, delete, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auth import verify_hmac, verify_handle_signature
@@ -28,8 +29,11 @@ _topic_graph = CPTopicGraph()
 _normalizer = Normalizer()
 _preprocessor = Preprocessor()
 
+# Bounds how many 5-fold model forwards run at once (see the analyze route).
+_MODEL_FORWARD_SEM = asyncio.Semaphore(2)
 
-async def _analyze_cf(handle: str, mode: str, _controller):
+
+async def _analyze_cf(handle: str, mode: str):
     """Analyze a Codeforces user. Returns (profile_dict, normalized_subs, easy_solved)."""
     client = CFClient()
     raw_info = await client.get_user_info(handle)
@@ -58,7 +62,7 @@ async def _analyze_cf(handle: str, mode: str, _controller):
     return profile, normalized_subs, None
 
 
-async def _analyze_lc(handle: str, mode: str, _controller):
+async def _analyze_lc(handle: str, mode: str):
     """Analyze a LeetCode user. Returns (profile_dict, normalized_subs, easy_solved|None).
 
     If LC submissions are private but stats exist, returns a special 'stats_only' result.
@@ -196,6 +200,20 @@ async def _persist_mastery_history(handle: str, platform: str, history: dict):
             ]
             if not rows:
                 return
+            # Checkpoint count varies with sequence length (short runs dedupe to
+            # fewer rows), so a later quick run leaves the previous deep run's
+            # tail behind — the read side would stitch two runs into one curve.
+            # Trim the tail for exactly the topics being written, in-transaction.
+            await session.execute(
+                delete(MasteryHistory).where(
+                    MasteryHistory.user_id == user.id,
+                    or_(*[
+                        and_(MasteryHistory.topic == t,
+                             MasteryHistory.checkpoint_idx >= len(cps))
+                        for t, cps in history.items()
+                    ]),
+                )
+            )
             stmt = pg_insert(MasteryHistory).values(rows)
             stmt = stmt.on_conflict_do_update(
                 index_elements=["user_id", "topic", "checkpoint_idx"],
@@ -221,16 +239,21 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
     try:
         # 1. Fetch profile + submissions via platform-specific helper
         if platform == "lc":
-            result = await _analyze_lc(handle, mode, None)
-            if result[0] is None or (isinstance(result[0], dict) and result[0].get("model_used") == "stats_only"):
+            result = await _analyze_lc(handle, mode)
+            if isinstance(result[0], dict) and result[0].get("model_used") == "stats_only":
                 return AnalyzeResponse(**result[0])
             profile, normalized_subs, easy_solved = result
         else:
-            profile, normalized_subs, easy_solved = await _analyze_cf(handle, mode, None)
+            profile, normalized_subs, easy_solved = await _analyze_cf(handle, mode)
 
-        # 2. Build sequence + topic profile
+        # 2. Build sequence + topic profile.
+        # canonical_only=True: CF tags outside the 29 (interactive, *special, …)
+        # would otherwise reach collate_fn's index-0 fallback and be counted as
+        # `implementation` — the graph root, and the topic with the paper's
+        # highest AUC. Filtering here keeps sequence rows, checkpoint timestamps
+        # and weekly buckets aligned (all three index this same list).
         subs = normalized_subs or []
-        sequence = _preprocessor.build_submission_sequence(subs)
+        sequence = _preprocessor.build_submission_sequence(subs, canonical_only=True)
         raw_profile = _preprocessor.build_topic_profile(subs)
         topic_profile = [TopicProfileEntry.model_validate(t) for t in raw_profile]
         weak_areas = _preprocessor.detect_weak_areas(raw_profile)
@@ -240,9 +263,14 @@ async def analyze(request: Request, handle: str, platform: str = Query("cf"), mo
         # work taking seconds in deep mode; running it inline would freeze the
         # event loop (all concurrent requests + Render health probes stall).
         preloaded = getattr(request.app.state, "graph_dkt_model", None)
-        mastery_scores, model_used, mastery_history, mastery_weekly = await asyncio.to_thread(
-            _compute_mastery, sequence, normalized_subs, preloaded,
-        )
+        # Cap concurrent forwards: the limiter allows 30 req/min per IP and auth is
+        # off on the public demo, so 30 tabs would otherwise start 30 × 5 LSTM
+        # passes at once and saturate a 1-2 CPU instance (health probes time out →
+        # Render restarts). Two in flight is plenty for a few dozen visitors/day.
+        async with _MODEL_FORWARD_SEM:
+            mastery_scores, model_used, mastery_history, mastery_weekly = await asyncio.to_thread(
+                _compute_mastery, sequence, normalized_subs, preloaded,
+            )
 
         user_rating = profile.get("rating") if isinstance(profile, dict) else None
 

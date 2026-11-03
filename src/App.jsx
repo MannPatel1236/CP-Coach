@@ -254,7 +254,10 @@ export default function App() {
           >
             {tagProfile.length > 0 && <SkillChart tags={tagProfile} />}
 
-            {cfUser && <RatingTrajectory />}
+            {/* Mounted unconditionally like its siblings: the component itself
+                renders the LC "only available for Codeforces" caption when
+                cfHandle is empty, which the cfUser guard made unreachable. */}
+            <RatingTrajectory />
 
             <MasteryHistory />
 

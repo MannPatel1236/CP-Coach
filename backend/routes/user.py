@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from auth import verify_hmac, verify_handle_signature
+from auth import auth_enabled, verify_hmac, verify_handle_signature
 from rate_limiter import limiter
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -30,6 +30,14 @@ async def delete_user(
 
     Requires HMAC authentication when CP_API_SECRET is configured.
     """
+    # Fail closed: with CP_API_SECRET unset the auth dependency is a
+    # pass-through, which would let anyone erase any handle's data with one
+    # unauthenticated request. Reads may be open on a public demo; erasure may not.
+    if not auth_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Erasure is disabled: set CP_API_SECRET to enable DELETE /api/user/{handle}.",
+        )
     verify_handle_signature(
         handle=handle,
         authorization=request.headers.get("Authorization"),

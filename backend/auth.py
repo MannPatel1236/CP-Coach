@@ -36,6 +36,15 @@ _API_SECRET = os.getenv("CP_API_SECRET", "")
 _STALE_SECONDS = int(os.getenv("CP_AUTH_STALE_SECONDS", "300"))  # 5 minutes
 
 
+def auth_enabled() -> bool:
+    """True when CP_API_SECRET is set, i.e. the dependencies below actually check.
+
+    Destructive routes (GDPR erasure) must fail closed when this is False —
+    a pass-through auth dependency is fine for reads, never for deletes.
+    """
+    return bool(_API_SECRET)
+
+
 def _hmac_sign(timestamp: str, handle: str) -> str:
     """HMAC-SHA256 of timestamp + handle using the shared secret."""
     if not _API_SECRET:

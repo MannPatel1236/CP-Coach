@@ -162,6 +162,52 @@ class TestRecommend:
         assert r.status_code == 200, r.json()
         assert r.json()["model_used"] == "rule_based"
 
+    def test_recommend_post_skips_submission_refetch_when_overrides_supplied(self, monkeypatch):
+        """POST carries solved_ids + mastery from the analyze pass; refetching the
+        submission history would duplicate CF/LC traffic for data already in hand."""
+        calls = {"subs": 0}
+        import routes.recommend as rec
+
+        original = rec.CFClient
+
+        class Counting:
+            def __getattr__(self, name):
+                inner = original()
+                if name == "get_submissions":
+                    async def counted(*a, **k):
+                        calls["subs"] += 1
+                        return await inner.get_submissions(*a, **k)
+                    return counted
+                return getattr(inner, name)
+
+        monkeypatch.setattr("routes.recommend.CFClient", Counting)
+        r = client.post(
+            "/api/recommend/tourist",
+            json={
+                "platforms": "cf",
+                "top_k": 5,
+                "mastery_scores": {"dp": 0.3},
+                "solved_ids": ["cf-1A"],
+                "user_rating": 1800,
+            },
+        )
+        assert r.status_code == 200, r.json()
+        assert calls["subs"] == 0
+
+    def test_recommend_post_invalid_handle_is_400_even_with_overrides(self):
+        """Overrides must not turn a bad handle into a silent empty result."""
+        r = client.post(
+            "/api/recommend/bad_handle!",
+            json={
+                "platforms": "cf",
+                "top_k": 5,
+                "mastery_scores": {"dp": 0.3},
+                "solved_ids": ["cf-1A"],
+            },
+        )
+        assert r.status_code == 400, r.json()
+        assert "VALIDATION_ERROR" == r.json()["code"]
+
     def test_recommend_post_body_too_large_returns_413(self):
         """Body > 1MB should be rejected by MaxBodySizeMiddleware."""
         big_body = "x" * (1_000_001)  # 1 MB + 1 byte

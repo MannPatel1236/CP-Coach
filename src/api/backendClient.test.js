@@ -97,6 +97,20 @@ describe("apiFetch cold-start retries", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not retry a 500 — wait is for cold starts, not real server faults", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(500, { detail: "boom" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getProgress } = await loadClient();
+    const promise = getProgress("tourist", undefined);
+    const settled = expect(promise).rejects.toThrow(/API error 500/);
+
+    await vi.advanceTimersByTimeAsync(30000);
+    await settled;
+    // A 500 would never succeed on retry; polling it for 95s only freezes the UI.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("never retries an aborted request", async () => {
     const abortErr = new DOMException("Aborted", "AbortError");
     const fetchMock = vi.fn().mockRejectedValue(abortErr);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { waitFor, fireEvent } from "@testing-library/react";
 import Workbook from "./Workbook.jsx";
 import { renderInContext } from "../__fixtures__/analysisContext.jsx";
-import { loadLocalPlans } from "../lib/workbookStore.js";
+import { loadLocalPlans, saveLocalPlans } from "../lib/workbookStore.js";
 
 const originalFetch = globalThis.fetch;
 const originalConfirm = globalThis.confirm;
@@ -70,6 +70,21 @@ describe("Workbook — §5.2 #9", () => {
     expect(getByTestId("wb-summary").textContent).toContain("2");
     expect(getByTestId("wb-summary").textContent).toContain("mannpatel");
     expect(container.querySelectorAll("[data-testid='wb-plan']").length).toBe(2);
+  });
+
+  it("keeps offline-only plans when the backend list loads", async () => {
+    // A plan saved while the backend was down lives only in localStorage. The
+    // successful read used to overwrite the cache with the server list and
+    // destroy it on the next reload.
+    mockApi(PLANS);
+    saveLocalPlans("mannpatel", [
+      { id: "local-1", name: "Saved while offline", payload: { items: [] }, created_at: null, updated_at: null },
+    ]);
+    const { container, getByTestId } = renderInContext(<Workbook />);
+    await loaded(container);
+    expect(container.querySelectorAll("[data-testid='wb-plan']").length).toBe(3);
+    expect(getByTestId("wb-local-note")).toBeTruthy();
+    expect(loadLocalPlans("mannpatel").some((p) => String(p.id).startsWith("local-"))).toBe(true);
   });
 
   it("blank checklist state when backend returns [] and no local copy", async () => {

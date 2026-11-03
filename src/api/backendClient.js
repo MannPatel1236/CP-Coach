@@ -49,10 +49,12 @@ async function apiFetch(path, signal, options = {}, attempt = 0, deadline = null
   } catch (err) {
     // Never retry abort signals — the caller explicitly cancelled
     if (err.name === "AbortError") throw err;
-    // Retry on network errors and 5xx status codes (cold-start 502/503/504 included)
+    // Retry only on network errors and the cold-start codes Render's edge emits.
+    // A 500 (or any other 5xx) is a real server fault: retrying it burns the
+    // ~95s read budget and freezes the UI without ever succeeding.
     const isNetworkError = !err.message?.includes("API error");
-    const isServerError = err.message?.match(/API error 5/);
-    if (!isNetworkError && !isServerError) throw err;
+    const isRetryableStatus = err.message?.match(/API error 50[234]/);
+    if (!isNetworkError && !isRetryableStatus) throw err;
 
     if (options.method && options.method !== "GET") {
       if (attempt < WRITE_RETRY_DELAYS_MS.length) {

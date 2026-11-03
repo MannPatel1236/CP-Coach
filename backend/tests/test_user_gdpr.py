@@ -57,33 +57,52 @@ def fake_db(monkeypatch):
     return install
 
 
+@pytest.fixture
+def erasure_enabled(monkeypatch):
+    """Erasure fails closed unless CP_API_SECRET is set (public demo = no secret).
+
+    Only the guard is flipped here — auth._API_SECRET stays unset so the HMAC
+    signature check stays a pass-through and these tests keep pinning the DELETE
+    contracts rather than the header format.
+    """
+    monkeypatch.setattr("routes.user.auth_enabled", lambda: True)
+
+
 class TestGdprErasure:
-    def test_existing_handle_deletes_and_returns_200(self, fake_db):
+    def test_refuses_to_erase_when_auth_is_disabled(self, fake_db):
+        """No CP_API_SECRET → one anonymous curl must not wipe a handle."""
+        session = fake_db(_FakeSession(rowcount=1))
+        r = client.delete("/api/user/mannpatel")
+        assert r.status_code == 503
+        assert session.captured_stmt is None
+        assert session.commits == 0
+
+    def test_existing_handle_deletes_and_returns_200(self, erasure_enabled, fake_db):
         session = fake_db(_FakeSession(rowcount=1))
         r = client.delete("/api/user/mannpatel")
         assert r.status_code == 200, r.json()
         assert "deleted" in r.json()["message"].lower()
         assert session.commits == 1
 
-    def test_dual_platform_twin_rows_deleted_in_one_call(self, fake_db):
+    def test_dual_platform_twin_rows_deleted_in_one_call(self, erasure_enabled, fake_db):
         session = fake_db(_FakeSession(rowcount=2))
         r = client.delete("/api/user/mannpatel")
         assert r.status_code == 200
         assert session.captured_stmt is not None
 
-    def test_unknown_handle_returns_404_without_commit(self, fake_db):
+    def test_unknown_handle_returns_404_without_commit(self, erasure_enabled, fake_db):
         session = fake_db(_FakeSession(rowcount=0))
         r = client.delete("/api/user/ghost")
         assert r.status_code == 404
         assert session.commits == 0
 
-    def test_db_failure_returns_500_after_rollback(self, fake_db):
+    def test_db_failure_returns_500_after_rollback(self, erasure_enabled, fake_db):
         session = fake_db(_FakeSession(fail=True))
         r = client.delete("/api/user/mannpatel")
         assert r.status_code == 500
         assert session.rollbacks == 1
 
-    def test_delete_sql_is_exact_equality_never_wildcard(self, fake_db):
+    def test_delete_sql_is_exact_equality_never_wildcard(self, erasure_enabled, fake_db):
         """'_' is a legal CF handle char AND a LIKE wildcard — an ilike here
         could erase stranger 'aXb' when asked for 'a_b'."""
         session = fake_db(_FakeSession(rowcount=1))
@@ -94,7 +113,7 @@ class TestGdprErasure:
         assert "lower(users.lc_handle) = 'a_b'" in where
         assert "LIKE" not in where.upper()
 
-    def test_delete_invalidates_memory_derived_caches(self, fake_db):
+    def test_delete_invalidates_memory_derived_caches(self, erasure_enabled, fake_db):
         """Erasure must reach the process-memory tiers too — progress/trajectory
         would otherwise keep serving the erased handle's aggregates for up to
         their TTLs after the 200."""

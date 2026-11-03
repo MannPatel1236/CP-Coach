@@ -114,8 +114,9 @@ class TestPlansContracts:
 
     def test_post_creates_plan_and_assigns_server_id(self, fake_db):
         # Identity resolution runs either-column find_user_by_handle first,
-        # then get_or_create_user when absent → two lookups, then the insert.
-        fake_db(_FakeResult(None), _FakeResult(None))
+        # then get_or_create_user when absent → two lookups; the third execute
+        # is the per-handle plan-count guard, then the insert.
+        fake_db(_FakeResult(None), _FakeResult(None), _FakeResult(rows=[]))
         r = client.post("/api/plans/mannpatel", json=PLAN_BODY)
         assert r.status_code == 201, r.json()
         body = r.json()
@@ -171,7 +172,7 @@ class TestPlanInValidation:
         assert r.status_code == 422
 
     def test_name_at_column_limit_accepted(self, fake_db):
-        fake_db(_FakeResult(None), _FakeResult(None))
+        fake_db(_FakeResult(None), _FakeResult(None), _FakeResult(rows=[]))
         r = client.post("/api/plans/mannpatel", json={"name": "x" * 120, "payload": {}})
         assert r.status_code == 201
 
@@ -193,7 +194,7 @@ class TestPlansBodyLimitAndAuth:
         assert r.status_code == 413
 
     def test_normal_size_post_passes_middleware(self, fake_db):
-        fake_db(_FakeResult(None), _FakeResult(None))
+        fake_db(_FakeResult(None), _FakeResult(None), _FakeResult(rows=[]))
         r = client.post("/api/plans/mannpatel", json=PLAN_BODY)
         assert r.status_code == 201
 
@@ -213,7 +214,7 @@ class TestPlansBodyLimitAndAuth:
     def test_signed_post_passes_and_creates_plan(self, fake_db, monkeypatch):
         import auth as auth_mod
         monkeypatch.setattr(auth_mod, "_API_SECRET", "test-secret")
-        fake_db(_FakeResult(None), _FakeResult(None))
+        fake_db(_FakeResult(None), _FakeResult(None), _FakeResult(rows=[]))
         r = client.post("/api/plans/mannpatel", json=PLAN_BODY,
                         headers=self._hmac_headers("mannpatel"))
         assert r.status_code == 201, r.json()

@@ -81,12 +81,17 @@ async def _get_or_fetch(key: str, fetch_fn):
 
 
 async def _fetch_platform_data_cached(
-    handle: str, platform_list: list[str], handle_map: dict[str, str] | None = None
+    handle: str, platform_list: list[str], handle_map: dict[str, str] | None = None,
+    skip_submissions: bool = False,
 ) -> tuple[list, list, set, int, list[str]]:
     """Fetch problems, submissions, solved IDs, user rating, and errors from requested platforms.
 
     handle_map overrides which handle to use per platform (keyed by "cf"/"lc").
     Falls back to the main ``handle`` param for any platform not in the map.
+
+    skip_submissions: the POST caller already sent solved_ids + mastery, so the
+    submission fetch (the expensive part — up to 1000 CF rows / 50 LC rows) is
+    redundant. Problemset + rating still load; the route passes the overrides in.
 
     Returns (all_problems, normalized_subs, solved_ids, user_rating, errors).
     """
@@ -96,6 +101,11 @@ async def _fetch_platform_data_cached(
     solved_ids: set = set()
     user_rating: int = 1200
     errors: list[str] = []
+    # Invalid handle / bad platform input (a 400), as opposed to an upstream
+    # outage (a 200 with partial_success). Tracked separately because the
+    # "everything failed" test below can no longer use submissions presence
+    # once skip_submissions empties them by construction.
+    validation_errors: list[str] = []
 
     handle_map = handle_map or {}
     cf_handle = handle_map.get("cf") or handle
@@ -104,10 +114,11 @@ async def _fetch_platform_data_cached(
     # Fetch CF data if needed
     if "cf" in platform_list:
         try:
-            raw_subs = await cf_client.get_submissions(cf_handle, count=1000)
-            cf_subs = [n for n in (_normalizer.normalize_cf_submission(s) for s in raw_subs) if n]
-            normalized_subs.extend(cf_subs)
-            solved_ids.update(s["problem_id"] for s in cf_subs if s.get("verdict") == "OK")
+            if not skip_submissions:
+                raw_subs = await cf_client.get_submissions(cf_handle, count=1000)
+                cf_subs = [n for n in (_normalizer.normalize_cf_submission(s) for s in raw_subs) if n]
+                normalized_subs.extend(cf_subs)
+                solved_ids.update(s["problem_id"] for s in cf_subs if s.get("verdict") == "OK")
 
             info = await cf_client.get_user_info(cf_handle)
             user_rating = info.get("rating", 1200)
@@ -116,6 +127,7 @@ async def _fetch_platform_data_cached(
             all_problems.extend(cf_problems)
         except ValueError as e:
             errors.append(f"CF validation: {e}")
+            validation_errors.append(f"CF validation: {e}")
         except RuntimeError as e:
             errors.append(f"CF API: {e}")
 
@@ -123,9 +135,10 @@ async def _fetch_platform_data_cached(
     if "lc" in platform_list:
         try:
             lc_client = LeetCodeClient()
-            lc_subs = await lc_client.get_user_submissions(lc_handle, limit=50)
-            normalized_subs.extend(lc_subs)
-            solved_ids.update(s["problem_id"] for s in lc_subs if s.get("verdict") == "OK")
+            if not skip_submissions:
+                lc_subs = await lc_client.get_user_submissions(lc_handle, limit=50)
+                normalized_subs.extend(lc_subs)
+                solved_ids.update(s["problem_id"] for s in lc_subs if s.get("verdict") == "OK")
 
             ranking = await lc_client.get_contest_ranking(lc_handle)
             if ranking and ranking.get("rating"):
@@ -141,12 +154,14 @@ async def _fetch_platform_data_cached(
                 errors.append(f"LC problemset: {e}")
         except ValueError as e:
             errors.append(f"LC validation: {e}")
+            validation_errors.append(f"LC validation: {e}")
         except RuntimeError as e:
             errors.append(f"LC API: {e}")
 
-    # If ALL platforms failed with validation errors, propagate as 400
-    if errors and not normalized_subs and not all_problems:
-        raise ValueError(errors[0])
+    # An invalid handle is a 400 even when the caller supplied overrides — but
+    # an upstream outage is not, as long as some data still came back.
+    if validation_errors and not all_problems and (skip_submissions or not normalized_subs):
+        raise ValueError(validation_errors[0])
 
     return all_problems, normalized_subs, solved_ids, user_rating, errors
 
@@ -288,8 +303,15 @@ async def recommend_post(
         if v is not None:
             handle_map[k] = v
     try:
+        # The client already sent solved_ids + mastery (it just ran /api/analyze),
+        # so refetching submissions here would double CF/LC traffic and add a
+        # second full pause before recommendations appear.
+        reuse_client_data = bool(body.solved_ids) and bool(body.mastery_scores)
         all_problems, normalized_subs, fetched_solved_ids, fetched_user_rating, fetch_errors = (
-            await _fetch_platform_data_cached(handle, platform_list, handle_map=handle_map)
+            await _fetch_platform_data_cached(
+                handle, platform_list, handle_map=handle_map,
+                skip_submissions=reuse_client_data,
+            )
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

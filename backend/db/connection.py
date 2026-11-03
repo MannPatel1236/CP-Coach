@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import (
-    Column, Integer, String, Float, BigInteger, ForeignKey, TIMESTAMP, ARRAY, Text,
+    Column, Integer, String, Float, BigInteger, ForeignKey, TIMESTAMP,
     case, delete, func, select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -81,40 +81,6 @@ class User(Base):
     cf_handle = Column(String(50), nullable=True)
     lc_handle = Column(String(50), nullable=True)
     primary_platform = Column(String(5), default="cf")
-    last_synced = Column(TIMESTAMP, nullable=True)
-
-
-class Submission(Base):
-    __tablename__ = "submissions"
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    platform = Column(String(5), nullable=False)
-    problem_id = Column(String(60), nullable=False)
-    verdict = Column(String(20), nullable=True)
-    topics = Column(ARRAY(Text), nullable=True)
-    difficulty = Column(Integer, nullable=True)
-    submitted_at = Column(TIMESTAMP, nullable=True)
-
-
-class Problem(Base):
-    __tablename__ = "problems"
-
-    problem_id = Column(String(60), primary_key=True)
-    platform = Column(String(5), nullable=True)
-    name = Column(Text, nullable=True)
-    difficulty = Column(Integer, nullable=True)
-    topics = Column(ARRAY(Text), nullable=True)
-    solve_count = Column(Integer, nullable=True)
-    url = Column(Text, nullable=True)
-
-
-class TopicGraph(Base):
-    __tablename__ = "topic_graph"
-
-    from_topic = Column(String(50), primary_key=True)
-    to_topic = Column(String(50), primary_key=True)
-    weight = Column(Float, default=1.0)
 
 
 class KTState(Base):
@@ -269,9 +235,3 @@ async def create_tables():
                 head = " ".join(stmt.split())[:120]
                 raise RuntimeError(f"schema.sql statement {i + 1}/{len(statements)} failed: {head} — {e}") from e
         await conn.commit()
-
-
-async def get_db():
-    """FastAPI dependency — yields an AsyncSession."""
-    async with AsyncSessionLocal() as session:
-        yield session

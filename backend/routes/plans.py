@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["plans"])
 
+# Per-handle ceiling on saved plans (see create_plan).
+_MAX_PLANS_PER_HANDLE = 50
+
 
 def _plan_out(p: Plan) -> PlanOut:
     return PlanOut(
@@ -87,6 +90,14 @@ async def create_plan(
             user = await find_user_by_handle(session, handle)
             if not user:
                 user = await get_or_create_user(session, handle)
+            # Body size is capped at 1 MB; the row count is not. With auth off on
+            # the public demo, an unthrottled loop of POSTs fills the free-tier
+            # database and every later write 502s for everyone.
+            existing = (await session.execute(
+                select(Plan.id).where(Plan.user_id == user.id).limit(_MAX_PLANS_PER_HANDLE)
+            )).scalars().all()
+            if len(existing) >= _MAX_PLANS_PER_HANDLE:
+                raise HTTPException(409, detail=f"Plan limit ({_MAX_PLANS_PER_HANDLE}) reached for this handle.")
             plan = Plan(user_id=user.id, name=body.name, payload=body.payload)  # pyright: ignore[reportAttributeAccessIssue]
             session.add(plan)
             await session.commit()

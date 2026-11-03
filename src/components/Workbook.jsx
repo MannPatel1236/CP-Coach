@@ -26,9 +26,13 @@ export default function Workbook() {
     try {
       const data = await getPlans(handle.trim(), controller.signal);
       if (data && data.length > 0) {
-        setPlans(data);
-        setLocalOnly(false);
-        saveLocalPlans(handle, data);
+        // Plans saved while the backend was down exist only in localStorage, so
+        // the server list must not overwrite them — that loses them on reload.
+        const localOnly = (loadLocalPlans(handle) || []).filter((p) => String(p.id).startsWith("local-"));
+        const merged = [...localOnly, ...data];
+        setPlans(merged);
+        setLocalOnly(localOnly.length > 0);
+        saveLocalPlans(handle, merged);
         return;
       }
       const local = loadLocalPlans(handle);

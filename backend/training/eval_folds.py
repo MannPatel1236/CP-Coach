@@ -119,6 +119,12 @@ def main():
                      help="Truncate sequences to this length (0=no truncation, default 0)")
     _ap.add_argument("--folds", type=int, default=5,
                      help="Number of folds to evaluate (must match training fold count, default 5)")
+    _ap.add_argument("--dkt-weights", default="dkt_fold{fold}.pt",
+                     help="DKT weights filename pattern relative to weights/ ({fold} = fold index). "
+                          "Default: dkt_fold{fold}.pt")
+    _ap.add_argument("--gdkt-weights", default="graph_dkt_fold{fold}.pt",
+                     help="Graph-DKT weights filename pattern relative to weights/ ({fold} = fold index). "
+                          "The tracked production ensemble is graph_dkt_10k_fold{fold}.pt")
     try:
         cli_args = _ap.parse_args()
     except SystemExit:
@@ -171,8 +177,8 @@ def main():
         val_dataset = DKTDataset(val_seqs, topic_graph)
         val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=lambda x: x)
 
-        dkt_path = os.path.join(WEIGHTS_DIR, f"dkt_fold{fi}.pt")
-        gdkt_path = os.path.join(WEIGHTS_DIR, f"graph_dkt_fold{fi}.pt")
+        dkt_path = os.path.join(WEIGHTS_DIR, cli_args.dkt_weights.format(fold=fi))
+        gdkt_path = os.path.join(WEIGHTS_DIR, cli_args.gdkt_weights.format(fold=fi))
 
         results: dict[str, object] = {"fold": fi, "val_users": len(val_seqs)}
         dkt_loaded = False
@@ -432,6 +438,21 @@ def main():
         d = np.mean(d_vals) if d_vals else 0
         g = np.mean(g_vals) if g_vals else 0
         print(f"  {t:<25} DKT={d:.4f}  GDKT={g:.4f}  Δ={g-d:+.4f}")
+
+
+    # ---- Fail loudly when nothing loaded ----
+    # Every weight name above is local-only in this repo (only the 10k ensemble
+    # is force-added), so a fresh clone used to print 0.0000 for every fold and
+    # exit 0 — a plausible-looking empty result instead of an error.
+    if not any(r.get("dkt_auc") is not None or r.get("gdkt_auc") is not None for r in all_results):
+        print(
+            f"\nNo fold weights loaded from {WEIGHTS_DIR} "
+            f"(dkt='{cli_args.dkt_weights}', gdkt='{cli_args.gdkt_weights}').\n"
+            "The tables above are EMPTY, not zero-valued results. Point the patterns at\n"
+            "the weights you actually have, e.g. --gdkt-weights graph_dkt_10k_fold{fold}.pt",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

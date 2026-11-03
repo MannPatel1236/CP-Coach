@@ -265,14 +265,21 @@ async def health(request: Request):
 
 
 @app.get("/health/deep", response_model=HealthDeepResponse)
-async def health_deep():
-    """Check downstream API availability (CF + LeetCode)."""
+@limiter.limit("6/minute")
+async def health_deep(request: Request):
+    """Check downstream API availability (CF + LeetCode).
+
+    Rate limited: each call makes two outbound requests, and the limiter on the
+    /api routes does not cover /health — unthrottled this is a free amplifier
+    pointed at CF and LeetCode.
+    """
     import httpx
+    from platforms.codeforces import CF_BASE
     results = {}
     async with httpx.AsyncClient(timeout=5.0) as client:
         # Check Codeforces
         try:
-            r = await client.get("https://codeforces.com/api/user.info?handles=tourist")
+            r = await client.get(f"{CF_BASE}/user.info?handles=tourist")
             results["codeforces"] = "ok" if r.status_code == 200 else f"error_{r.status_code}"
         except Exception:
             results["codeforces"] = "unreachable"
