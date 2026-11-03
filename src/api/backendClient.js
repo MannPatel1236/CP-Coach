@@ -4,8 +4,18 @@ const BASE = import.meta.env.VITE_API_URL || null;
 // answers 502/503 (or drops the socket) for ~30–60s while it boots. The old 1s/2s
 // budget gave up after ~3s, fell through to the client-only rule-based path, and
 // surfaced as the "estimate · not graph-dkt" badge — so the ceiling is patience,
-// not error class. Delays escalate to a ~95s total budget; happy path is unchanged.
-const RETRY_DELAYS_MS = [5000, 15000, 30000, 45000];
+// not error class. Happy path is unchanged (first attempt succeeds, no retries).
+//
+// Reads poll on a short fixed cadence within that same ~95s budget. The previous
+// schedule (5s, 15s, 30s, 45s) was equally patient but far less prompt: it only
+// learned the backend was awake at the next coarse tick, so a boot finishing at
+// t=12s still waited until t=20s, and a boot finishing at t=38s could land in the
+// 45s tail (~95s total). Polling every 2s within the same deadline means the wait
+// is the boot itself plus at most one poll interval. Attempts that arrive while
+// the instance is still booting never reach it (Render answers 502 at the edge),
+// so this adds no backend load once the service is up.
+const READ_RETRY_INTERVAL_MS = 2000;
+const READ_RETRY_BUDGET_MS = 95000;
 // Writes keep the original short budget: they are user-initiated and land after
 // a read already warmed the instance, so a 5xx there is a real failure — waiting
 // ~95s to report it just freezes the UI (and the save-plan contract says so).
@@ -23,7 +33,9 @@ export const warmUpBackend = () => {
   return fetch(`${BASE}/health`).catch(() => {});
 };
 
-async function apiFetch(path, signal, options = {}, attempt = 0) {
+// `deadline` is fixed by the first attempt so retries share one total budget
+// instead of restarting it on each recursion.
+async function apiFetch(path, signal, options = {}, attempt = 0, deadline = null) {
   if (!BASE) throw new Error("VITE_API_URL not set");
   try {
     const res = await fetch(`${BASE}${path}`, { signal, ...options });
@@ -38,14 +50,23 @@ async function apiFetch(path, signal, options = {}, attempt = 0) {
     // Never retry abort signals — the caller explicitly cancelled
     if (err.name === "AbortError") throw err;
     // Retry on network errors and 5xx status codes (cold-start 502/503/504 included)
-    const retryDelays = options.method && options.method !== "GET" ? WRITE_RETRY_DELAYS_MS : RETRY_DELAYS_MS;
-    if (attempt < retryDelays.length) {
-      const isNetworkError = !err.message?.includes("API error");
-      const isServerError = err.message?.match(/API error 5/);
-      if (isNetworkError || isServerError) {
-        await delay(retryDelays[attempt]);
-        return apiFetch(path, signal, options, attempt + 1);
+    const isNetworkError = !err.message?.includes("API error");
+    const isServerError = err.message?.match(/API error 5/);
+    if (!isNetworkError && !isServerError) throw err;
+
+    if (options.method && options.method !== "GET") {
+      if (attempt < WRITE_RETRY_DELAYS_MS.length) {
+        await delay(WRITE_RETRY_DELAYS_MS[attempt]);
+        return apiFetch(path, signal, options, attempt + 1, deadline);
       }
+      throw err;
+    }
+
+    const until = deadline ?? Date.now() + READ_RETRY_BUDGET_MS;
+    const remaining = until - Date.now();
+    if (remaining > 0) {
+      await delay(Math.min(READ_RETRY_INTERVAL_MS, remaining));
+      return apiFetch(path, signal, options, attempt + 1, until);
     }
     throw err;
   }
