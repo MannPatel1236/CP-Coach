@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import ProfileCard from "./ProfileCard.jsx";
+import { rankColor } from "../utils.js";
+
+// jsdom normalises inline colors to rgb(), so compare against the converted hex.
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}
 
 // Pin the avatar display contract: the backend now supplies an avatar URL for both
 // platforms, so the card must render it, request it without a referrer (some image
@@ -47,5 +54,29 @@ describe("ProfileCard avatars", () => {
       <ProfileCard user={{ ...CF_USER, avatar: null }} tagCount={5} weakCount={1} />,
     );
     expect(queryByAltText("tourist avatar")).toBeNull();
+  });
+
+  // CF and LC share one fallback branch: same UserIcon, same 50px circle, coloured
+  // by the card's rank/rating accent (CF = rankColor, LC = its fixed green). CF's
+  // avatar host currently 503s, so this is the path CF users actually see — it must
+  // not look different from LC's.
+  it("falls back to the same rating-coloured icon on both platforms", () => {
+    for (const [user, accent] of [
+      [CF_USER, rankColor(CF_USER.rank)],
+      [LC_USER, "#28a745"],
+    ]) {
+      const { container, getByAltText, unmount } = render(
+        <ProfileCard user={user} tagCount={5} weakCount={1} />,
+      );
+      fireEvent.error(getByAltText(`${user.handle} avatar`));
+
+      const placeholder = container.querySelector("svg")?.parentElement;
+      expect(container.querySelector("img")).toBeNull();
+      expect(placeholder).toBeTruthy();
+      expect(getComputedStyle(placeholder).width).toBe("50px");
+      expect(getComputedStyle(placeholder).borderRadius).toBe("50%");
+      expect(getComputedStyle(placeholder).borderColor).toBe(hexToRgb(accent));
+      unmount();
+    }
   });
 });
