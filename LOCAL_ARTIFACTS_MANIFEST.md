@@ -103,3 +103,11 @@ du -sh backend/weights backend/results backend/data _paper
 ls backend/weights/*.pt | wc -l        # expect 60
 ls backend/results/*.peruser.npz | wc -l   # expect 10
 ```
+
+NOTE (2026-11-04, verified): downloading the dataset from Kaggle returns a
+REPACKAGED zip ("archive.zip") — Kaggle auto-extracts uploaded archives
+(training.csv.zip -> training.csv/, tex-snapshots.tar.gz -> folder/) so the
+download's SHA-256 will NOT match the upload's. Verify by per-file checksums
+instead: all 87 content files confirmed byte-identical 2026-11-04. Kaggle UI's
+"116 files / 12 columns" summary reflects its post-extraction counting, not a
+mismatch.
