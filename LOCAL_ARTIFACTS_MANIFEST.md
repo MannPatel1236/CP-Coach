@@ -79,6 +79,23 @@ Private Kaggle dataset or personal cloud bucket. If no cloud credentials are
 configured locally, a force-added compressed archive under a protected repo path
 is an in-repo fallback, but it bloats git history.
 
+## Offsite backup — DONE 2026-11-04
+
+Uploaded by Mann to a **private Kaggle dataset** (`cp-coach-offsite-backup-2026-11-04`,
+or the closest Kaggle-assigned slug) on 2026-11-04.
+
+- Artifact: `~/Desktop/cpcoach-offsite-backup-2026-11-04.zip` — 74 MB,
+  95 file entries + 8 directory entries
+- SHA-256: `a76e5fc5f61cc2dca466ffb4e1fe9635bf29c2c30997944e2e5e0210567bb3aa`
+- Contents: 60 weight files, 10 `*.peruser.npz` + `ARTIFACTS.md` (checksums,
+  extracted from `exp/defense-evidence`), `training.csv.zip` + `smoke_50.csv` +
+  `training.meta.json`, `_paper/tex/` + `_paper/archive/`, this manifest
+- Kaggle's UI summary reported "116 files / 12 columns" — its own post-extraction
+  counting (dirs + metadata). Local ground truth is the zip above. NOTE: the
+  CSVs in the bundle are 6 columns; the "12 columns" summary line did not map
+  to a shipped file — if you re-verify, download the zip and compare the
+  SHA-256 instead of trusting the UI summary.
+
 ## Verification
 
 ```bash
