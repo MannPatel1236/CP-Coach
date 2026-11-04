@@ -36,6 +36,10 @@ Ten `eval_*_perfolds.peruser.npz` files (152 KB each), inputs to
 `training/paired_stats.py`'s user-level bootstrap. Untracked; per-file checksums
 in `backend/results/ARTIFACTS.md`.
 
+NOTE (2026-11-04): `training/paired_stats.py` and `backend/results/ARTIFACTS.md`
+live on the `exp/defense-evidence` branch only — not merged to main. The npz
+files themselves are on this machine regardless of branch.
+
 ## Paper source
 
 | Path | Size | Notes |
