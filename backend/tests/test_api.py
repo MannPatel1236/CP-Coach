@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock
 
+from data.topic_graph import CPTopicGraph
 from platforms.codeforces import _HANDLE_PATTERN
 
 from fastapi.testclient import TestClient
@@ -120,6 +121,99 @@ class TestAnalyze:
         assert "topic_profile" in data
         assert "mastery_scores" in data
         assert "model_used" in data
+
+    def test_analyze_rule_path_omits_untrained_topics(self):
+        """Zero-corpus topics have no CF evidence → absent keys, not 0.0 fills
+        (0.0 reads as maximally weak and poisons the recommender's weak set)."""
+        r = client.get("/api/analyze/tourist?platform=cf&mode=quick")
+        assert r.status_code == 200
+        mastery = r.json()["mastery_scores"]
+        assert set(CPTopicGraph.UNTRAINED_TOPICS).isdisjoint(mastery)
+        assert "implementation" in mastery  # unseen trained topics still 0.0-filled
+
+
+class _AllTopicsModel:
+    """Stands in for the ensemble: 29-topic output with the untrained four at a
+    flat 0.5 — the garbage the real untrained output units emit."""
+
+    def predict_mastery_full(self, sequence, topic_graph, n_checkpoints=8):
+        mastery = {t: 0.8 for t in topic_graph.TOPICS}
+        mastery.update({t: 0.5 for t in topic_graph.UNTRAINED_TOPICS})
+        history = {t: [{"ts": 1, "p": 0.5}] for t in topic_graph.TOPICS}
+        weekly = {t: [{"week": "2026-W40", "p": 0.5}] for t in topic_graph.TOPICS}
+        return mastery, history, weekly
+
+
+_SEQ = [{"topic": "dp", "solved": 1, "difficulty": 0.4, "timestamp_delta": 0.1, "weight": 1.0}]
+
+
+def _lc_sub(topic, pid):
+    return {"problem_id": pid, "platform": "lc", "verdict": "OK",
+            "topics": [topic], "difficulty": 1500, "timestamp": 1}
+
+
+class TestComputeMasteryUntrained:
+    def test_model_output_for_untrained_topics_is_never_exposed(self):
+        from routes.analyze import _compute_mastery
+
+        mastery, model_used, history, weekly = _compute_mastery(
+            _SEQ, [], preloaded_model=_AllTopicsModel())
+        assert model_used == "graph_dkt"
+        assert history is not None and weekly is not None
+        assert set(CPTopicGraph.UNTRAINED_TOPICS).isdisjoint(mastery)
+        assert set(CPTopicGraph.UNTRAINED_TOPICS).isdisjoint(history)
+        assert set(CPTopicGraph.UNTRAINED_TOPICS).isdisjoint(weekly)
+        assert mastery["dp"] == 0.8  # trained topics keep model values
+
+    def test_untrained_topic_keeps_rule_evidence_when_it_exists(self):
+        from routes.analyze import _compute_mastery
+
+        mastery, model_used, _, _ = _compute_mastery(
+            _SEQ, [_lc_sub("backtracking", "lc-backtracking-1")],
+            preloaded_model=_AllTopicsModel())
+        assert model_used == "graph_dkt"
+        # Real LC evidence → rule solve_rate (1/1), not the model's flat 0.5.
+        assert mastery["backtracking"] == 1.0
+        # No evidence → absent (not 0.0, not the model's 0.5).
+        assert "prefix_sum" not in mastery
+
+
+class TestRecommendUntrained:
+    def test_rule_path_never_recommends_untrained_topics(self):
+        """GET-path mastery build must not 0.0-fill the untrained four — a 0.0
+        fill puts them in the weak set, surfacing LC problems for topics the
+        user never practiced (and dragging their prereqs into FOUNDATION)."""
+        from routes.recommend import _run_recommender
+
+        # Weak on dp only; everything else strong enough to stay out of the
+        # capped weak set.
+        subs = [_lc_sub("dp", f"lc-dp-{i}") for i in range(3)]
+        subs[0]["verdict"] = "WRONG_ANSWER"
+        subs[1]["verdict"] = "WRONG_ANSWER"
+        strong = [t for t in CPTopicGraph.TOPICS
+                  if t not in CPTopicGraph.UNTRAINED_TOPICS and t not in ("dp", "brute_force")]
+        for t in strong:
+            subs.extend(_lc_sub(t, f"lc-{t}-{i}") for i in range(2))
+
+        def problem(pid, topic):
+            return {"problem_id": pid, "platform": "lc", "name": pid, "difficulty": 1100,
+                    "topics": [topic], "solve_count": 500, "url": ""}
+
+        resp = _run_recommender(
+            handle="u", platform_list=["lc"], focus_topics_str=None, top_k=20,
+            all_problems=[problem("lc-dp-p", "dp"),
+                          problem("lc-bt-p", "backtracking"),
+                          problem("lc-prefix-p", "prefix_sum")],
+            normalized_subs=subs, fetched_solved_ids=set(), fetched_user_rating=1200,
+            mastery_scores_override=None, solved_ids_override=None,
+            user_rating_override=None, model_used="rule_based", fetch_errors=[],
+        )
+        recs = resp["recommendations"]
+        assert any(r["problem_id"] == "lc-dp-p" for r in recs)  # real weakness still works
+        untrained = set(CPTopicGraph.UNTRAINED_TOPICS)
+        for r in recs:
+            assert untrained.isdisjoint(r["matched_topics"]), r
+            assert r.get("trigger_weak_tag") not in untrained, r
 
 
 class TestRecommend:

@@ -125,7 +125,8 @@ def _compute_mastery(
     model_used = "rule_based"
     mastery_history = None
     mastery_weekly = None
-    mastery_scores = {t["topic"]: t["solve_rate"] for t in _preprocessor.build_topic_profile(normalized_subs)}
+    rule_scores = {t["topic"]: t["solve_rate"] for t in _preprocessor.build_topic_profile(normalized_subs)}
+    mastery_scores = rule_scores
 
     model = preloaded_model
     if model is None:
@@ -140,13 +141,24 @@ def _compute_mastery(
 
     if model is not None and sequence:
         try:
-            mastery_scores, mastery_history, mastery_weekly = model.predict_mastery_full(sequence, _topic_graph)
+            model_scores, mastery_history, mastery_weekly = model.predict_mastery_full(sequence, _topic_graph)
+            # UNTRAINED_TOPICS have zero corpus rows → their output units emit
+            # ~0.5 regardless of skill (a claim, not evidence). Expose model
+            # values only for trained topics; untrained keys keep rule-based
+            # evidence (real LC submissions) or stay absent.
+            untrained = _topic_graph.UNTRAINED_TOPICS
+            mastery_scores = {t: m for t, m in model_scores.items() if t not in untrained}
+            mastery_scores.update({t: m for t, m in rule_scores.items() if t in untrained})
+            mastery_history = {t: h for t, h in mastery_history.items() if t not in untrained}
+            mastery_weekly = {t: w for t, w in mastery_weekly.items() if t not in untrained}
             model_used = "graph_dkt"
         except Exception as e:
             logger.warning("Graph-DKT prediction failed: %s", e)
 
+    # Fill unseen trained topics with 0.0, but never the untrained four: "no
+    # evidence" must surface as an absent key (UI renders unknown), not 0.0.
     for t in _topic_graph.TOPICS:
-        if t not in mastery_scores:
+        if t not in _topic_graph.UNTRAINED_TOPICS and t not in mastery_scores:
             mastery_scores[t] = 0.0
 
     # Keep only canonical 29 topics — non-canonical CF tags (e.g. "*special")

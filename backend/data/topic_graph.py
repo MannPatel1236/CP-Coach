@@ -19,6 +19,11 @@ class CPTopicGraph:
         "backtracking", "string_algorithms", "matrices",
     ]
 
+    # Zero CF-corpus rows (LC-flavored tags) — their Graph-DKT output units are
+    # untrained and emit ~0.5 regardless of skill. Never expose model output for
+    # these; rule-based evidence is kept where it exists (routes/analyze.py).
+    UNTRAINED_TOPICS = frozenset({"backtracking", "dp_on_trees", "prefix_sum", "sliding_window"})
+
     EDGES = [
         # Root: implementation → foundational topics
         ("implementation", "math"),

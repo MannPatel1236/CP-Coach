@@ -70,6 +70,22 @@ describe("CompareHandles — §5.2 #8", () => {
     expect(queryByTestId("compare-estimate-badge")).toBeNull(); // both graph_dkt
   });
 
+  it("skips topics missing on either side (untrained topics are absent, not 0.0)", async () => {
+    // Backend drops the zero-corpus topics; a diff row must not invent a delta
+    // against a 0.5-ish phantom from an older snapshot.
+    const secondary = { ...SECONDARY, mastery_scores: { ...SECONDARY.mastery_scores } };
+    delete secondary.mastery_scores.dp_on_trees;
+    delete secondary.mastery_scores.backtracking;
+    globalThis.fetch.mockResolvedValue(okResponse(secondary));
+    const { container, getByTestId } = renderInContext(<CompareHandles />);
+    await typeAndCompare(getByTestId, "tourist");
+    await waitFor(() => {
+      expect(container.querySelectorAll("[data-testid='compare-delta']").length).toBeGreaterThan(0);
+    });
+    expect(container.querySelector("[data-topic='dp_on_trees']")).toBeNull();
+    expect(container.querySelector("[data-topic='backtracking']")).toBeNull();
+  });
+
   it("self-compare renders an explicit same-handle message, not a misleading no-overlap panel", async () => {
     // Comparing the primary against itself: identical mastery would previously
     // fall into the deltas.length===0 branch ("No shared mastery data to diff —

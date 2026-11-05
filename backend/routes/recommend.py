@@ -201,7 +201,8 @@ def _run_recommender(
         topic_profile = _preprocessor.build_topic_profile(normalized_subs)
         mastery_scores = {t["topic"]: t["solve_rate"] for t in topic_profile}
         for t in _topic_graph.TOPICS:
-            if t not in mastery_scores:
+            # Untrained topics stay absent — a 0.0 fill reads as maximally weak.
+            if t not in _topic_graph.UNTRAINED_TOPICS and t not in mastery_scores:
                 mastery_scores[t] = 0.0
 
     focus = [t.strip() for t in focus_topics_str.split(",") if t.strip()] if focus_topics_str else None

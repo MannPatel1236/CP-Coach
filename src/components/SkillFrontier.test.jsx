@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import SkillFrontier from "./SkillFrontier.jsx";
-import { renderInContext } from "../__fixtures__/analysisContext.jsx";
+import { baseContext, renderInContext } from "../__fixtures__/analysisContext.jsx";
 
 // jsdom does not implement fetch, so /api/graph rejects → SkillFrontier renders
 // FALLBACK_GRAPH (§8 fallback). Mocking at file scope keeps every test deterministic
@@ -27,6 +27,21 @@ describe("SkillFrontier — render", () => {
     const impl = container.querySelector('g[aria-label^="implementation mastery"]');
     expect(impl.getAttribute("data-weak")).toBe("false");
     expect(container.querySelectorAll("svg g[role='button']").length).toBe(29);
+  });
+
+  it("renders topics missing from mastery as 'mastery unknown' — never weak", async () => {
+    // Untrained topics (zero training data) are absent from the analyze payload;
+    // a missing key must not read as 0.0/weak (backend drops them intentionally).
+    const mastery = { ...baseContext.masteryScoresRef.current };
+    for (const t of ["backtracking", "dp_on_trees", "prefix_sum", "sliding_window"]) delete mastery[t];
+    const { container } = renderInContext(<SkillFrontier />, {
+      masteryScoresRef: { current: mastery },
+    });
+    await nodesMounted(container);
+    const node = container.querySelector('g[aria-label^="prefix sum mastery"]');
+    expect(node.getAttribute("data-mastery")).toBe("");
+    expect(node.getAttribute("data-weak")).toBe("false");
+    expect(node.getAttribute("aria-label")).toMatch(/unknown/i);
   });
 
   it("reveals the prerequisite chain on node click; second click deselects", async () => {

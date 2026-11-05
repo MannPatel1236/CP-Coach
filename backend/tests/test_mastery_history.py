@@ -113,6 +113,48 @@ class TestMasteryHistoryRoute:
         assert data["mastery_history"] is None
         assert data["note"] == "No mastery history yet — run a deep analyze while Graph-DKT is loaded."
 
+    def test_read_filters_pre_fix_phantom_topic_rows(self, monkeypatch):
+        """Snapshots persisted before the untrained-topic fix carry garbage
+        ~0.5 checkpoint series for the zero-corpus topics — the read side must
+        skip them so history matches what a fresh analyze now returns (25)."""
+        import routes.mastery_history as mh
+
+        class _Row:
+            def __init__(self, topic, idx, p):
+                self.topic, self.checkpoint_idx, self.ts, self.p_mastery = topic, idx, 1, p
+
+        class _Scalars:
+            def all(self):
+                return [
+                    _Row("implementation", 0, 0.9),
+                    _Row("prefix_sum", 0, 0.5),
+                    _Row("dp_on_trees", 0, 0.52),
+                ]
+
+        class _Result:
+            def scalars(self):
+                return _Scalars()
+
+        class _Session:
+            async def execute(self, *a, **k):
+                return _Result()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+        async def fake_find_user(session, handle, platform):
+            return type("_User", (), {"id": 1})()
+
+        monkeypatch.setattr(mh, "AsyncSessionLocal", lambda: _Session())
+        monkeypatch.setattr(mh, "find_user_by_handle", fake_find_user)
+
+        import asyncio
+        history = asyncio.run(mh._read_mastery_history("tourist", "cf"))
+        assert history == {"implementation": [{"ts": 1, "p": 0.9}]}
+
     def test_analyze_inlines_history_when_graph_dkt_model_runs(self, monkeypatch):
         # Need a CF submission so the sequence is non-empty (model only runs then)
         async def one_sub(handle, **kwargs):
@@ -160,7 +202,12 @@ class TestMasteryHistoryRoute:
             assert data["model_used"] == "graph_dkt"
             assert fake.n_calls == 1, "mastery + checkpoints must share ONE forward pass"
             assert data["mastery_history"] is not None
-            assert len(data["mastery_history"]) == 29
+            # 29 − the 4 zero-corpus topics: their model output is untrained
+            # garbage, so no checkpoint series is exposed for them.
+            assert len(data["mastery_history"]) == 25
+            assert set(data["mastery_history"]) == (
+                set(CPTopicGraph.TOPICS) - set(CPTopicGraph.UNTRAINED_TOPICS)
+            )
             assert len(data["mastery_history"]["implementation"]) == 8
             assert data["mastery_weekly"] is not None
             assert data["mastery_weekly"]["implementation"][0] == {"week": "2026-W40", "p": 0.5}

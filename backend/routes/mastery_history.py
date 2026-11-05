@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 
 from auth import verify_hmac, verify_handle_signature
+from data.topic_graph import CPTopicGraph
 from rate_limiter import limiter
 from db.connection import (
     AsyncSessionLocal, MasteryHistory, find_user_by_handle,
@@ -36,6 +37,9 @@ async def _read_mastery_history(handle: str, platform: str) -> dict | None:
             return None
         history = {}
         for r in sorted(rows, key=lambda r: (r.topic, r.checkpoint_idx)):
+            # Pre-fix snapshots carry garbage ~0.5 series for untrained topics.
+            if r.topic in CPTopicGraph.UNTRAINED_TOPICS:
+                continue
             history.setdefault(r.topic, []).append({"ts": r.ts or 0, "p": r.p_mastery})  # pyright: ignore[reportGeneralTypeIssues]
         return history
 
