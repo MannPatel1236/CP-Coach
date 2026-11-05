@@ -8,7 +8,9 @@
 #   BASE_URL=http://localhost:8000                     bash backend/scripts/smoke_test.sh
 #
 # Requires: curl, jq
-# Exits non-zero on the first failed assertion.
+# Runs every assertion and tallies pass/fail; exits non-zero if any failed.
+# Per-call curl timeout is ${CURL_TIMEOUT:-30}s — Render free-tier cold starts
+# (first hit after ~15min idle) can take 30-60s+, so use CURL_TIMEOUT=120 there.
 
 set -euo pipefail
 
@@ -45,7 +47,7 @@ assert_get() {
   local desc="$3"
   local body
   local status
-  body=$(curl -sS -w "\n%{http_code}" --max-time 30 "$BASE_URL$path") || {
+  body=$(curl -sS -w "\n%{http_code}" --max-time "${CURL_TIMEOUT:-30}" "$BASE_URL$path") || {
     log_fail "$desc — curl failed"
     return
   }
@@ -69,7 +71,7 @@ assert_post() {
   local desc="$4"
   local body
   local status
-  body=$(curl -sS -w "\n%{http_code}" --max-time 30 \
+  body=$(curl -sS -w "\n%{http_code}" --max-time "${CURL_TIMEOUT:-30}" \
     -X POST "$BASE_URL$path" \
     -H "Content-Type: application/json" \
     -d "$payload") || {
@@ -91,13 +93,13 @@ assert_post() {
 
 # ── 1. /health ───────────────────────────────────────────────────────────────
 assert_get "/health" \
-  '.status == "ok" and .version == "2.0" and .platforms | index("cf") and index("lc")' \
+  '.status == "ok" and .version == "2.0" and (.platforms | contains(["cf", "lc"]))' \
   "GET /health returns ok + cf + lc"
 
 # ── 2. /health/deep ──────────────────────────────────────────────────────────
 # Probes live CF + LeetCode. If CF is rate-limiting or down, this is "degraded"
 # — we warn but don't fail. The /health endpoint is the strict check.
-if deep=$(curl -sS --max-time 30 "$BASE_URL/health/deep"); then
+if deep=$(curl -sS --max-time "${CURL_TIMEOUT:-30}" "$BASE_URL/health/deep"); then
   cf_status=$(printf '%s' "$deep" | jq -r '.downstream.codeforces // "unknown"')
   if [[ "$cf_status" == "ok" ]]; then
     log_pass "GET /health/deep — codeforces ok"
@@ -109,13 +111,13 @@ else
 fi
 
 # ── 3. GET /api/analyze/{handle} ─────────────────────────────────────────────
-# Real call to the live CF API; this can take 5-15s on first hit. The
-# assertion is intentionally lenient on the topic_profile shape — any non-empty
-# profile with a 'math' or 'implementation' topic counts as success (handles
-# vary wildly in topic mix).
+# Real call to the live CF API; on Render free tier this can take 30-60s+ on a
+# cold start (CURL_TIMEOUT=120 recommended). Mastery is the 25-key contract:
+# the 4 zero-corpus topics (backtracking, dp_on_trees, prefix_sum,
+# sliding_window) are never exposed for CF users — absent, not 0.0.
 assert_get "/api/analyze/${HANDLE}?platform=cf&mode=quick" \
-  ".handle == \"${HANDLE}\" and .platform == \"cf\" and (.topic_profile | length) > 0 and (.mastery_scores | length) > 0 and (.model_used | IN(\"rule_based\", \"graph_dkt\"))" \
-  "GET /api/analyze/${HANDLE} — valid shape, non-empty topic_profile + mastery_scores"
+  ".handle == \"${HANDLE}\" and .platform == \"cf\" and (.topic_profile | length) > 0 and (.mastery_scores | length) == 25 and (.mastery_scores | (has(\"backtracking\") or has(\"dp_on_trees\") or has(\"prefix_sum\") or has(\"sliding_window\")) | not) and (.model_used | IN(\"rule_based\", \"graph_dkt\"))" \
+  "GET /api/analyze/${HANDLE} — valid shape, 25-key mastery (no untrained topics)"
 
 # ── 4. POST /api/recommend/{handle} ──────────────────────────────────────────
 assert_post "/api/recommend/${HANDLE}" \
@@ -124,10 +126,10 @@ assert_post "/api/recommend/${HANDLE}" \
   "POST /api/recommend/${HANDLE} — non-empty recommendations"
 
 # ── 5. GET /api/graph ────────────────────────────────────────────────────────
-# The CP prerequisite graph is 22 nodes, 18 edges (per CLAUDE.md).
+# The CP prerequisite graph is 29 nodes, 39 directed edges (per CLAUDE.md).
 assert_get "/api/graph" \
-  '(.nodes | length) == 22 and (.edges | length) == 18' \
-  "GET /api/graph — 22 nodes, 18 edges"
+  '(.nodes | length) == 29 and (.edges | length) == 39' \
+  "GET /api/graph — 29 nodes, 39 edges"
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
