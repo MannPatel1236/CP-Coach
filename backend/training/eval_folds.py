@@ -193,11 +193,13 @@ def main():
             dkt_metrics = evaluate_model(dkt_model, val_loader, topic_graph, device)
             results["dkt_auc"] = dkt_metrics["auc"]
             dkt_loaded = True
+            results["dkt_auc_new"] = dkt_metrics["auc_new"]
             results["dkt_accuracy"] = dkt_metrics["accuracy"]
             results["dkt_per_topic_auc"] = dkt_metrics["per_topic_auc"]
             results["dkt_precision_at_k"] = dkt_metrics["precision_at_k"]
             results["dkt_ndcg_at_k"] = dkt_metrics["ndcg_at_k"]
-            logger.info("  DKT: AUC=%.4f, Acc=%.4f", dkt_metrics["auc"], dkt_metrics["accuracy"])
+            logger.info("  DKT: AUC=%.4f (new-sub=%.4f), Acc=%.4f",
+                        dkt_metrics["auc"], dkt_metrics["auc_new"], dkt_metrics["accuracy"])
         else:
             logger.warning("  DKT weights not found: %s", dkt_path)
 
@@ -216,11 +218,13 @@ def main():
             gdkt_model.to(device)
             gdkt_metrics = evaluate_model(gdkt_model, val_loader, topic_graph, device)
             results["gdkt_auc"] = gdkt_metrics["auc"]
+            results["gdkt_auc_new"] = gdkt_metrics["auc_new"]
             results["gdkt_accuracy"] = gdkt_metrics["accuracy"]
             results["gdkt_per_topic_auc"] = gdkt_metrics["per_topic_auc"]
             results["gdkt_precision_at_k"] = gdkt_metrics["precision_at_k"]
             results["gdkt_ndcg_at_k"] = gdkt_metrics["ndcg_at_k"]
-            logger.info("  Graph-DKT: AUC=%.4f, Acc=%.4f", gdkt_metrics["auc"], gdkt_metrics["accuracy"])
+            logger.info("  Graph-DKT: AUC=%.4f (new-sub=%.4f), Acc=%.4f",
+                        gdkt_metrics["auc"], gdkt_metrics["auc_new"], gdkt_metrics["accuracy"])
 
             # --- Segment-by-length: evaluate each activity group ---
             if cli_args.segment_by_length and dkt_loaded:
@@ -260,22 +264,31 @@ def main():
     print("\n" + "=" * 70)
     print(f"AGGREGATE COMPARISON — Folds {fold_indices}")
     print("=" * 70)
-    print(f"{'Fold':>5} {'DKT AUC':>10} {'GDKT AUC':>10} {'Delta':>10}")
-    print("-" * 70)
+    print(f"{'Fold':>5} {'DKT AUC':>10} {'GDKT AUC':>10} {'Delta':>10} {'DKT New':>10} {'GDKT New':>10} {'ΔNew':>8}")
+    print("-" * 78)
     dkt_aucs = []
     gdkt_aucs = []
+    dkt_news = []
+    gdkt_news = []
     for r in all_results:
         d = r.get("dkt_auc", 0)
         g = r.get("gdkt_auc", 0)
+        dn = r.get("dkt_auc_new", 0)
+        gn = r.get("gdkt_auc_new", 0)
         dkt_aucs.append(d)
         gdkt_aucs.append(g)
-        print(f"{r['fold']:>5d} {d:>10.4f} {g:>10.4f} {g - d:>+10.4f}")
+        dkt_news.append(dn)
+        gdkt_news.append(gn)
+        print(f"{r['fold']:>5d} {d:>10.4f} {g:>10.4f} {g - d:>+10.4f} {dn:>10.4f} {gn:>10.4f} {gn - dn:>+8.4f}")
     if dkt_aucs and gdkt_aucs:
-        print("-" * 70)
+        print("-" * 78)
         d_mean, d_std = np.mean(dkt_aucs), np.std(dkt_aucs, ddof=1)
         g_mean, g_std = np.mean(gdkt_aucs), np.std(gdkt_aucs, ddof=1)
-        print(f"{'Mean ± Std':>5} {d_mean:>10.4f}±{d_std:.4f} {g_mean:>10.4f}±{g_std:.4f} {g_mean - d_mean:>+10.4f}")
-    print("=" * 70)
+        dn_mean, dn_std = np.mean(dkt_news), np.std(dkt_news, ddof=1)
+        gn_mean, gn_std = np.mean(gdkt_news), np.std(gdkt_news, ddof=1)
+        print(f"{'Mean ± Std':>5} {d_mean:>10.4f}±{d_std:.4f} {g_mean:>10.4f}±{g_std:.4f} {g_mean - d_mean:>+10.4f} "
+              f"{dn_mean:>10.4f}±{dn_std:.4f} {gn_mean:>10.4f}±{gn_std:.4f} {gn_mean - dn_mean:>+8.4f}")
+    print("=" * 78)
 
     # ---- Segment-by-length aggregate ----
     if cli_args.segment_by_length:
