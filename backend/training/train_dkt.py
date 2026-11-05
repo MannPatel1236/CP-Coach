@@ -201,8 +201,8 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
     patience = 5
     import time as _time
 
-    print(f"\n{'Epoch':>5} {'Train Loss':>12} {'Val Loss':>10} {'Val AUC':>10} {'Time':>8}", flush=True)
-    print("-" * 48, flush=True)
+    print(f"\n{'Epoch':>5} {'Train Loss':>12} {'Val Loss':>10} {'Val AUC':>10} {'Val NewAUC':>11} {'Time':>8}", flush=True)
+    print("-" * 60, flush=True)
 
     for epoch in range(1, args.epochs + 1):
         t0 = _time.time()
@@ -210,14 +210,18 @@ def train_one_fold(args, train_seqs, val_seqs, topic_graph, device, fold_idx=Non
         val_metrics = evaluate_model(model, val_loader, topic_graph, device)
         elapsed = _time.time() - t0
 
-        print(f"{epoch:>5d} {train_loss:>12.4f} {val_metrics['loss']:>10.4f} {val_metrics['auc']:>10.4f} {elapsed:>7.0f}s", flush=True)
+        print(f"{epoch:>5d} {train_loss:>12.4f} {val_metrics['loss']:>10.4f} {val_metrics['auc']:>10.4f} {val_metrics['auc_new']:>11.4f} {elapsed:>7.0f}s", flush=True)
 
         # Tolerance: ignore AUC improvements smaller than 1e-4 (display precision).
         # Without this, patience never increments once val AUC plateaus near 1.0,
         # because the LSTM keeps producing microscopic improvements
         # (1.00000001 > 1.00000000) and the model trains all 50 epochs.
-        if val_metrics["auc"] - best_auc > 1e-4:
-            best_auc = val_metrics["auc"]
+        # Select on new-submission AUC: the pooled AUC is ~69% same-submission
+        # copy pairs, so it ranks checkpoints mostly by copy skill. Fall back to
+        # pooled only when a val split has no new pairs (toy data → auc_new=0).
+        selection_auc = val_metrics["auc_new"] if val_metrics["auc_new"] > 0 else val_metrics["auc"]
+        if selection_auc - best_auc > 1e-4:
+            best_auc = selection_auc
             patience_counter = 0
             # Save best
             if args.model == "graph_dkt":
@@ -258,6 +262,14 @@ def train_epoch(model, dataloader, optimizer, criterion, topic_graph, device):
         target = solved[:, 1:]  # (B, T-1)
         target_weights = weights[:, 1:]  # (B, T-1)
         target_mask = mask[:, 1:]  # (B, T-1)
+
+        # Same-submission rows (one row per tag) share `solved`; their
+        # recency weight is identical within a user, so equal weight at t and
+        # t+1 means "same submission" and the target is an input the model has
+        # already seen. Drop those pairs from the loss: supervise only real
+        # next-submission predictions (same filter as the NEW-submission eval).
+        new_sub = (weights[:, 1:] != weights[:, :-1]).float()  # (B, T-1)
+        target_mask = target_mask * new_sub.bool()
 
         loss_raw = criterion(pred_for_target, target)
         loss_masked = (loss_raw * target_weights * target_mask.float()).sum() / (target_weights * target_mask.float()).sum().clamp(min=1)

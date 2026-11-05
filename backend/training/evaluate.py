@@ -126,7 +126,8 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
 
     Returns:
         dict with keys:
-            auc              — macro ROC-AUC
+            auc              — macro ROC-AUC (pooled; ~69% same-submission copy pairs)
+            auc_new          — ROC-AUC on new-submission pairs only (honest metric)
             accuracy         — binary accuracy (threshold 0.5)
             per_topic_auc    — dict {topic_name: AUC}
             loss             — mean BCELoss
@@ -139,6 +140,8 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
 
     all_preds = []
     all_labels = []
+    new_preds = []   # subset of all_preds on new-submission (t→t+1) pairs
+    new_labels = []
     per_topic_preds = defaultdict(list)
     per_topic_labels = defaultdict(list)
 
@@ -159,6 +162,7 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
             topic_ids = batch["topic_ids"].cpu()  # (B, T)
             solved = batch["solved"].squeeze(-1).cpu()  # (B, T)
             batch_mask = batch["mask"].cpu()  # (B, T)
+            weights = batch["weight"].squeeze(-1).cpu()  # (B, T)
 
             # Standard DKT alignment: predictions[t] forecasts the outcome for
             # the topic practiced at timestep t+1 (c_{t+1}), not the topic just
@@ -183,6 +187,15 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
             all_preds.extend(pred_list)
             all_labels.extend(label_list)
 
+            # ~69% of pairs are two tag-rows of one submission (weight[t] ==
+            # weight[t+1]) where the target is an input just seen — the model
+            # scores those ~perfect. Track the honest new-submission subset so
+            # training can select checkpoints on it instead of the pooled AUC.
+            new_sub = (weights[:, 1:] != weights[:, :-1]).float()  # (B, T-1)
+            new_mask = valid_mask & new_sub.bool()
+            new_preds.extend(pred_target[new_mask].tolist())
+            new_labels.extend(solved_target[new_mask].tolist())
+
             for pred, label, tid in zip(pred_list, label_list, tid_list):
                 topic_name = topic_graph.idx_to_topic[tid]
                 per_topic_preds[topic_name].append(pred)
@@ -199,6 +212,7 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
     # Compute metrics
     result = {
         "auc": 0.0,
+        "auc_new": 0.0,
         "accuracy": 0.0,
         "per_topic_auc": {},
         "loss": 0.0,
@@ -214,6 +228,9 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
 
     if len(set(all_labels)) > 1:
         result["auc"] = roc_auc_score(all_labels, all_preds)
+
+    if len(set(new_labels)) > 1:
+        result["auc_new"] = roc_auc_score(new_labels, new_preds)
 
     if all_labels:
         binary_preds = [1 if p >= 0.5 else 0 for p in all_preds]
