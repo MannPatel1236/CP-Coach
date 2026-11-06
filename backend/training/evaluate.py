@@ -44,7 +44,7 @@ def get_target_prediction(predictions, topic_ids):
     return predictions[:, :-1, :].gather(2, topic_ids[:, 1:].unsqueeze(-1)).squeeze(-1)
 
 
-def _compute_ranking_metrics(predictions, topic_ids, mask, K_list=None):
+def _compute_ranking_metrics(predictions, topic_ids, mask, K_list=None, extra_pair_mask=None):
     """Vectorized Precision@K and NDCG@K — no Python loops over B×T timesteps.
 
     Alignment: ranks all 29 topics by predictions[t], then checks the rank of
@@ -62,6 +62,8 @@ def _compute_ranking_metrics(predictions, topic_ids, mask, K_list=None):
         topic_ids: (B, T) — ground-truth topic at each timestep.
         mask: (B, T) — boolean, valid positions.
         K_list: list of K values for ranking metrics (default RANKING_K_VALUES).
+        extra_pair_mask: optional (B, T-1) boolean tensor ANDed into the pair
+            mask — e.g. new-submission pairs only (weight[t] != weight[t+1]).
 
     Returns:
         dict with "precision_at_k" and "ndcg_at_k", each a dict of {K: value}.
@@ -84,6 +86,8 @@ def _compute_ranking_metrics(predictions, topic_ids, mask, K_list=None):
     source_sorted = sorted_indices[:, :-1, :]  # (B, T-1, num_topics)
     next_topics = topic_ids[:, 1:]  # (B, T-1)
     valid_mask = mask[:, 1:]  # (B, T-1)
+    if extra_pair_mask is not None:
+        valid_mask = valid_mask & extra_pair_mask.bool()
 
     # Broadcast comparison: for each (b, t-1), at what position (rank) does
     # next_topics[b, t] appear in the sorted prediction at t-1?
@@ -133,6 +137,9 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
             loss             — mean BCELoss
             precision_at_k   — dict {K: hit-rate} for K in [1, 3, 5, 10]
             ndcg_at_k        — dict {K: NDCG} for K in [1, 3, 5, 10]
+            precision_at_k_new / ndcg_at_k_new — same, on new-submission
+                pairs only (the honest subset; ~69% of pooled pairs are
+                same-submission tag-rows whose target is an input just seen)
     """
     model.eval()
     model.to(device)
@@ -149,6 +156,9 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
     _rank_sum = {k: 0.0 for k in RANKING_K_VALUES}
     _ndcg_sum = {k: 0.0 for k in RANKING_K_VALUES}
     _rank_total = 0
+    _rank_sum_new = {k: 0.0 for k in RANKING_K_VALUES}
+    _ndcg_sum_new = {k: 0.0 for k in RANKING_K_VALUES}
+    _rank_total_new = 0
 
     with torch.no_grad():
         for batch_seqs in dataloader:
@@ -209,6 +219,17 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
                 _ndcg_sum[k] += batch_rank["ndcg_at_k"][k] * n_valid
             _rank_total += n_valid
 
+            # Honest ranking subset — same pair set as auc_new: only pairs
+            # whose target is a genuinely new submission.
+            batch_rank_new = _compute_ranking_metrics(
+                predictions, topic_ids, batch_mask, extra_pair_mask=new_sub
+            )
+            n_valid_new = new_mask.sum().item()
+            for k in RANKING_K_VALUES:
+                _rank_sum_new[k] += batch_rank_new["precision_at_k"][k] * n_valid_new
+                _ndcg_sum_new[k] += batch_rank_new["ndcg_at_k"][k] * n_valid_new
+            _rank_total_new += n_valid_new
+
     # Compute metrics
     result = {
         "auc": 0.0,
@@ -218,6 +239,8 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
         "loss": 0.0,
         "precision_at_k": {k: 0.0 for k in RANKING_K_VALUES},
         "ndcg_at_k": {k: 0.0 for k in RANKING_K_VALUES},
+        "precision_at_k_new": {k: 0.0 for k in RANKING_K_VALUES},
+        "ndcg_at_k_new": {k: 0.0 for k in RANKING_K_VALUES},
     }
 
     # Vectorized loss computation to avoid per-iteration torch.tensor() overhead
@@ -247,11 +270,14 @@ def evaluate_model(model, dataloader, topic_graph, device="cpu"):
     if _rank_total > 0:
         result["precision_at_k"] = {k: _rank_sum[k] / _rank_total for k in RANKING_K_VALUES}
         result["ndcg_at_k"] = {k: _ndcg_sum[k] / _rank_total for k in RANKING_K_VALUES}
+    if _rank_total_new > 0:
+        result["precision_at_k_new"] = {k: _rank_sum_new[k] / _rank_total_new for k in RANKING_K_VALUES}
+        result["ndcg_at_k_new"] = {k: _ndcg_sum_new[k] / _rank_total_new for k in RANKING_K_VALUES}
 
     return result
 
 
-def compute_rule_baseline_pk(sequences, topic_graph, K_list=None):
+def compute_rule_baseline_pk(sequences, topic_graph, K_list=None, new_sub_only=False):
     """Compute P@K/NDCG@K for a frequency-based rule baseline.
 
     At each timestep t, ranks all topics by their cumulative frequency in the
@@ -268,6 +294,9 @@ def compute_rule_baseline_pk(sequences, topic_graph, K_list=None):
         sequences: list of per-user sequences (same format as DKTDataset input).
         topic_graph: CPTopicGraph instance.
         K_list: list of K values (default RANKING_K_VALUES).
+        new_sub_only: if True, count only pairs whose rows carry different
+            'weight' (a genuinely new submission) — the same pair set
+            evaluate_model uses for auc_new / *_at_k_new.
 
     Returns:
         dict with 'precision_at_k' and 'ndcg_at_k', each a dict of {K: value}.
@@ -301,6 +330,11 @@ def compute_rule_baseline_pk(sequences, topic_graph, K_list=None):
             next_topic = seq[t + 1]["topic"]
             next_idx = topic_to_idx.get(next_topic)
             if next_idx is None:
+                continue
+
+            if new_sub_only and seq[t].get("weight") == seq[t + 1].get("weight"):
+                # Two tag-rows of one submission — excluded so the rule row is
+                # comparable to the models' new-submission P@K.
                 continue
 
             # Rank topics by frequency (desc), tie-break by topic index (asc).

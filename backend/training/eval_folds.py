@@ -198,8 +198,11 @@ def main():
             results["dkt_per_topic_auc"] = dkt_metrics["per_topic_auc"]
             results["dkt_precision_at_k"] = dkt_metrics["precision_at_k"]
             results["dkt_ndcg_at_k"] = dkt_metrics["ndcg_at_k"]
-            logger.info("  DKT: AUC=%.4f (new-sub=%.4f), Acc=%.4f",
-                        dkt_metrics["auc"], dkt_metrics["auc_new"], dkt_metrics["accuracy"])
+            results["dkt_precision_at_k_new"] = dkt_metrics["precision_at_k_new"]
+            results["dkt_ndcg_at_k_new"] = dkt_metrics["ndcg_at_k_new"]
+            logger.info("  DKT: AUC=%.4f (new-sub=%.4f), Acc=%.4f, P@5new=%.4f",
+                        dkt_metrics["auc"], dkt_metrics["auc_new"], dkt_metrics["accuracy"],
+                        dkt_metrics["precision_at_k_new"][5])
         else:
             logger.warning("  DKT weights not found: %s", dkt_path)
 
@@ -223,8 +226,11 @@ def main():
             results["gdkt_per_topic_auc"] = gdkt_metrics["per_topic_auc"]
             results["gdkt_precision_at_k"] = gdkt_metrics["precision_at_k"]
             results["gdkt_ndcg_at_k"] = gdkt_metrics["ndcg_at_k"]
-            logger.info("  Graph-DKT: AUC=%.4f (new-sub=%.4f), Acc=%.4f",
-                        gdkt_metrics["auc"], gdkt_metrics["auc_new"], gdkt_metrics["accuracy"])
+            results["gdkt_precision_at_k_new"] = gdkt_metrics["precision_at_k_new"]
+            results["gdkt_ndcg_at_k_new"] = gdkt_metrics["ndcg_at_k_new"]
+            logger.info("  Graph-DKT: AUC=%.4f (new-sub=%.4f), Acc=%.4f, P@5new=%.4f",
+                        gdkt_metrics["auc"], gdkt_metrics["auc_new"], gdkt_metrics["accuracy"],
+                        gdkt_metrics["precision_at_k_new"][5])
 
             # --- Segment-by-length: evaluate each activity group ---
             if cli_args.segment_by_length and dkt_loaded:
@@ -247,6 +253,9 @@ def main():
                 rule_metrics = compute_rule_baseline_pk(val_seqs, topic_graph)
                 results["rule_precision_at_k"] = rule_metrics["precision_at_k"]
                 results["rule_ndcg_at_k"] = rule_metrics["ndcg_at_k"]
+                rule_metrics_new = compute_rule_baseline_pk(val_seqs, topic_graph, new_sub_only=True)
+                results["rule_precision_at_k_new"] = rule_metrics_new["precision_at_k"]
+                results["rule_ndcg_at_k_new"] = rule_metrics_new["ndcg_at_k"]
         else:
             logger.warning("  Graph-DKT weights not found: %s", gdkt_path)
 
@@ -361,6 +370,49 @@ def main():
     for name, dkt_dict, gdkt_dict, rule_dict in [
         ("P@K", dkt_p_at_k, gdkt_p_at_k, rule_p_at_k),
         ("N@K", dkt_n_at_k, gdkt_n_at_k, rule_n_at_k),
+    ]:
+        line = f"{name:<10}"
+        for k in sorted([1, 3, 5, 10]):
+            d_mean = np.mean(dkt_dict[k]) if dkt_dict[k] else 0
+            g_mean = np.mean(gdkt_dict[k]) if gdkt_dict[k] else 0
+            if has_rule_agg:
+                r_mean = np.mean(rule_dict[k]) if rule_dict[k] else 0
+                line += f"  {d_mean:>10.4f}  {g_mean:>10.4f}  {r_mean:>10.4f}  {g_mean - d_mean:>+10.4f}"
+            else:
+                line += f"  {d_mean:>10.4f}  {g_mean:>10.4f}  {g_mean - d_mean:>+10.4f}"
+        print(line)
+    print("=" * sep_w)
+
+    # ---- Ranking metrics on new-submission pairs (honest; no copy leak) ----
+    dkt_p_at_k_new = {k: [] for k in [1, 3, 5, 10]}
+    gdkt_p_at_k_new = {k: [] for k in [1, 3, 5, 10]}
+    dkt_n_at_k_new = {k: [] for k in [1, 3, 5, 10]}
+    gdkt_n_at_k_new = {k: [] for k in [1, 3, 5, 10]}
+    rule_p_at_k_new = {k: [] for k in [1, 3, 5, 10]}
+    rule_n_at_k_new = {k: [] for k in [1, 3, 5, 10]}
+    for r in all_results:
+        dpk = r.get("dkt_precision_at_k_new", {})
+        gpk = r.get("gdkt_precision_at_k_new", {})
+        dnk = r.get("dkt_ndcg_at_k_new", {})
+        gnk = r.get("gdkt_ndcg_at_k_new", {})
+        rpk = r.get("rule_precision_at_k_new", {})
+        rnk = r.get("rule_ndcg_at_k_new", {})
+        for k in [1, 3, 5, 10]:
+            dkt_p_at_k_new[k].append(dpk.get(k, 0))
+            gdkt_p_at_k_new[k].append(gpk.get(k, 0))
+            dkt_n_at_k_new[k].append(dnk.get(k, 0))
+            gdkt_n_at_k_new[k].append(gnk.get(k, 0))
+            rule_p_at_k_new[k].append(rpk.get(k, 0))
+            rule_n_at_k_new[k].append(rnk.get(k, 0))
+
+    print("\n" + "=" * sep_w)
+    print("RANKING METRICS — NEW-SUBMISSION PAIRS ONLY (no same-submission copy leak)")
+    print("=" * sep_w)
+    print(header)
+    print("-" * sep_w)
+    for name, dkt_dict, gdkt_dict, rule_dict in [
+        ("P@K", dkt_p_at_k_new, gdkt_p_at_k_new, rule_p_at_k_new),
+        ("N@K", dkt_n_at_k_new, gdkt_n_at_k_new, rule_n_at_k_new),
     ]:
         line = f"{name:<10}"
         for k in sorted([1, 3, 5, 10]):
