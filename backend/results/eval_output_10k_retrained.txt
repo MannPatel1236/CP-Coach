@@ -1,0 +1,171 @@
+================================================================================
+eval_output_10k_retrained.txt — PRIMARY eval of the leak-fixed 10k retrain
+================================================================================
+Produced:   2026-11-07, Kaggle T4 (final commit of the self-resuming notebook run;
+            folds 0-3 carried via the verified gdkt10k-folds dataset, fold 4 trained
+            in-commit). Transcribed from the Kaggle run log — the viewer triplicates
+            and interleaves lines; deduplicated here, content verbatim.
+Weights:    dkt_10k_fold{0..4}.pt + graph_dkt_10k_fold{0..4}.pt — leak-fixed retrain
+            (same-submission pair loss mask + auc_new checkpoint selection, code
+            46b2208..1e49769). The graph_dkt folds are the deployed prod ensemble.
+Config:     training.eval_folds --segment-by-length --device cpu --max-seq-len 10000
+            --dkt-weights dkt_10k_fold{fold}.pt --gdkt-weights graph_dkt_10k_fold{fold}.pt
+Supersedes: eval_output_10k.txt (leak-era ensemble; retained as the Table 4 directed-
+            row source). Pooled AUC here (~0.72) is NOT a regression vs 0.969 — the
+            old number was inflated by 69% same-submission copy pairs (model AUC 1.000).
+Headline:   honest new-submission AUC — DKT 0.6950±0.0062, Graph-DKT 0.6947±0.0062
+            (leak-era weights scored 0.6867/0.6876 on the same metric: retraining on
+            the honest objective IMPROVES honest AUC by ~+0.008).
+
+--- tail of train_dkt stdout (fold 4 only this commit; folds 0-3 from the dataset) ---
+CV summary (1 folds): 0.7037 ± 0.0000 (mean ± std)
+
+--- eval_folds stdout ---
+2026-11-07 13:10:41,179 Device: cpu
+2026-11-07 13:10:41,180 Loading data from /kaggle/working/CP-Coach/backend/data/training.csv
+2026-11-07 13:14:51,825 Loaded 1341 user sequences
+2026-11-07 13:19:01,434 Activity tertiles (pre-truncation lengths): low ≤ 1065 | mid 1066-3665 | high > 3665
+2026-11-07 13:19:01,436 === Fold 1/5 (val: 269 users) ===
+2026-11-07 13:19:45,686   DKT: AUC=0.7258 (new-sub=0.6931), Acc=0.6593, P@5new=0.1390
+2026-11-07 13:22:03,538   Graph-DKT: AUC=0.7123 (new-sub=0.6924), Acc=0.6509, P@5new=0.1338
+2026-11-07 13:22:09,996   Segment low (n=82): DKT AUC=0.7225, GDKT AUC=0.7086
+2026-11-07 13:22:41,401   Segment mid (n=109): DKT AUC=0.7171, GDKT AUC=0.7022
+2026-11-07 13:23:54,214   Segment high (n=78): DKT AUC=0.7290, GDKT AUC=0.7159
+2026-11-07 13:24:01,450 === Fold 2/5 (val: 268 users) ===
+2026-11-07 13:24:46,863   DKT: AUC=0.7300 (new-sub=0.6893), Acc=0.6623, P@5new=0.1262
+2026-11-07 13:26:43,995   Graph-DKT: AUC=0.7151 (new-sub=0.6903), Acc=0.6545, P@5new=0.1255
+2026-11-07 13:26:50,673   Segment low (n=86): DKT AUC=0.7225, GDKT AUC=0.7052
+2026-11-07 13:27:20,833   Segment mid (n=98): DKT AUC=0.7193, GDKT AUC=0.7060
+2026-11-07 13:28:34,815   Segment high (n=84): DKT AUC=0.7337, GDKT AUC=0.7185
+2026-11-07 13:28:42,284 === Fold 3/5 (val: 268 users) ===
+2026-11-07 13:29:28,693   DKT: AUC=0.7147 (new-sub=0.6896), Acc=0.6529, P@5new=0.1351
+2026-11-07 13:31:25,529   Graph-DKT: AUC=0.7195 (new-sub=0.6888), Acc=0.6548, P@5new=0.1330
+2026-11-07 13:31:32,031   Segment low (n=90): DKT AUC=0.7096, GDKT AUC=0.7203
+2026-11-07 13:32:00,344   Segment mid (n=88): DKT AUC=0.7070, GDKT AUC=0.7156
+2026-11-07 13:33:18,191   Segment high (n=90): DKT AUC=0.7170, GDKT AUC=0.7202
+2026-11-07 13:33:25,923 === Fold 4/5 (val: 268 users) ===
+2026-11-07 13:34:15,793   DKT: AUC=0.7178 (new-sub=0.6996), Acc=0.6606, P@5new=0.1211
+2026-11-07 13:36:12,455   Graph-DKT: AUC=0.7159 (new-sub=0.6981), Acc=0.6574, P@5new=0.1195
+2026-11-07 13:36:18,670   Segment low (n=89): DKT AUC=0.6957, GDKT AUC=0.6937
+2026-11-07 13:36:43,645   Segment mid (n=80): DKT AUC=0.7095, GDKT AUC=0.7078
+2026-11-07 13:38:14,604   Segment high (n=99): DKT AUC=0.7201, GDKT AUC=0.7182
+2026-11-07 13:38:22,901 === Fold 5/5 (val: 268 users) ===
+2026-11-07 13:39:09,273   DKT: AUC=0.7241 (new-sub=0.7032), Acc=0.6566, P@5new=0.1285
+2026-11-07 13:41:01,211   Graph-DKT: AUC=0.7160 (new-sub=0.7037), Acc=0.6564, P@5new=0.1374
+2026-11-07 13:41:09,526   Segment low (n=96): DKT AUC=0.7086, GDKT AUC=0.7027
+2026-11-07 13:41:33,090   Segment mid (n=80): DKT AUC=0.7088, GDKT AUC=0.7007
+2026-11-07 13:42:53,346   Segment high (n=92): DKT AUC=0.7290, GDKT AUC=0.7207
+
+======================================================================
+AGGREGATE COMPARISON — Folds [0, 1, 2, 3, 4]
+======================================================================
+ Fold    DKT AUC   GDKT AUC      Delta    DKT New   GDKT New     ΔNew
+------------------------------------------------------------------------------
+    0     0.7258     0.7123    -0.0135     0.6931     0.6924  -0.0007
+    1     0.7300     0.7151    -0.0149     0.6893     0.6903  +0.0010
+    2     0.7147     0.7195    +0.0048     0.6896     0.6888  -0.0008
+    3     0.7178     0.7159    -0.0019     0.6996     0.6981  -0.0015
+    4     0.7241     0.7160    -0.0081     0.7032     0.7037  +0.0004
+------------------------------------------------------------------------------
+Mean ± Std     0.7225±0.0062     0.7158±0.0026    -0.0067     0.6950±0.0062     0.6947±0.0062  -0.0003
+==============================================================================
+
+===========================================================================
+ACTIVITY-LEVEL AGGREGATE (tertile split, averaged across folds)
+===========================================================================
+Group                         N      DKT AUC     GDKT AUC          Δ
+---------------------------------------------------------------------------
+Low (≤1065)           443   0.7118±0.0112   0.7061±0.0097    -0.0057
+Mid (1066-3665)       455   0.7123±0.0055   0.7065±0.0059    -0.0059
+High (>3665)          443   0.7258±0.0069   0.7187±0.0019    -0.0071
+===========================================================================
+
+==================================================================================================================================
+RANKING METRICS (averaged across folds)
+==================================================================================================================================
+Metric      DKT@K=1       GDKT@K=1       Rule@K=1       Δ@K=1       DKT@K=3       GDKT@K=3       Rule@K=3       Δ@K=3       DKT@K=5       GDKT@K=5       Rule@K=5       Δ@K=5       DKT@K=10      GDKT@K=10      Rule@K=10      Δ@K=10
+----------------------------------------------------------------------------------------------------------------------------------
+P@K             0.0753      0.0758      0.1415     +0.0005      0.2007      0.2025      0.3591     +0.0018      0.2901      0.2893      0.5117     -0.0008      0.4593      0.4593      0.7673     -0.0001
+N@K             0.0753      0.0758      0.1415     +0.0005      0.1470      0.1484      0.2664     +0.0014      0.1837      0.1840      0.3290     +0.0003      0.2379      0.2384      0.4117     +0.0005
+==================================================================================================================================
+
+==================================================================================================================================
+RANKING METRICS — NEW-SUBMISSION PAIRS ONLY (no same-submission copy leak)
+==================================================================================================================================
+Metric      DKT@K=1       GDKT@K=1       Rule@K=1       Δ@K=1       DKT@K=3       GDKT@K=3       Rule@K=3       Δ@K=3       DKT@K=5       GDKT@K=5       Rule@K=5       Δ@K=5       DKT@K=10      GDKT@K=10      Rule@K=10      Δ@K=10
+----------------------------------------------------------------------------------------------------------------------------------
+P@K             0.0188      0.0185      0.0930     -0.0004      0.0692      0.0684      0.2619     -0.0009      0.1300      0.1298      0.4817     -0.0001      0.3129      0.3156      0.8129     +0.0027
+N@K             0.0188      0.0185      0.0930     -0.0004      0.0472      0.0465      0.1860     -0.0007      0.0719      0.0716      0.2760     -0.0004      0.1301      0.1306      0.3839     +0.0005
+==================================================================================================================================
+
+==========================================================================================
+PER-TOPIC AUC (averaged across folds)
+==========================================================================================
+Topic                            DKT       GDKT      Delta  Depth
+------------------------------------------------------------------------------------------
+backtracking                  0.0000     0.0000    +0.0000      6
+binary_search                 0.7005     0.7000    -0.0005      2
+bitmasks                      0.7182     0.7213    +0.0031      2
+brute_force                   0.7266     0.7277    +0.0011      1
+combinatorics                 0.7494     0.7503    +0.0009      3
+constructive_algorithms       0.7151     0.7145    -0.0006      2
+data_structures               0.8175     0.8102    -0.0072      3
+dfs_and_similar               0.8028     0.7858    -0.0170      5
+divide_and_conquer            0.8856     0.8912    +0.0056      3
+dp                            0.8426     0.8136    -0.0290      6
+dp_on_trees                   0.0000     0.0000    +0.0000      7
+dsu                           0.8887     0.8886    -0.0000      5
+flows                         0.7285     0.7124    -0.0160      6
+geometry                      0.8058     0.7961    -0.0097      2
+graphs                        0.8826     0.8769    -0.0057      4
+greedy                        0.6220     0.6133    -0.0087      2
+hashing                       0.8589     0.8653    +0.0064      2
+implementation                0.7582     0.7465    -0.0117      0
+math                          0.7184     0.7005    -0.0179      1
+matrices                      0.5836     0.6250    +0.0414      7
+number_theory                 0.8359     0.8378    +0.0019      2
+prefix_sum                    0.0000     0.0000    +0.0000      1
+shortest_paths                0.8720     0.8231    -0.0489      5
+sliding_window                0.0000     0.0000    +0.0000      3
+sortings                      0.7421     0.7580    +0.0159      1
+string_algorithms             0.7172     0.7655    +0.0482      7
+strings                       0.6870     0.6843    -0.0026      1
+trees                         0.8079     0.7960    -0.0119      4
+two_pointers                  0.7891     0.7881    -0.0010      2
+==========================================================================================
+
+======================================================================
+DEEP TOPICS (depth >= 4) — where the graph should help most
+======================================================================
+  backtracking              DKT=0.0000  GDKT=0.0000  Δ=+0.0000
+  dfs_and_similar           DKT=0.8028  GDKT=0.7858  Δ=-0.0170
+  dp                        DKT=0.8426  GDKT=0.8136  Δ=-0.0290
+  dp_on_trees               DKT=0.0000  GDKT=0.0000  Δ=+0.0000
+  dsu                       DKT=0.8887  GDKT=0.8886  Δ=-0.0000
+  flows                     DKT=0.7285  GDKT=0.7124  Δ=-0.0160
+  graphs                    DKT=0.8826  GDKT=0.8769  Δ=-0.0057
+  matrices                  DKT=0.5836  GDKT=0.6250  Δ=+0.0414
+  shortest_paths            DKT=0.8720  GDKT=0.8231  Δ=-0.0489
+  string_algorithms         DKT=0.7172  GDKT=0.7655  Δ=+0.0482
+  trees                     DKT=0.8079  GDKT=0.7960  Δ=-0.0119
+
+======================================================================
+SHALLOW TOPICS (depth <= 2) — baseline comparison
+======================================================================
+  binary_search             DKT=0.7005  GDKT=0.7000  Δ=-0.0005
+  bitmasks                  DKT=0.7182  GDKT=0.7213  Δ=+0.0031
+  brute_force               DKT=0.7266  GDKT=0.7277  Δ=+0.0011
+  constructive_algorithms   DKT=0.7151  GDKT=0.7145  Δ=-0.0006
+  geometry                  DKT=0.8058  GDKT=0.7961  Δ=-0.0097
+  greedy                    DKT=0.6220  GDKT=0.6133  Δ=-0.0087
+  hashing                   DKT=0.8589  GDKT=0.8653  Δ=+0.0064
+  implementation            DKT=0.7582  GDKT=0.7465  Δ=-0.0117
+  math                      DKT=0.7184  GDKT=0.7005  Δ=-0.0179
+  number_theory             DKT=0.8359  GDKT=0.8378  Δ=+0.0019
+  prefix_sum                DKT=0.0000  GDKT=0.0000  Δ=+0.0000
+  sortings                  DKT=0.7421  GDKT=0.7580  Δ=+0.0159
+  strings                   DKT=0.6870  GDKT=0.6843  Δ=-0.0026
+  two_pointers              DKT=0.7891  GDKT=0.7881  Δ=-0.0010
+======================================================================
+
+>>> COPY THE TABLES ABOVE OUT OF THIS LOG — results.zip is weights-only <<<
